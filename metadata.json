@@ -1,0 +1,7 @@
+{
+  "name": "EchoCoach - English Pronunciation Master",
+  "description": "An AI-powered English pronunciation assistant. Enter text to hear native AI pronunciation, record your own voice, and get detailed feedback on accuracy and intonation.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
