@@ -157,7 +157,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
   const mapTokens = rawTokens.length === words.length ? rawTokens : buildFallbackTokens(words);
 
   return (
-    <div className={`bg-white rounded-[3rem] shadow-2xl border border-slate-100 p-6 md:p-8 space-y-8 animate-fade-in-up relative transition-all duration-500 ${isUpdating ? 'opacity-50 scale-[0.97] blur-[1px]' : 'opacity-100 scale-100'}`}>
+    <div className={`bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 p-5 md:p-6 space-y-6 animate-fade-in-up relative transition-all duration-500 ${isUpdating ? 'opacity-50 scale-[0.97] blur-[1px]' : 'opacity-100 scale-100'}`}>
       <style>{`
         @keyframes symbol-pop {
           0%, 100% { transform: translateY(0) scale(1); filter: brightness(1.1); }
@@ -168,15 +168,17 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
 
       {/* Header Info */}
       <div className="flex flex-col sm:flex-row gap-6 items-center">
-        <div className="flex items-center gap-6 flex-1 w-full">
-           <ScoreRing score={result.score} />
-           <div className="flex-1 bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100 relative min-h-[64px] flex items-center shadow-inner">
-             <div className="absolute -top-3 left-6 bg-indigo-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase shadow-lg ring-4 ring-white">Expert Advice</div>
-             <p className="text-slate-600 text-[13px] leading-relaxed font-bold italic">
-               {result.overallComment || "正在生成你的发音报告..."}
-             </p>
-           </div>
-        </div>
+        {result.overallComment && result.score > 0 && (
+          <div className="flex items-center gap-6 flex-1 w-full">
+            <ScoreRing score={result.score} />
+            <div className="flex-1 bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100 relative min-h-[64px] flex items-center shadow-inner">
+              <div className="absolute -top-3 left-6 bg-indigo-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase shadow-lg ring-4 ring-white">Expert Advice</div>
+              <p className="text-slate-600 text-[13px] leading-relaxed font-bold italic">
+                {result.overallComment}
+              </p>
+            </div>
+          </div>
+        )}
         <div className="flex flex-row sm:flex-col gap-3 shrink-0 items-center sm:items-end w-full sm:w-auto justify-between sm:justify-center">
            <button onClick={onPlayUserRecording} className="text-[11px] font-black text-slate-400 hover:text-indigo-600 uppercase tracking-widest transition-all hover:scale-105">Replay Mine</button>
            <div className="flex gap-2">
@@ -187,67 +189,91 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
       </div>
 
       {/* Analysis Display */}
-      <div 
-        className="analysis-box bg-slate-900 rounded-[2rem] p-6 md:p-8 shadow-2xl relative border-4 border-slate-800/50 min-h-[240px] overflow-hidden group" 
+      <div
+        className="analysis-box bg-slate-900 rounded-[1.5rem] p-5 md:p-6 shadow-2xl relative border-4 border-slate-800/50 min-h-[180px] overflow-hidden group"
         onMouseUp={handleMouseUp}
       >
           <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/10 to-transparent pointer-events-none transition-opacity duration-1000 group-hover:opacity-20"></div>
-          
-          <div className="flex flex-col items-center w-full z-10 pb-16">
+
+          <div className="flex flex-col items-center w-full z-10 pb-12">
             {/* Phonics at top */}
             {result.fullLinkedPhonetic && (
-              <div className="mb-6 px-6 py-2 bg-white/5 rounded-full border border-white/10 backdrop-blur-xl shadow-lg">
-                <p className="text-[12px] md:text-[14px] font-bold text-slate-400 tracking-[0.4em] font-mono select-none pointer-events-none text-center">
+              <div className="mb-4 px-5 py-1.5 bg-white/5 rounded-full border border-white/10 backdrop-blur-xl shadow-lg">
+                <p className="text-[11px] md:text-[13px] font-bold text-slate-400 tracking-[0.35em] font-mono select-none pointer-events-none text-center">
                   /{result.fullLinkedPhonetic}/
                 </p>
               </div>
             )}
 
-            <div className="flex flex-wrap justify-center gap-x-2 md:gap-x-3 gap-y-2 select-text w-full">
-              {words.map((word, i) => (
-                <div key={i} className="flex flex-col items-center min-w-fit group/word transition-transform duration-300 hover:scale-105">
-                  <span className="text-white text-lg md:text-xl font-black leading-none mb-1 break-words text-center tracking-tight transition-all group-hover/word:text-indigo-300 drop-shadow-[0_3px_10px_rgba(0,0,0,0.4)] relative">
-                    {word.split('‿').map((part, idx, arr) => (
-                      <React.Fragment key={idx}>
-                        {part}
-                        {idx < arr.length - 1 && (
-                          <span className="text-indigo-400 font-black mx-1 opacity-80 animate-pulse">‿</span>
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </span>
-                  
-                  {/* Symbols exactly under the word/phrase */}
-                  <div className="h-7 flex items-start justify-center select-none pointer-events-none mt-0.5">
-                    <SymbolSpan
-                      token={mapTokens[i]}
-                      isLast={i === words.length - 1}
-                      firstWord={words[0]}
-                    />
+            <div className="flex flex-wrap justify-center gap-x-2 md:gap-x-3 gap-y-2 w-full">
+              {words.map((word, i) => {
+                // Clean word for pronunciation (remove punctuation and linking symbols)
+                const cleanWord = word.replace(/[‿?.!,;]/g, '').trim();
+                const isPlaying = playingWord === cleanWord || (isPlayingTutor && selectedText === cleanWord);
+
+                return (
+                  <div
+                    key={i}
+                    className="flex flex-col items-center min-w-fit group/word transition-all duration-200"
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (cleanWord) {
+                          onPlayTutor(cleanWord);
+                        }
+                      }}
+                      className={`text-white text-lg md:text-xl font-black leading-none mb-1 break-words text-center tracking-tight transition-all drop-shadow-[0_3px_10px_rgba(0,0,0,0.4)] relative cursor-pointer
+                        ${isPlaying
+                          ? 'text-emerald-400 scale-110 animate-pulse'
+                          : 'hover:text-indigo-300 hover:scale-110 active:scale-95'
+                        }`}
+                      title={`Click to hear: "${cleanWord}"`}
+                    >
+                      {word.split('‿').map((part, idx, arr) => (
+                        <React.Fragment key={idx}>
+                          {part}
+                          {idx < arr.length - 1 && (
+                            <span className="text-indigo-400 font-black mx-1 opacity-80 animate-pulse pointer-events-none">‿</span>
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </button>
+
+                    {/* Symbols exactly under the word/phrase */}
+                    <div className="h-7 flex items-start justify-center select-none pointer-events-none mt-0.5">
+                      <SymbolSpan
+                        token={mapTokens[i]}
+                        isLast={i === words.length - 1}
+                        firstWord={words[0]}
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
           {/* Tutorial UI for selections */}
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-full flex justify-center pointer-events-none px-10 z-20">
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full flex justify-center pointer-events-none px-10 z-20">
              {selectedText ? (
                <button
                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onPlayTutor(selectedText); }}
-                 className={`pointer-events-auto bg-indigo-600/95 backdrop-blur-xl text-white px-6 h-11 rounded-full text-[11px] font-bold uppercase tracking-[0.12em] shadow-[0_8px_24px_rgba(79,70,229,0.5)] flex items-center gap-2 hover:bg-indigo-500 border border-white/30 active:scale-95 transition-all`}
+                 className={`pointer-events-auto bg-indigo-600/95 backdrop-blur-xl text-white px-4 h-8 rounded-full text-[9px] font-bold uppercase tracking-[0.1em] shadow-[0_4px_16px_rgba(79,70,229,0.4)] flex items-center gap-1.5 hover:bg-indigo-500 border border-white/30 active:scale-95 transition-all`}
                >
                  {isTutorLoading ? (
-                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                   <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                  ) : (
-                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                   <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
                  )}
-                 {isTutorLoading ? "Cooking Audio..." : isPlayingTutor ? "Playing Coach..." : `Pronounce: "${selectedText.length > 20 ? selectedText.slice(0, 20) + '...' : selectedText}"`}
+                 {isTutorLoading ? "Loading..." : isPlayingTutor ? "Playing..." : `"${selectedText.length > 15 ? selectedText.slice(0, 15) + '...' : selectedText}"`}
                </button>
              ) : (
-               <div className="flex flex-col items-center gap-3 opacity-20 transition-opacity hover:opacity-40">
-                 <p className="text-[11px] font-black text-white uppercase tracking-[0.6em] select-none text-center">Drag-select words to hear specific coaching</p>
-                 <div className="w-32 h-1 bg-gradient-to-r from-transparent via-white/60 to-transparent rounded-full"></div>
+               <div className="flex flex-col items-center gap-1.5 opacity-20 transition-opacity hover:opacity-40">
+                 <p className="text-[9px] font-black text-white uppercase tracking-[0.4em] select-none text-center">Click word to hear</p>
+                 <p className="text-[8px] font-bold text-white/50 tracking-[0.2em] select-none text-center">Or drag for phrases</p>
+                 <div className="w-24 h-0.5 bg-gradient-to-r from-transparent via-white/50 to-transparent rounded-full"></div>
                </div>
              )}
           </div>

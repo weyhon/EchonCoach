@@ -5,6 +5,7 @@ import { FeedbackCard } from './components/FeedbackCard';
 import { HistoryList } from './components/HistoryList';
 import { generateSpeech, analyzePronunciation, getLinkingAnalysisForText, generateTutorAudio } from './services/geminiService';
 import { playBase64Audio, speakWithWebSpeech } from './services/audioUtils';
+import { shouldLink, isFunctionWord } from './services/linkingUtils';
 import { AnalysisResult, AppState, HistoryItem } from './types';
 
 const ttsCache = new Map<string, string>();
@@ -201,17 +202,6 @@ const App: React.FC = () => {
       }
 
       // Smart fallback for linking analysis (should never be needed as geminiService has its own fallback)
-      const FUNCTION_WORDS = new Set([
-        'a', 'an', 'the', 'to', 'of', 'in', 'on', 'at', 'by', 'for', 'with', 'from',
-        'is', 'am', 'are', 'was', 'were', 'be', 'been', 'being',
-        'do', 'does', 'did', 'have', 'has', 'had',
-        'can', 'could', 'will', 'would', 'shall', 'should', 'may', 'might', 'must',
-        'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them',
-        'my', 'your', 'his', 'her', 'its', 'our', 'their',
-        'this', 'that', 'these', 'those',
-        'and', 'or', 'but', 'so', 'if', 'as', 'than', 'into', 'onto', 'up', 'never', 'use', 'someone', 'else'
-      ]);
-
       const linking = linkingResult.status === 'fulfilled'
         ? linkingResult.value
         : (() => {
@@ -219,20 +209,21 @@ const App: React.FC = () => {
             const words = textToSpeak.trim().split(/\s+/);
             const hasQuestion = textToSpeak.includes('?');
             const tokens = words.map(w => w.replace(/[?.!,;]/g, '').toLowerCase());
+
+            // Use pronunciation-based function word detection
             const intonationTokens = tokens.map((token, i) => {
               const isLast = i === tokens.length - 1;
-              const isFunction = FUNCTION_WORDS.has(token);
+              const isFunction = isFunctionWord(token);
               if (isLast) return (isFunction ? '·' : '●') + (hasQuestion ? '↗' : '↘');
               return isFunction ? '·' : '●';
             });
 
+            // Use pronunciation-based linking detection
             let linkedSentence = '';
             for (let i = 0; i < words.length; i++) {
               linkedSentence += words[i];
               if (i < words.length - 1) {
-                const currentEndsWithConsonant = /[bcdfghjklmnpqrstvwxyz]$/i.test(words[i].replace(/[?.!,;]/g, ''));
-                const nextStartsWithVowel = /^[aeiou]/i.test(words[i + 1]);
-                linkedSentence += currentEndsWithConsonant && nextStartsWithVowel ? '‿' : ' ';
+                linkedSentence += shouldLink(words[i], words[i + 1]) ? '‿' : ' ';
               }
             }
 
@@ -248,7 +239,7 @@ const App: React.FC = () => {
       
       const res: AnalysisResult = {
         score: 0,
-        overallComment: "标注已准备就绪。点击下方录音按钮，开始你的发音挑战吧！",
+        overallComment: "",
         speechScript: textToSpeak,
         wordBreakdown: [],
         fullLinkedSentence: linking.fullLinkedSentence,
@@ -321,7 +312,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20 px-4 selection:bg-indigo-100 font-sans antialiased">
+    <div className="min-h-screen bg-slate-50 pb-20 selection:bg-indigo-100 font-sans antialiased">
       {/* Error Toast */}
       {error && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
@@ -339,17 +330,20 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <header className="max-w-2xl mx-auto py-10 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-black shadow-xl shadow-indigo-100 transform -rotate-3 transition-transform hover:rotate-0">E</div>
-          <div>
-            <h1 className="font-black text-2xl tracking-tighter text-slate-800 leading-none">EchoCoach</h1>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Pronunciation Mastery</p>
-          </div>
-        </div>
-      </header>
+      <div className="flex">
+        {/* Main Content Area */}
+        <div className="flex-1 px-4">
+          <header className="max-w-2xl mx-auto py-10 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-black shadow-xl shadow-indigo-100 transform -rotate-3 transition-transform hover:rotate-0">E</div>
+              <div>
+                <h1 className="font-black text-2xl tracking-tighter text-slate-800 leading-none">EchoCoach</h1>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Pronunciation Mastery</p>
+              </div>
+            </div>
+          </header>
 
-      <main className="max-w-2xl mx-auto space-y-10">
+          <main className="max-w-2xl mx-auto space-y-10 pb-10">
         <section className="bg-white p-8 rounded-[3rem] shadow-2xl shadow-slate-200/60 border border-slate-100 flex flex-col gap-8 transition-all hover:shadow-indigo-100/40">
           <textarea 
             value={text} 
@@ -396,57 +390,62 @@ const App: React.FC = () => {
             }}
           />
         )}
-        
-        <HistoryList
-          history={history}
-          onSelect={async (t) => {
-            setText(t);
-            const item = history.find(h => h.text.trim().toLowerCase() === t.trim().toLowerCase());
+          </main>
+        </div>
 
-            if (item?.result) {
-              // Check if the result has valid intonationMap
-              const wordCount = (item.result.fullLinkedSentence || item.result.speechScript || "").trim().split(/\s+/).length;
-              const tokenCount = (item.result.intonationMap || "").trim().split(/\s+/).filter(Boolean).length;
+        {/* Right Sidebar - History */}
+        <aside className="w-96 h-screen sticky top-0 overflow-y-auto bg-white border-l border-slate-200 px-6 py-10">
+          <HistoryList
+            history={history}
+            onSelect={async (t) => {
+              setText(t);
+              const item = history.find(h => h.text.trim().toLowerCase() === t.trim().toLowerCase());
 
-              if (!item.result.intonationMap || tokenCount !== wordCount || tokenCount === 0) {
-                console.warn("⚠️ History data incomplete, regenerating...");
-                // Regenerate linking analysis for old data
-                try {
-                  const linking = await getLinkingAnalysisForText(t);
-                  const fixedResult = {
-                    ...item.result,
-                    fullLinkedSentence: linking.fullLinkedSentence,
-                    fullLinkedPhonetic: linking.fullLinkedPhonetic,
-                    intonationMap: linking.intonationMap
-                  };
-                  setResult(fixedResult);
-                  // Update cache and history
-                  analysisCache.set(t, fixedResult);
-                  const newHistory = history.map(h =>
-                    h.text.trim().toLowerCase() === t.trim().toLowerCase()
-                      ? { ...h, result: fixedResult }
-                      : h
-                  );
-                  setHistory(newHistory);
-                  localStorage.setItem('echocoach_history_v3', JSON.stringify(newHistory));
-                  console.log("✅ History data fixed");
-                } catch (e) {
-                  console.error("Failed to fix history data:", e);
-                  setResult(item.result); // Use original even if incomplete
+              if (item?.result) {
+                // Check if the result has valid intonationMap
+                const wordCount = (item.result.fullLinkedSentence || item.result.speechScript || "").trim().split(/\s+/).length;
+                const tokenCount = (item.result.intonationMap || "").trim().split(/\s+/).filter(Boolean).length;
+
+                if (!item.result.intonationMap || tokenCount !== wordCount || tokenCount === 0) {
+                  console.warn("⚠️ History data incomplete, regenerating...");
+                  // Regenerate linking analysis for old data
+                  try {
+                    const linking = await getLinkingAnalysisForText(t);
+                    const fixedResult = {
+                      ...item.result,
+                      fullLinkedSentence: linking.fullLinkedSentence,
+                      fullLinkedPhonetic: linking.fullLinkedPhonetic,
+                      intonationMap: linking.intonationMap
+                    };
+                    setResult(fixedResult);
+                    // Update cache and history
+                    analysisCache.set(t, fixedResult);
+                    const newHistory = history.map(h =>
+                      h.text.trim().toLowerCase() === t.trim().toLowerCase()
+                        ? { ...h, result: fixedResult }
+                        : h
+                    );
+                    setHistory(newHistory);
+                    localStorage.setItem('echocoach_history_v3', JSON.stringify(newHistory));
+                    console.log("✅ History data fixed");
+                  } catch (e) {
+                    console.error("Failed to fix history data:", e);
+                    setResult(item.result); // Use original even if incomplete
+                  }
+                } else {
+                  setResult(item.result);
                 }
-              } else {
-                setResult(item.result);
               }
-            }
-          }} 
-          onClear={() => {
-            if(confirm("确定清空练习历史吗？")) {
-              setHistory([]);
-              localStorage.removeItem('echocoach_history_v3');
-            }
-          }} 
-        />
-      </main>
+            }}
+            onClear={() => {
+              if(confirm("确定清空练习历史吗？")) {
+                setHistory([]);
+                localStorage.removeItem('echocoach_history_v3');
+              }
+            }}
+          />
+        </aside>
+      </div>
     </div>
   );
 };

@@ -27,9 +27,9 @@ export const HistoryList: React.FC<HistoryListProps> = ({ history, onSelect, onC
   if (history.length === 0) return null;
 
   return (
-    <div className="space-y-3 animate-fade-in pt-6 border-t border-slate-200">
-      <div className="flex items-center justify-between px-1">
-        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Recent Practice</h3>
+    <div className="space-y-4 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <h3 className="text-[11px] font-black text-slate-600 uppercase tracking-widest">Recent Practice</h3>
         <button 
           onClick={onClear}
           className="text-[9px] font-black text-slate-300 hover:text-red-500 uppercase transition-colors"

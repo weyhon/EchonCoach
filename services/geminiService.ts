@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Modality } from "@google/genai";
 import { AnalysisResult } from "../types";
+import { shouldLink, isFunctionWord } from "./linkingUtils";
 
 const getApiKey = (): string => {
   const key = import.meta.env.VITE_API_KEY;
@@ -133,10 +134,10 @@ const generateSmartFallback = (text: string): any => {
   const words = text.split(/\s+/);
   const tokens = words.map(w => w.replace(/[?.!,;]/g, ''));
 
-  // Generate intonation map
+  // Generate intonation map using improved function word detection
   const intonationTokens = tokens.map((token, i) => {
     const isLast = i === tokens.length - 1;
-    const isFunction = FUNCTION_WORDS.has(token.toLowerCase());
+    const isFunction = isFunctionWord(token);
 
     if (isLast) {
       // Last word: add intonation direction
@@ -146,14 +147,13 @@ const generateSmartFallback = (text: string): any => {
     return isFunction ? '·' : '●';
   });
 
-  // Generate linked sentence with connecting marks
+  // Generate linked sentence with pronunciation-based linking detection
   let linkedSentence = '';
   for (let i = 0; i < words.length; i++) {
     linkedSentence += words[i];
     if (i < words.length - 1) {
-      const currentEndsWithConsonant = /[bcdfghjklmnpqrstvwxyz]$/i.test(words[i].replace(/[?.!,;]/g, ''));
-      const nextStartsWithVowel = /^[aeiou]/i.test(words[i + 1]);
-      if (currentEndsWithConsonant && nextStartsWithVowel) {
+      // Use pronunciation-based linking detection
+      if (shouldLink(words[i], words[i + 1])) {
         linkedSentence += '‿';
       } else {
         linkedSentence += ' ';

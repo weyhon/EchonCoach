@@ -25,6 +25,44 @@ export const base64ToUint8Array = (base64: string): Uint8Array => {
   return bytes;
 };
 
+// Global audio management - prevent overlapping playback
+let currentAudio: HTMLAudioElement | null = null;
+let currentAudioSource: AudioBufferSourceNode | null = null;
+let currentAudioContext: AudioContext | null = null;
+
+// Stop any currently playing audio
+const stopCurrentAudio = () => {
+  if (currentAudio) {
+    try {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      currentAudio.src = '';
+      currentAudio = null;
+    } catch (e) {
+      console.warn("Error stopping audio:", e);
+    }
+  }
+
+  if (currentAudioSource) {
+    try {
+      currentAudioSource.stop();
+      currentAudioSource.disconnect();
+      currentAudioSource = null;
+    } catch (e) {
+      console.warn("Error stopping audio source:", e);
+    }
+  }
+
+  if (currentAudioContext) {
+    try {
+      currentAudioContext.close();
+      currentAudioContext = null;
+    } catch (e) {
+      console.warn("Error closing audio context:", e);
+    }
+  }
+};
+
 export const decodePCM = (
   base64String: string,
   audioContext: AudioContext,
@@ -60,11 +98,15 @@ export const playBase64Audio = async (
 ): Promise<void> => {
   return new Promise(async (resolve, reject) => {
     try {
+      // CRITICAL: Stop any currently playing audio first to prevent echo
+      stopCurrentAudio();
+
       // 尝试作为 MP3 播放（MiniMax）
       const dataUrl = `data:${mimeType};base64,${base64Audio}`;
       console.log("Playing audio, dataUrl length:", dataUrl.length);
 
       const audio = new Audio(dataUrl);
+      currentAudio = audio; // Track current audio
       let playbackStarted = false;
 
       audio.oncanplay = () => {
@@ -74,11 +116,13 @@ export const playBase64Audio = async (
 
       audio.onended = () => {
         console.log("Audio playback ended");
+        currentAudio = null;
         resolve();
       };
 
       audio.onerror = async (e) => {
         console.warn("MP3 playback failed, trying PCM format:", e);
+        currentAudio = null;
 
         // 如果 MP3 播放失败，尝试作为 PCM 播放（Gemini）
         try {
@@ -96,6 +140,7 @@ export const playBase64Audio = async (
           .then(() => console.log("Audio play started"))
           .catch(async (err) => {
             console.warn("Audio play failed, trying PCM:", err);
+            currentAudio = null;
             // 尝试 PCM 播放
             try {
               await playPCMAudio(base64Audio);
@@ -107,6 +152,7 @@ export const playBase64Audio = async (
       }
     } catch (error) {
       console.error("playBase64Audio error:", error);
+      currentAudio = null;
       reject(error);
     }
   });
@@ -116,17 +162,24 @@ export const playBase64Audio = async (
 export const playPCMAudio = async (base64Audio: string): Promise<void> => {
   return new Promise((resolve, reject) => {
     try {
+      // CRITICAL: Stop any currently playing audio first to prevent echo
+      stopCurrentAudio();
+
       console.log("Playing PCM audio");
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
       const audioContext = new AudioContext();
+      currentAudioContext = audioContext;
 
       const pcmBuffer = decodePCM(base64Audio, audioContext, 24000);
       const source = audioContext.createBufferSource();
+      currentAudioSource = source; // Track current source
       source.buffer = pcmBuffer;
       source.connect(audioContext.destination);
 
       source.onended = () => {
         console.log("PCM playback ended");
+        currentAudioSource = null;
+        currentAudioContext = null;
         audioContext.close();
         resolve();
       };
@@ -134,6 +187,8 @@ export const playPCMAudio = async (base64Audio: string): Promise<void> => {
       source.start(0);
     } catch (error) {
       console.error("PCM playback error:", error);
+      currentAudioSource = null;
+      currentAudioContext = null;
       reject(error);
     }
   });
@@ -143,8 +198,15 @@ export const playPCMAudio = async (base64Audio: string): Promise<void> => {
 export const speakWithWebSpeech = async (text: string, rate: number = 1): Promise<void> => {
   return new Promise((resolve, reject) => {
     try {
+      // Stop any audio/PCM playback before using Web Speech
+      stopCurrentAudio();
+
       const synth = window.speechSynthesis;
       if (!synth) throw new Error("当前浏览器不支持语音合成");
+
+      // Cancel any ongoing speech
+      synth.cancel();
+
       const utter = new SpeechSynthesisUtterance(text);
       utter.lang = 'en-US';
       utter.rate = rate;
