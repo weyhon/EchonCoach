@@ -36,29 +36,58 @@ const ScoreRing: React.FC<{ score: number }> = ({ score = 0 }) => {
   );
 };
 
-const SymbolSpan: React.FC<{ token: string }> = ({ token }) => {
-  if (!token) return null;
-  const chars = Array.from(token);
-  
+interface SymbolSpanProps {
+  token?: string;
+  isLast?: boolean;
+  firstWord?: string;
+}
+
+const SymbolSpan: React.FC<SymbolSpanProps> = ({ token, isLast, firstWord }) => {
+  // 确定显示什么符号
+  let stressSymbol: string | null = null;
+  let toneSymbol: string | null = null;
+
+  if (token && token.trim()) {
+    // 更宽松的解析：检查字符是否存在
+    const t = token.trim();
+    if (t.includes('●')) stressSymbol = '●';
+    else if (t.includes('·')) stressSymbol = '·';
+
+    if (t.includes('↗')) toneSymbol = '↗';
+    else if (t.includes('↘')) toneSymbol = '↘';
+  }
+
+  // 如果没有提供符号，使用默认值
+  if (!stressSymbol && !toneSymbol) {
+    if (isLast) {
+      // 最后一个词：根据句首词判断是疑问句还是陈述句
+      const isQuestion = firstWord?.toLowerCase().match(/^(do|does|did|is|are|am|can|could|will|would|have|has|had|isn't|can't|couldn't|won't|wouldn't|haven't|hasn't|didn't|aren't)/);
+      stressSymbol = isQuestion ? '·' : '●';
+      toneSymbol = isQuestion ? '↗' : '↘';
+    } else {
+      // 非最后一个词：默认弱读
+      stressSymbol = '·';
+    }
+  }
+
   return (
-    <div className="flex gap-2 items-center justify-center pt-3">
-      {chars.map((char, i) => {
-        switch (char) {
-          case '●': return <span key={i} className="text-indigo-400 font-black text-[18px] drop-shadow-[0_0_5px_rgba(129,140,248,0.8)]">●</span>;
-          case '·': return <span key={i} className="text-slate-500 font-bold text-[14px] opacity-30">·</span>;
-          case '↗': return (
-            <span key={i} className="text-orange-500 font-black text-[38px] leading-[0.5] drop-shadow-[0_0_20px_rgba(249,115,22,0.9)] animate-symbol-pop">
-              ↗
-            </span>
-          );
-          case '↘': return (
-            <span key={i} className="text-sky-500 font-black text-[38px] leading-[0.5] drop-shadow-[0_0_20px_rgba(14,165,233,0.9)] animate-symbol-pop">
-              ↘
-            </span>
-          );
-          default: return null;
-        }
-      })}
+    <div className="flex flex-col items-center justify-start gap-0">
+      {/* 语调符号 - 精致小巧 */}
+      {toneSymbol && (
+        <span className={`font-black text-[20px] leading-none drop-shadow-lg animate-symbol-pop ${
+          toneSymbol === '↗' ? 'text-orange-400 drop-shadow-[0_0_12px_rgba(251,146,60,0.8)]' : 'text-sky-400 drop-shadow-[0_0_12px_rgba(56,189,248,0.8)]'
+        }`}>
+          {toneSymbol}
+        </span>
+      )}
+      {/* 重读符号 */}
+      {stressSymbol && (
+        <span className={`font-black text-[10px] ${
+          stressSymbol === '●' ? 'text-indigo-400 drop-shadow-[0_0_6px_rgba(129,140,248,0.8)]' : 'text-slate-500 opacity-40'
+        }`}>
+          {stressSymbol}
+        </span>
+      )}
     </div>
   );
 };
@@ -89,7 +118,43 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
   };
 
   const words = (result.fullLinkedSentence || result.speechScript || "").trim().split(/\s+/);
-  const mapTokens = (result.intonationMap || "").trim().split(/\s+/);
+
+  // Smart fallback with function word detection
+  const FUNCTION_WORDS = new Set([
+    'a', 'an', 'the', 'to', 'of', 'in', 'on', 'at', 'by', 'for', 'with', 'from',
+    'is', 'am', 'are', 'was', 'were', 'be', 'been', 'being',
+    'do', 'does', 'did', 'have', 'has', 'had',
+    'can', 'could', 'will', 'would', 'shall', 'should', 'may', 'might', 'must',
+    'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them',
+    'my', 'your', 'his', 'her', 'its', 'our', 'their',
+    'this', 'that', 'these', 'those',
+    'and', 'or', 'but', 'so', 'if', 'as', 'than', 'into', 'onto', 'up'
+  ]);
+
+  const buildFallbackTokens = (ws: string[]) => {
+    if (ws.length === 0) return [];
+    const hasQuestion = (result.fullLinkedSentence || result.speechScript || "").includes('?');
+
+    return ws.map((word, i) => {
+      const cleanWord = word.replace(/[?.!,;‿]/g, '').toLowerCase();
+      const isFunction = FUNCTION_WORDS.has(cleanWord);
+      const isLast = i === ws.length - 1;
+
+      if (isLast) {
+        return (isFunction ? '·' : '●') + (hasQuestion ? '↗' : '↘');
+      }
+      return isFunction ? '·' : '●';
+    });
+  };
+
+  const rawTokens = (result.intonationMap || "").trim().split(/\s+/).filter(Boolean);
+  console.log("🎯 FeedbackCard token matching:", {
+    words: words.length,
+    rawTokens: rawTokens.length,
+    usingFallback: rawTokens.length !== words.length,
+    result: result.intonationMap
+  });
+  const mapTokens = rawTokens.length === words.length ? rawTokens : buildFallbackTokens(words);
 
   return (
     <div className={`bg-white rounded-[3rem] shadow-2xl border border-slate-100 p-6 md:p-8 space-y-8 animate-fade-in-up relative transition-all duration-500 ${isUpdating ? 'opacity-50 scale-[0.97] blur-[1px]' : 'opacity-100 scale-100'}`}>
@@ -123,25 +188,25 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
 
       {/* Analysis Display */}
       <div 
-        className="analysis-box bg-slate-900 rounded-[3rem] p-10 md:p-14 shadow-2xl relative border-8 border-slate-800/50 min-h-[380px] overflow-hidden group" 
+        className="analysis-box bg-slate-900 rounded-[2rem] p-6 md:p-8 shadow-2xl relative border-4 border-slate-800/50 min-h-[240px] overflow-hidden group" 
         onMouseUp={handleMouseUp}
       >
           <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/10 to-transparent pointer-events-none transition-opacity duration-1000 group-hover:opacity-20"></div>
           
-          <div className="flex flex-col items-center w-full z-10 pb-28">
+          <div className="flex flex-col items-center w-full z-10 pb-16">
             {/* Phonics at top */}
             {result.fullLinkedPhonetic && (
-              <div className="mb-14 px-8 py-3 bg-white/5 rounded-full border border-white/10 backdrop-blur-xl shadow-2xl">
-                <p className="text-[13px] md:text-[16px] font-bold text-slate-400 tracking-[0.6em] font-mono select-none pointer-events-none text-center">
+              <div className="mb-6 px-6 py-2 bg-white/5 rounded-full border border-white/10 backdrop-blur-xl shadow-lg">
+                <p className="text-[12px] md:text-[14px] font-bold text-slate-400 tracking-[0.4em] font-mono select-none pointer-events-none text-center">
                   /{result.fullLinkedPhonetic}/
                 </p>
               </div>
             )}
 
-            <div className="flex flex-wrap justify-center gap-x-12 md:gap-x-16 gap-y-24 select-text w-full">
+            <div className="flex flex-wrap justify-center gap-x-2 md:gap-x-3 gap-y-2 select-text w-full">
               {words.map((word, i) => (
-                <div key={i} className="flex flex-col items-center min-w-fit group/word transition-transform duration-300 hover:scale-110">
-                  <span className="text-white text-4xl md:text-6xl font-black leading-none mb-4 break-words text-center tracking-tighter transition-all group-hover/word:text-indigo-300 drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)] relative">
+                <div key={i} className="flex flex-col items-center min-w-fit group/word transition-transform duration-300 hover:scale-105">
+                  <span className="text-white text-lg md:text-xl font-black leading-none mb-1 break-words text-center tracking-tight transition-all group-hover/word:text-indigo-300 drop-shadow-[0_3px_10px_rgba(0,0,0,0.4)] relative">
                     {word.split('‿').map((part, idx, arr) => (
                       <React.Fragment key={idx}>
                         {part}
@@ -153,8 +218,12 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
                   </span>
                   
                   {/* Symbols exactly under the word/phrase */}
-                  <div className="h-12 flex items-center justify-center select-none pointer-events-none">
-                    <SymbolSpan token={mapTokens[i] || (i === words.length - 1 ? (words[0].toLowerCase().match(/^(do|does|did|is|are|am|can|could|will|would|have|has|had|isnt|cant|couldnt)/) ? '·↗' : '●↘') : '·')} />
+                  <div className="h-7 flex items-start justify-center select-none pointer-events-none mt-0.5">
+                    <SymbolSpan
+                      token={mapTokens[i]}
+                      isLast={i === words.length - 1}
+                      firstWord={words[0]}
+                    />
                   </div>
                 </div>
               ))}
@@ -164,14 +233,14 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
           {/* Tutorial UI for selections */}
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-full flex justify-center pointer-events-none px-10 z-20">
              {selectedText ? (
-               <button 
+               <button
                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onPlayTutor(selectedText); }}
-                 className={`pointer-events-auto bg-indigo-600/95 backdrop-blur-2xl text-white px-12 h-16 rounded-full text-[13px] font-black uppercase tracking-[0.2em] shadow-[0_25px_70px_rgba(79,70,229,0.8)] flex items-center gap-4 hover:bg-indigo-500 border-2 border-white/40 active:scale-95 transition-all animate-bounce-in`}
+                 className={`pointer-events-auto bg-indigo-600/95 backdrop-blur-xl text-white px-6 h-11 rounded-full text-[11px] font-bold uppercase tracking-[0.12em] shadow-[0_8px_24px_rgba(79,70,229,0.5)] flex items-center gap-2 hover:bg-indigo-500 border border-white/30 active:scale-95 transition-all`}
                >
                  {isTutorLoading ? (
-                   <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
+                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                  ) : (
-                   <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
                  )}
                  {isTutorLoading ? "Cooking Audio..." : isPlayingTutor ? "Playing Coach..." : `Pronounce: "${selectedText.length > 20 ? selectedText.slice(0, 20) + '...' : selectedText}"`}
                </button>

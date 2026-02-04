@@ -4,7 +4,7 @@ import { Button } from './components/Button';
 import { FeedbackCard } from './components/FeedbackCard';
 import { HistoryList } from './components/HistoryList';
 import { generateSpeech, analyzePronunciation, getLinkingAnalysisForText, generateTutorAudio } from './services/geminiService';
-import { decodePCM } from './services/audioUtils';
+import { playBase64Audio, speakWithWebSpeech } from './services/audioUtils';
 import { AnalysisResult, AppState, HistoryItem } from './types';
 
 const ttsCache = new Map<string, string>();
@@ -18,6 +18,12 @@ const App: React.FC = () => {
   const [isAudioLoading, setIsAudioLoading] = useState(false);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [userAudioBlob, setUserAudioBlob] = useState<Blob | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const showError = (message: string) => {
+    setError(message);
+    setTimeout(() => setError(null), 5000);
+  };
 
   const [history, setHistory] = useState<HistoryItem[]>(() => {
     try {
@@ -67,38 +73,52 @@ const App: React.FC = () => {
     return ctx;
   };
 
-  const playBuffer = async (base64Audio: string, sourceKey: string) => {
+  const playAudio = async (base64Audio: string, sourceKey: string) => {
     try {
-      const ctx = await ensureAudioContext();
-      if (audioSourceRef.current) {
-        try { audioSourceRef.current.stop(); } catch(e) {}
+      console.log("playAudio called, sourceKey:", sourceKey, "audio length:", base64Audio?.length);
+
+      // Prevent overlapping audio playback
+      if (activeAudioSource && activeAudioSource !== 'tutor_loading') {
+        console.log("⚠️ Audio already playing, ignoring new playback request");
+        return;
       }
-      const audioBuffer = decodePCM(base64Audio, ctx, 24000);
-      const source = ctx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(ctx.destination);
-      audioSourceRef.current = source;
+
+      if (!base64Audio || base64Audio.length < 100) {
+        console.error("Audio data too short or empty:", base64Audio);
+        showError("音频数据无效，请重试");
+        return;
+      }
       setActiveAudioSource(sourceKey);
-      source.start(0);
-      source.onended = () => { setActiveAudioSource(null); };
+      await playBase64Audio(base64Audio, 'audio/mpeg');
+      setActiveAudioSource(null);
     } catch (e) {
+      console.error("Audio playback error:", e);
+      showError("音频播放失败: " + (e as Error).message);
       setActiveAudioSource(null);
     }
   };
 
   const handlePlayTutor = async (selectedText: string) => {
     if (!selectedText.trim()) return;
-    const cacheKey = `tutor_${selectedText}`;
-    const cached = ttsCache.get(cacheKey);
-    if (cached) {
-      await playBuffer(cached, 'tutor');
+
+    // Prevent overlapping playback - early check
+    if (activeAudioSource && activeAudioSource !== 'tutor_loading') {
+      console.log("⚠️ Playback in progress, ignoring tutor request");
       return;
     }
+
+    const cacheKey = `tutor_${selectedText}`;
+    const cached = ttsCache.get(cacheKey);
+    if (cached && cached.length > 100) {
+      await playAudio(cached, 'tutor');
+      return;
+    }
+    ttsCache.delete(cacheKey);
     setActiveAudioSource('tutor_loading'); 
     try {
       const base64 = await generateTutorAudio(selectedText);
       ttsCache.set(cacheKey, base64);
-      await playBuffer(base64, 'tutor');
+      await playAudio(base64, 'tutor');
     } catch (e) { 
       console.error("Tutor playback error", e);
       setActiveAudioSource(null); 
@@ -107,21 +127,41 @@ const App: React.FC = () => {
 
   const handlePlayTTS = async (textToSpeak: string, isSlow: boolean = false) => {
     if (!textToSpeak.trim()) return;
+
+    // Prevent overlapping playback - early check
+    if (activeAudioSource && activeAudioSource !== 'tutor_loading') {
+      console.log("⚠️ Playback in progress, ignoring TTS request");
+      return;
+    }
+
     const cacheKey = `${textToSpeak}_${isSlow ? 'slow' : 'normal'}`;
     const sourceKey = isSlow ? 'input_slow' : 'input_normal';
     const cached = ttsCache.get(cacheKey);
-    if (cached) {
-      await playBuffer(cached, sourceKey);
+    if (cached && cached.length > 100) {
+      await playAudio(cached, sourceKey);
       return;
     }
+    ttsCache.delete(cacheKey);
     setAppState(AppState.GENERATING_TTS);
     setActiveAudioSource(sourceKey);
     try {
       const base64 = await generateSpeech(textToSpeak, isSlow);
       ttsCache.set(cacheKey, base64);
-      await playBuffer(base64, sourceKey);
-    } catch (e) { 
+      await playAudio(base64, sourceKey);
+    } catch (e: any) { 
       console.error("TTS playback error", e);
+      if (e?.code === 'RATE_LIMIT') {
+        showError("今日 MiniMax 额度已用完，请更换密钥或稍后重试");
+      } else if (e?.code === 'INSUFFICIENT_BALANCE') {
+        // 静默切换到本地朗读，不再弹出提示
+        try { await speakWithWebSpeech(textToSpeak, isSlow ? 0.8 : 1); } catch (_) {}
+      } else if (e?.code === 'NO_AUDIO') {
+        showError("MiniMax 未返回音频，请稍后重试");
+      } else if (typeof e?.message === 'string') {
+        showError(e.message);
+      } else {
+        showError("语音合成失败，请稍后重试");
+      }
       setActiveAudioSource(null); 
     }
     finally { setAppState(AppState.IDLE); }
@@ -143,11 +183,67 @@ const App: React.FC = () => {
     setAppState(AppState.GENERATING_TTS);
     
     try {
-      const [base64, linking] = await Promise.all([
+      // 分开请求，链接分析失败时用本地兜底
+      const [ttsResult, linkingResult] = await Promise.allSettled([
         generateSpeech(textToSpeak, false),
         getLinkingAnalysisForText(textToSpeak)
       ]);
-      
+
+      console.log("🔍 App.tsx Analysis Results:", {
+        ttsStatus: ttsResult.status,
+        linkingStatus: linkingResult.status,
+        linkingValue: linkingResult.status === 'fulfilled' ? linkingResult.value : null,
+        linkingReason: linkingResult.status === 'rejected' ? linkingResult.reason : null
+      });
+
+      if (ttsResult.status !== 'fulfilled') {
+        throw ttsResult.reason;
+      }
+
+      // Smart fallback for linking analysis (should never be needed as geminiService has its own fallback)
+      const FUNCTION_WORDS = new Set([
+        'a', 'an', 'the', 'to', 'of', 'in', 'on', 'at', 'by', 'for', 'with', 'from',
+        'is', 'am', 'are', 'was', 'were', 'be', 'been', 'being',
+        'do', 'does', 'did', 'have', 'has', 'had',
+        'can', 'could', 'will', 'would', 'shall', 'should', 'may', 'might', 'must',
+        'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them',
+        'my', 'your', 'his', 'her', 'its', 'our', 'their',
+        'this', 'that', 'these', 'those',
+        'and', 'or', 'but', 'so', 'if', 'as', 'than', 'into', 'onto', 'up', 'never', 'use', 'someone', 'else'
+      ]);
+
+      const linking = linkingResult.status === 'fulfilled'
+        ? linkingResult.value
+        : (() => {
+            console.warn("⚠️ App.tsx fallback triggered (shouldn't happen)");
+            const words = textToSpeak.trim().split(/\s+/);
+            const hasQuestion = textToSpeak.includes('?');
+            const tokens = words.map(w => w.replace(/[?.!,;]/g, '').toLowerCase());
+            const intonationTokens = tokens.map((token, i) => {
+              const isLast = i === tokens.length - 1;
+              const isFunction = FUNCTION_WORDS.has(token);
+              if (isLast) return (isFunction ? '·' : '●') + (hasQuestion ? '↗' : '↘');
+              return isFunction ? '·' : '●';
+            });
+
+            let linkedSentence = '';
+            for (let i = 0; i < words.length; i++) {
+              linkedSentence += words[i];
+              if (i < words.length - 1) {
+                const currentEndsWithConsonant = /[bcdfghjklmnpqrstvwxyz]$/i.test(words[i].replace(/[?.!,;]/g, ''));
+                const nextStartsWithVowel = /^[aeiou]/i.test(words[i + 1]);
+                linkedSentence += currentEndsWithConsonant && nextStartsWithVowel ? '‿' : ' ';
+              }
+            }
+
+            return {
+              fullLinkedSentence: linkedSentence,
+              fullLinkedPhonetic: tokens.join(' '),
+              intonationMap: intonationTokens.join(' ')
+            };
+          })();
+
+      const base64 = ttsResult.value;
       ttsCache.set(`${textToSpeak}_normal`, base64);
       
       const res: AnalysisResult = {
@@ -166,9 +262,21 @@ const App: React.FC = () => {
       
       setIsAudioLoading(false);
       setAppState(AppState.SHOWING_RESULT);
-      await playBuffer(base64, 'input_normal');
-    } catch (e) {
+      await playAudio(base64, 'input_normal');
+    } catch (e: any) {
       console.error("PlayAndAnalyze major failure", e);
+      if (e?.code === 'RATE_LIMIT') {
+        showError("今日 MiniMax 额度已用完，请更换密钥或稍后重试");
+      } else if (e?.code === 'INSUFFICIENT_BALANCE') {
+        // 静默切换到本地朗读，不再弹出提示
+        try { await speakWithWebSpeech(textToSpeak, 1); } catch (_) {}
+      } else if (e?.code === 'NO_AUDIO') {
+        showError("MiniMax 未返回音频，请稍后重试");
+      } else if (typeof e?.message === 'string') {
+        showError(e.message);
+      } else {
+        showError("生成语音失败，请检查网络连接");
+      }
       setIsAudioLoading(false);
       setAppState(AppState.IDLE);
     }
@@ -194,24 +302,43 @@ const App: React.FC = () => {
             setResult(res);
             setAppState(AppState.SHOWING_RESULT);
             analysisCache.set(text, res);
-            saveToHistory(text, res); // PERSIST EVALUATED RESULT
-          } catch (err) { 
+            saveToHistory(text, res);
+          } catch (err: any) {
             console.error("Recording evaluation failure", err);
-            setAppState(AppState.IDLE); 
+            showError(err?.message || "分析失败，请重试");
+            setAppState(AppState.IDLE);
           }
         };
         reader.readAsDataURL(audioBlob);
       };
       mediaRecorder.start();
       setAppState(AppState.RECORDING);
-    } catch (e) { 
+    } catch (e: any) {
       console.error("Microphone access failure", e);
-      setAppState(AppState.IDLE); 
+      showError("无法访问麦克风，请检查权限设置");
+      setAppState(AppState.IDLE);
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 px-4 selection:bg-indigo-100 font-sans antialiased">
+      {/* Error Toast */}
+      {error && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+          <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-3 rounded-2xl shadow-xl flex items-center gap-3">
+            <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-sm font-semibold">{error}</span>
+            <button onClick={() => setError(null)} className="ml-2 text-red-400 hover:text-red-600">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       <header className="max-w-2xl mx-auto py-10 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-black shadow-xl shadow-indigo-100 transform -rotate-3 transition-transform hover:rotate-0">E</div>
@@ -270,12 +397,47 @@ const App: React.FC = () => {
           />
         )}
         
-        <HistoryList 
-          history={history} 
-          onSelect={(t) => { 
-            setText(t); 
-            const item = history.find(h => h.text.trim().toLowerCase() === t.trim().toLowerCase()); 
-            if(item?.result) setResult(item.result); 
+        <HistoryList
+          history={history}
+          onSelect={async (t) => {
+            setText(t);
+            const item = history.find(h => h.text.trim().toLowerCase() === t.trim().toLowerCase());
+
+            if (item?.result) {
+              // Check if the result has valid intonationMap
+              const wordCount = (item.result.fullLinkedSentence || item.result.speechScript || "").trim().split(/\s+/).length;
+              const tokenCount = (item.result.intonationMap || "").trim().split(/\s+/).filter(Boolean).length;
+
+              if (!item.result.intonationMap || tokenCount !== wordCount || tokenCount === 0) {
+                console.warn("⚠️ History data incomplete, regenerating...");
+                // Regenerate linking analysis for old data
+                try {
+                  const linking = await getLinkingAnalysisForText(t);
+                  const fixedResult = {
+                    ...item.result,
+                    fullLinkedSentence: linking.fullLinkedSentence,
+                    fullLinkedPhonetic: linking.fullLinkedPhonetic,
+                    intonationMap: linking.intonationMap
+                  };
+                  setResult(fixedResult);
+                  // Update cache and history
+                  analysisCache.set(t, fixedResult);
+                  const newHistory = history.map(h =>
+                    h.text.trim().toLowerCase() === t.trim().toLowerCase()
+                      ? { ...h, result: fixedResult }
+                      : h
+                  );
+                  setHistory(newHistory);
+                  localStorage.setItem('echocoach_history_v3', JSON.stringify(newHistory));
+                  console.log("✅ History data fixed");
+                } catch (e) {
+                  console.error("Failed to fix history data:", e);
+                  setResult(item.result); // Use original even if incomplete
+                }
+              } else {
+                setResult(item.result);
+              }
+            }
           }} 
           onClear={() => {
             if(confirm("确定清空练习历史吗？")) {

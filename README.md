@@ -1,55 +1,168 @@
-# EchoCoach - AI English Pronunciation Assistant
+# 🎤 EchoCoach - AI 英语发音教练
 
-EchoCoach is a React application powered by Google's Gemini 2.5 Flash API. It helps users practice English pronunciation by providing real-time AI feedback, speech synthesis (TTS), and visual scoring.
+一个基于 MiniMax AI 的智能英语发音练习工具，帮助你学习连读、重音和语调。
 
-## Features
+## ✨ 核心功能
 
-- **AI Speech Synthesis**: Hear native-level pronunciation of any text using Gemini TTS (`gemini-2.5-flash-preview-tts`).
-- **Real-time Recording**: Record your voice directly in the browser.
-- **Voice Activity Detection (VAD)**: Automatically stops recording when you finish speaking.
-- **AI Analysis**: Get instant feedback on your pronunciation accuracy, intonation, and specific word corrections (`gemini-2.5-flash`).
-- **Playback**: Replay your own recording or listen to the AI coach's advice.
-- **History**: Save and search your practice sessions.
+### 📊 智能语音标注系统
 
-## Environment Variables
+- **连读标注** `‿` - 标记单词间的自然连读（如 "tell‿us"）
+- **重音标注** `●` / `·` - 显示重读和弱读音节
+- **语调标注** `↗` / `↘` - 标记升调（疑问）和降调（陈述）
+- **国际音标** - 完整句子的音标显示
 
-To run this app, you need a Google Gemini API Key.
+### 🎯 练习流程
 
-| Variable | Description |
-| t-------- | ----------- |
-| `API_KEY` | Your Google GenAI API Key (get one at [aistudio.google.com](https://aistudio.google.com)) |
+1. **输入文本** → 输入想练习的英语句子
+2. **AI 分析** → 自动生成连读、重音、语调标注
+3. **听标准音** → 两种速度播放（正常/慢速）
+4. **录制发音** → 录下你的发音
+5. **获得反馈** → AI 评分 + 逐词建议
 
-## How to Run Locally
+## 🚀 快速开始
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/your-username/your-repo-name.git
-   cd your-repo-name
-   ```
+### 1. 安装依赖
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+```
 
-3. **Configure API Key**
-   Create a `.env` file in the root directory (or configure your bundler's environment variables):
-   ```
-   API_KEY=your_actual_api_key_here
-   ```
+### 2. 配置 API 密钥
 
-4. **Start the development server**
-   ```bash
-   npm run dev
-   ```
+复制环境变量模板：
 
-## How to Deploy (Recommended: Vercel)
+```bash
+cp .env.example .env
+```
 
-1. Push your code to a **GitHub** repository.
-2. Go to [Vercel](https://vercel.com) and sign up with GitHub.
-3. Click **"Add New Project"** and import your repository.
-4. In the **"Environment Variables"** section:
-   - Add Name: `API_KEY`
-   - Add Value: `Your_Actual_Gemini_API_Key`
-5. Click **"Deploy"**.
-6. Once finished, Vercel will give you a live URL to share and use.
+编辑 `.env` 文件，填入你的 MiniMax API 凭证：
+
+```env
+VITE_MINIMAX_API_KEY=你的API密钥
+VITE_MINIMAX_GROUP_ID=你的Group_ID
+```
+
+**获取 API 密钥**：访问 [MiniMax 官网](https://www.minimaxi.com) 注册并获取
+
+### 3. 启动开发服务器
+
+```bash
+npm run dev
+```
+
+浏览器访问 [http://localhost:5173](http://localhost:5173)
+
+## 📖 使用示例
+
+**练习句子**：`How is it going?`
+
+**标注显示**：
+```
+     ●↘    ·    ·  ·↗
+   How   is‿it going?
+  /haʊ ɪ zɪt goʊɪŋ/
+```
+
+- `●↘` - "How" 重读 + 降调（开场词）
+- `·` - "is", "it", "going" 弱读
+- `‿` - "is" 和 "it" 连读
+- `↗` - 句尾升调（疑问句）
+
+## 🛠️ 技术栈
+
+- **前端框架**: React 19 + TypeScript 5.7
+- **构建工具**: Vite 6.0
+- **样式**: Tailwind CSS (CDN)
+- **AI 服务**: MiniMax API
+  - TTS: `speech-2.8-turbo` 模型
+  - 文本分析: `abab6.5s-chat` 模型
+
+## 📂 项目结构
+
+```
+├── App.tsx                  # 主应用（状态管理）
+├── components/
+│   ├── FeedbackCard.tsx     # 反馈卡片（语音标注显示）
+│   ├── Button.tsx           # 通用按钮组件
+│   ├── HistoryList.tsx      # 练习历史
+│   └── ErrorBoundary.tsx    # 错误边界
+├── services/
+│   ├── minimaxService.ts    # MiniMax API 集成
+│   └── audioUtils.ts        # 音频处理工具
+└── types.ts                 # TypeScript 类型定义
+```
+
+## 🎨 语音标注符号说明
+
+| 符号 | 含义 | 示例 | 说明 |
+|-----|------|------|------|
+| `‿` | 连读 | tell‿us | 两个词自然连读 |
+| `●` | 重读 | **tell**‿us | 该词/音节需重读 |
+| `·` | 弱读 | tell‿**us** | 该词/音节轻读 |
+| `↗` | 升调 | Are you ready`↗` | 语调上扬（疑问） |
+| `↘` | 降调 | I'm ready`↘` | 语调下降（陈述） |
+
+## 💡 功能特点
+
+### 智能缓存
+- TTS 音频缓存 - 同一句子不重复请求
+- 分析结果缓存 - 即时显示历史分析
+- 历史记录持久化 - 保存最近 50 条练习
+
+### 容错设计
+- 多域名自动切换 - MiniMax API 容错
+- Fallback 机制 - AI 分析失败时本地生成标注
+- 友好错误提示 - 识别常见错误（额度、密钥等）
+
+### 交互体验
+- 选词发音 - 拖选任意文本播放发音
+- 双速播放 - 正常/慢速切换
+- 回放录音 - 对比自己的发音
+
+## 🐛 常见问题
+
+### Q: 为什么 API 调用失败？
+
+**A**: 检查以下几点：
+1. `.env` 文件中的 `VITE_MINIMAX_API_KEY` 和 `VITE_MINIMAX_GROUP_ID` 是否正确
+2. 确保环境变量名以 `VITE_` 开头（Vite 要求）
+3. 重启开发服务器（修改 .env 后需要重启）
+4. 检查 MiniMax 账户余额
+
+### Q: 语音标注不显示？
+
+**A**: 这通常是 AI 分析返回格式问题。项目有 fallback 机制，会自动生成基础标注：
+- 最后一个词根据句首判断升/降调
+- 其他词默认弱读 `·`
+- 检查浏览器控制台的错误信息
+
+### Q: 录音没有声音？
+
+**A**:
+1. 检查浏览器麦克风权限
+2. 确保使用 HTTPS 或 localhost（浏览器安全限制）
+3. 尝试其他浏览器（推荐 Chrome/Edge）
+
+## 📚 深入学习
+
+想了解项目的详细技术实现？查看 [FORMac.md](FORMac.md) - 包含：
+- 架构设计决策
+- 踩过的坑和解决方案
+- 性能优化技巧
+- 代码片段详解
+
+## 🚧 未来计划
+
+- [ ] 增加单词级别的详细分析（音节拆分）
+- [ ] 支持更多口音（英式英语、澳式英语）
+- [ ] 添加发音进步曲线图
+- [ ] PWA 支持（离线可用）
+- [ ] 后端服务（保护 API 密钥）
+
+## 📄 开源协议
+
+MIT License
+
+---
+
+**提示**: 这是一个学习项目。如需生产环境部署，建议增加后端服务保护 API 密钥。
