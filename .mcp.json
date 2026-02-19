@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "pencil": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upwaver/mcp-pencil"
+      ]
+    }
+  }
+}

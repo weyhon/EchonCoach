@@ -1,4 +1,6 @@
 import { AnalysisResult } from "../types";
+import { AUDIO_CONFIG, API_CONFIG, UI_CONFIG } from "../config/constants";
+import { generateIntonationMap } from "./intonationUtils";
 
 const MINIMAX_API_KEY = (import.meta.env.VITE_MINIMAX_API_KEY || "").trim();
 const MINIMAX_GROUP_ID = (import.meta.env.VITE_MINIMAX_GROUP_ID || "").trim();
@@ -50,6 +52,38 @@ const getApiKey = (): string => {
   return key;
 };
 
+/**
+ * Fetch with timeout protection to prevent hanging requests
+ * @param url - The URL to fetch
+ * @param options - Fetch options
+ * @param timeoutMs - Timeout in milliseconds (default: 30000)
+ */
+const fetchWithTimeout = async (
+  url: string,
+  options: RequestInit,
+  timeoutMs: number = API_CONFIG.DEFAULT_TIMEOUT
+): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      const err: any = new Error('请求超时，请检查网络连接或稍后重试');
+      err.code = 'REQUEST_TIMEOUT';
+      throw err;
+    }
+    throw error;
+  }
+};
+
 // 统一的 POST 调用，带多域名/GroupId 重试逻辑，解决 invalid api key 可能来自域名不匹配
 const postWithFallback = async (endpoint: string, body: any) => {
   let lastErr: any;
@@ -59,14 +93,18 @@ const postWithFallback = async (endpoint: string, body: any) => {
         ? `${base}${endpoint}?GroupId=${encodeURIComponent(MINIMAX_GROUP_ID)}`
         : `${base}${endpoint}`;
     try {
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getApiKey()}`,
+      const resp = await fetchWithTimeout(
+        url,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${getApiKey()}`,
+          },
+          body: JSON.stringify(body),
         },
-        body: JSON.stringify(body),
-      });
+        30000 // 30 second timeout
+      );
 
       if (!resp.ok) {
         let message = resp.statusText;
@@ -111,18 +149,18 @@ const postWithFallback = async (endpoint: string, body: any) => {
 export const generateSpeech = async (text: string, slow: boolean = false): Promise<string> => {
   try {
     const data = await postWithFallback("/t2a_v2", {
-      model: "speech-2.8-turbo",
+      model: API_CONFIG.MINIMAX_TTS_MODEL,
       text: text,
       output_format: "hex", // 明确返回 hex，方便统一转换
       voice_setting: {
-        voice_id: "female-yujie", // MiniMax 支持的女声音色（御姐音）
-        speed: slow ? 0.85 : 1.0, // 慢速稍微提高一点，更易听清
-        vol: 1.0,
-        pitch: 0, // 保持自然音调
+        voice_id: API_CONFIG.MINIMAX_VOICE_ID,
+        speed: slow ? AUDIO_CONFIG.MINIMAX_SLOW_SPEED : AUDIO_CONFIG.DEFAULT_PLAYBACK_RATE,
+        vol: AUDIO_CONFIG.DEFAULT_VOLUME,
+        pitch: AUDIO_CONFIG.DEFAULT_PITCH,
       },
       audio_setting: {
-        sample_rate: 24000,
-        bitrate: 128000, // MiniMax 支持的标准比特率
+        sample_rate: AUDIO_CONFIG.SAMPLE_RATE,
+        bitrate: AUDIO_CONFIG.MP3_BITRATE,
         format: "mp3",
       },
     });
@@ -130,7 +168,7 @@ export const generateSpeech = async (text: string, slow: boolean = false): Promi
     // MiniMax 返回 hex 或 base64，统一转换
     const rawAudio = data.data?.audio || data.audio || "";
     const audioBase64 = normalizeAudio(rawAudio);
-    if (!audioBase64 || audioBase64.length < 50) {
+    if (!audioBase64 || audioBase64.length < UI_CONFIG.MIN_BASE64_LENGTH) {
       const err: any = new Error("MiniMax TTS 未返回音频数据");
       err.code = "NO_AUDIO";
       console.error("MiniMax 返回数据中没有 audio:", data);
@@ -149,24 +187,24 @@ export const generateTutorAudio = async (text: string): Promise<string> => {
     console.log("调用 MiniMax Tutor TTS, text:", text);
 
     const data = await postWithFallback("/t2a_v2", {
-      model: "speech-2.8-turbo",
+      model: API_CONFIG.MINIMAX_TTS_MODEL,
       text: text,
       output_format: "hex",
       voice_setting: {
-        voice_id: "female-yujie", // 使用相同的音色
-        speed: 0.9, // 单词发音稍慢一点，便于听清
-        vol: 1.0,
-        pitch: 0,
+        voice_id: API_CONFIG.MINIMAX_VOICE_ID,
+        speed: AUDIO_CONFIG.TUTOR_PLAYBACK_RATE,
+        vol: AUDIO_CONFIG.DEFAULT_VOLUME,
+        pitch: AUDIO_CONFIG.DEFAULT_PITCH,
       },
       audio_setting: {
-        sample_rate: 24000,
-        bitrate: 128000, // MiniMax 支持的标准比特率
+        sample_rate: AUDIO_CONFIG.SAMPLE_RATE,
+        bitrate: AUDIO_CONFIG.MP3_BITRATE,
         format: "mp3",
       },
     });
 
     const audioBase64 = normalizeAudio(data.data?.audio || data.audio || "");
-    if (!audioBase64 || audioBase64.length < 50) {
+    if (!audioBase64 || audioBase64.length < UI_CONFIG.MIN_BASE64_LENGTH) {
       const err: any = new Error("MiniMax Tutor TTS 未返回音频数据");
       err.code = "NO_AUDIO";
       console.error("MiniMax Tutor 返回空音频:", data);
@@ -291,18 +329,7 @@ EXAMPLES:
 
 Return ONLY valid JSON with these 3 fields. No markdown, no explanation.`;
 
-    const buildFallbackIntonation = (raw: string) => {
-      const words = raw.trim().split(/\s+/).filter(Boolean);
-      if (words.length === 0) return "";
-      const isQuestion = /^[dDwW]o|^[iI]s|^[aA]re|^[cC]an|^[wW]ill|^[cC]ould|^[wW]ould/.test(words[0]);
-      return words
-        .map((_, i) => {
-          const base = i === words.length - 1 ? (isQuestion ? "·↗" : "●↘") : "·";
-          return base;
-        })
-        .join(" ");
-    };
-
+    // Simple fallback for linked sentence (just joins with linking marks)
     const buildFallbackLinked = (raw: string) => {
       const words = raw.trim().split(/\s+/).filter(Boolean);
       if (words.length === 0) return raw;
@@ -326,14 +353,14 @@ Return ONLY valid JSON with these 3 fields. No markdown, no explanation.`;
       const jsonStr = content.replace(/```json|```/g, '').trim();
       const result = JSON.parse(jsonStr);
       const fullLinkedSentence = result.fullLinkedSentence || buildFallbackLinked(text);
-      const intonationRaw = result.intonationMap || buildFallbackIntonation(fullLinkedSentence);
+      const intonationRaw = result.intonationMap || generateIntonationMap(fullLinkedSentence);
 
       // 若返回的符号数与词数不匹配，使用本地生成的方案
       const words = fullLinkedSentence.trim().split(/\s+/).filter(Boolean);
       const tokens = intonationRaw.trim().split(/\s+/).filter(Boolean);
       const intonationMap = words.length === tokens.length
         ? intonationRaw
-        : buildFallbackIntonation(fullLinkedSentence);
+        : generateIntonationMap(fullLinkedSentence, words);
 
       return {
         fullLinkedSentence,
@@ -342,7 +369,7 @@ Return ONLY valid JSON with these 3 fields. No markdown, no explanation.`;
       };
     } catch (parseError) {
       console.error("JSON 解析错误:", parseError);
-      const fallback = buildFallbackIntonation(text);
+      const fallback = generateIntonationMap(text);
       return {
         fullLinkedSentence: buildFallbackLinked(text),
         fullLinkedPhonetic: "analysis failed",
@@ -354,7 +381,7 @@ Return ONLY valid JSON with these 3 fields. No markdown, no explanation.`;
     return {
       fullLinkedSentence: buildFallbackLinked(text),
       fullLinkedPhonetic: "analysis failed",
-      intonationMap: text.split(/\s+/).filter(Boolean).map((_, i, arr) => i === arr.length - 1 ? "●↘" : "·").join(" "),
+      intonationMap: generateIntonationMap(text),
     };
   }
 };

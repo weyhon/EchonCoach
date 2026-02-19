@@ -1,3 +1,4 @@
+import { AUDIO_CONFIG } from '../config/constants';
 
 export const blobToBase64 = (blob: Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -29,6 +30,21 @@ export const base64ToUint8Array = (base64: string): Uint8Array => {
 let currentAudio: HTMLAudioElement | null = null;
 let currentAudioSource: AudioBufferSourceNode | null = null;
 let currentAudioContext: AudioContext | null = null;
+
+// Global AudioContext singleton - prevents memory leak from creating multiple contexts
+let globalAudioContext: AudioContext | null = null;
+
+/**
+ * Get or create the global AudioContext singleton
+ * Reuses existing context to prevent memory leaks
+ */
+export const getAudioContext = (): AudioContext => {
+  if (!globalAudioContext || globalAudioContext.state === 'closed') {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    globalAudioContext = new AudioContextClass();
+  }
+  return globalAudioContext;
+};
 
 // Stop any currently playing audio
 const stopCurrentAudio = () => {
@@ -66,7 +82,7 @@ const stopCurrentAudio = () => {
 export const decodePCM = (
   base64String: string,
   audioContext: AudioContext,
-  sampleRate: number = 24000
+  sampleRate: number = AUDIO_CONFIG.SAMPLE_RATE
 ): AudioBuffer => {
   const bytes = base64ToUint8Array(base64String);
 
@@ -166,11 +182,11 @@ export const playPCMAudio = async (base64Audio: string): Promise<void> => {
       stopCurrentAudio();
 
       console.log("Playing PCM audio");
-      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-      const audioContext = new AudioContext();
+      // Use singleton AudioContext to prevent memory leak
+      const audioContext = getAudioContext();
       currentAudioContext = audioContext;
 
-      const pcmBuffer = decodePCM(base64Audio, audioContext, 24000);
+      const pcmBuffer = decodePCM(base64Audio, audioContext, AUDIO_CONFIG.SAMPLE_RATE);
       const source = audioContext.createBufferSource();
       currentAudioSource = source; // Track current source
       source.buffer = pcmBuffer;
@@ -217,4 +233,16 @@ export const speakWithWebSpeech = async (text: string, rate: number = 1): Promis
       reject(e);
     }
   });
+};
+
+/**
+ * Cleanup all audio resources on component unmount
+ * Prevents memory leaks by closing the global AudioContext
+ */
+export const cleanupAudioResources = () => {
+  stopCurrentAudio();
+  if (globalAudioContext && globalAudioContext.state !== 'closed') {
+    globalAudioContext.close();
+    globalAudioContext = null;
+  }
 };

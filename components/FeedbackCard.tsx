@@ -1,6 +1,10 @@
 
 import React, { useState } from 'react';
 import { AnalysisResult, WordAnalysis } from '../types';
+import { isYesNoQuestion } from '../services/linkingUtils';
+import { generateIntonationTokens } from '../services/intonationUtils';
+import { IPALegend } from './IPALegend';
+import { SnailIcon, SpeakerIcon } from './Icons';
 
 interface FeedbackCardProps {
   result: AnalysisResult;
@@ -40,9 +44,10 @@ interface SymbolSpanProps {
   token?: string;
   isLast?: boolean;
   firstWord?: string;
+  fullText?: string;
 }
 
-const SymbolSpan: React.FC<SymbolSpanProps> = ({ token, isLast, firstWord }) => {
+const SymbolSpan: React.FC<SymbolSpanProps> = ({ token, isLast, firstWord, fullText }) => {
   // 确定显示什么符号
   let stressSymbol: string | null = null;
   let toneSymbol: string | null = null;
@@ -60,10 +65,15 @@ const SymbolSpan: React.FC<SymbolSpanProps> = ({ token, isLast, firstWord }) => 
   // 如果没有提供符号，使用默认值
   if (!stressSymbol && !toneSymbol) {
     if (isLast) {
-      // 最后一个词：根据句首词判断是疑问句还是陈述句
-      const isQuestion = firstWord?.toLowerCase().match(/^(do|does|did|is|are|am|can|could|will|would|have|has|had|isn't|can't|couldn't|won't|wouldn't|haven't|hasn't|didn't|aren't)/);
-      stressSymbol = isQuestion ? '·' : '●';
-      toneSymbol = isQuestion ? '↗' : '↘';
+      // 最后一个词：使用专业的语调判断逻辑
+      // Wh-questions (What, Where, etc.) use falling intonation ↘
+      // Yes/No questions (Do you, Are you, etc.) use rising intonation ↗
+      // Statements use falling intonation ↘
+      const sentenceIntonation = fullText ? getSentenceIntonation(fullText) : '↘';
+      const isYesNo = firstWord ? isYesNoQuestion(fullText || firstWord) : false;
+
+      stressSymbol = isYesNo ? '·' : '●';
+      toneSymbol = sentenceIntonation;
     } else {
       // 非最后一个词：默认弱读
       stressSymbol = '·';
@@ -92,10 +102,11 @@ const SymbolSpan: React.FC<SymbolSpanProps> = ({ token, isLast, firstWord }) => 
   );
 };
 
-export const FeedbackCard: React.FC<FeedbackCardProps> = ({ 
-  result, isUpdating, onPlayNormal, onPlaySlow, activeAudioSource, onPlayWord, onPlayTutor, playingWord, onPlayUserRecording 
+export const FeedbackCard: React.FC<FeedbackCardProps> = ({
+  result, isUpdating, onPlayNormal, onPlaySlow, activeAudioSource, onPlayWord, onPlayTutor, playingWord, onPlayUserRecording
 }) => {
   const [selectedText, setSelectedText] = useState<string | null>(null);
+  const [showIPALegend, setShowIPALegend] = useState<boolean>(false);
   const isPlayingNormal = activeAudioSource === 'input_normal';
   const isPlayingSlow = activeAudioSource === 'input_slow';
   const isPlayingTutor = activeAudioSource === 'tutor';
@@ -118,34 +129,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
   };
 
   const words = (result.fullLinkedSentence || result.speechScript || "").trim().split(/\s+/);
-
-  // Smart fallback with function word detection
-  const FUNCTION_WORDS = new Set([
-    'a', 'an', 'the', 'to', 'of', 'in', 'on', 'at', 'by', 'for', 'with', 'from',
-    'is', 'am', 'are', 'was', 'were', 'be', 'been', 'being',
-    'do', 'does', 'did', 'have', 'has', 'had',
-    'can', 'could', 'will', 'would', 'shall', 'should', 'may', 'might', 'must',
-    'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them',
-    'my', 'your', 'his', 'her', 'its', 'our', 'their',
-    'this', 'that', 'these', 'those',
-    'and', 'or', 'but', 'so', 'if', 'as', 'than', 'into', 'onto', 'up'
-  ]);
-
-  const buildFallbackTokens = (ws: string[]) => {
-    if (ws.length === 0) return [];
-    const hasQuestion = (result.fullLinkedSentence || result.speechScript || "").includes('?');
-
-    return ws.map((word, i) => {
-      const cleanWord = word.replace(/[?.!,;‿]/g, '').toLowerCase();
-      const isFunction = FUNCTION_WORDS.has(cleanWord);
-      const isLast = i === ws.length - 1;
-
-      if (isLast) {
-        return (isFunction ? '·' : '●') + (hasQuestion ? '↗' : '↘');
-      }
-      return isFunction ? '·' : '●';
-    });
-  };
+  const sentenceText = result.fullLinkedSentence || result.speechScript || "";
 
   const rawTokens = (result.intonationMap || "").trim().split(/\s+/).filter(Boolean);
   console.log("🎯 FeedbackCard token matching:", {
@@ -154,10 +138,14 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
     usingFallback: rawTokens.length !== words.length,
     result: result.intonationMap
   });
-  const mapTokens = rawTokens.length === words.length ? rawTokens : buildFallbackTokens(words);
+
+  // Use centralized intonation generation for fallback
+  const mapTokens = rawTokens.length === words.length
+    ? rawTokens
+    : generateIntonationTokens(sentenceText, words);
 
   return (
-    <div className={`bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 p-5 md:p-6 space-y-6 animate-fade-in-up relative transition-all duration-500 ${isUpdating ? 'opacity-50 scale-[0.97] blur-[1px]' : 'opacity-100 scale-100'}`}>
+    <div className={`bg-gradient-to-br from-white to-purple-50/30 rounded-[32px] shadow-xl border-2 border-purple-100/50 p-10 md:p-12 space-y-8 animate-fade-in-up relative transition-all duration-500 ${isUpdating ? 'opacity-50 scale-[0.97] blur-[1px]' : 'opacity-100 scale-100'}`}>
       <style>{`
         @keyframes symbol-pop {
           0%, 100% { transform: translateY(0) scale(1); filter: brightness(1.1); }
@@ -167,41 +155,74 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
       `}</style>
 
       {/* Header Info */}
-      <div className="flex flex-col sm:flex-row gap-6 items-center">
+      <div className="flex flex-col sm:flex-row gap-6 items-start">
         {result.overallComment && result.score > 0 && (
-          <div className="flex items-center gap-6 flex-1 w-full">
+          <div className="flex items-center gap-5 flex-1 w-full">
             <ScoreRing score={result.score} />
-            <div className="flex-1 bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100 relative min-h-[64px] flex items-center shadow-inner">
-              <div className="absolute -top-3 left-6 bg-indigo-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase shadow-lg ring-4 ring-white">Expert Advice</div>
-              <p className="text-slate-600 text-[13px] leading-relaxed font-bold italic">
+            <div className="flex-1 bg-gradient-to-br from-emerald-50 to-emerald-100/50 p-6 rounded-[20px] border-[1.5px] border-emerald-300/60 relative min-h-[70px] flex flex-col gap-3 shadow-sm">
+              <div className="text-[11px] font-black text-emerald-600 uppercase tracking-[0.15em]">✨ Expert Advice</div>
+              <p className="text-emerald-800 text-[14px] leading-relaxed font-semibold">
                 {result.overallComment}
               </p>
             </div>
           </div>
         )}
         <div className="flex flex-row sm:flex-col gap-3 shrink-0 items-center sm:items-end w-full sm:w-auto justify-between sm:justify-center">
-           <button onClick={onPlayUserRecording} className="text-[11px] font-black text-slate-400 hover:text-indigo-600 uppercase tracking-widest transition-all hover:scale-105">Replay Mine</button>
-           <div className="flex gap-2">
-             <button onClick={onPlaySlow} className={`text-[11px] font-black px-4 py-2 rounded-xl border transition-all uppercase tracking-tighter shadow-sm ${isPlayingSlow ? 'bg-orange-500 text-white border-orange-500 scale-105' : 'text-orange-500 border-orange-100 hover:bg-orange-50'}`}>Slow</button>
-             <button onClick={onPlayNormal} className={`text-[11px] font-black px-4 py-2 rounded-xl border transition-all uppercase tracking-tighter shadow-sm ${isPlayingNormal ? 'bg-emerald-500 text-white border-emerald-500 scale-105' : 'text-emerald-500 border-emerald-100 hover:bg-emerald-50'}`}>Normal</button>
+           <button onClick={onPlayUserRecording} className="text-[11px] font-bold text-slate-400 hover:text-indigo-600 uppercase tracking-wider transition-all hover:scale-105">Replay Mine</button>
+           <div className="flex gap-2.5 bg-gradient-to-br from-slate-100 to-slate-50 p-2.5 rounded-[12px] border border-slate-200">
+             <button
+               onClick={onPlaySlow}
+               className={`px-5 py-2 rounded-[10px] transition-all flex items-center gap-2 ${
+                 isPlayingSlow
+                   ? 'bg-gradient-to-br from-amber-50 to-amber-100 text-amber-600 shadow-md border-[1.5px] border-amber-400'
+                   : 'text-slate-500 hover:text-amber-600 hover:bg-amber-50/50'
+               }`}
+             >
+               <SnailIcon size={18} />
+             </button>
+             <button
+               onClick={onPlayNormal}
+               className={`px-5 py-2 rounded-[10px] transition-all flex items-center gap-2 ${
+                 isPlayingNormal
+                   ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600 shadow-md border-[1.5px] border-emerald-400'
+                   : 'text-slate-500 hover:text-emerald-600 hover:bg-emerald-50/50'
+               }`}
+             >
+               <SpeakerIcon size={18} />
+             </button>
            </div>
         </div>
       </div>
 
       {/* Analysis Display */}
       <div
-        className="analysis-box bg-slate-900 rounded-[1.5rem] p-5 md:p-6 shadow-2xl relative border-4 border-slate-800/50 min-h-[180px] overflow-hidden group"
+        className="analysis-box bg-gradient-to-br from-slate-900 to-slate-800 rounded-[24px] p-7 md:p-8 shadow-2xl relative border border-slate-700 min-h-[220px] overflow-hidden group"
         onMouseUp={handleMouseUp}
       >
-          <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/10 to-transparent pointer-events-none transition-opacity duration-1000 group-hover:opacity-20"></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/10 to-transparent pointer-events-none transition-opacity duration-1000 group-hover:opacity-40"></div>
 
           <div className="flex flex-col items-center w-full z-10 pb-12">
             {/* Phonics at top */}
             {result.fullLinkedPhonetic && (
-              <div className="mb-4 px-5 py-1.5 bg-white/5 rounded-full border border-white/10 backdrop-blur-xl shadow-lg">
-                <p className="text-[11px] md:text-[13px] font-bold text-slate-400 tracking-[0.35em] font-mono select-none pointer-events-none text-center">
-                  /{result.fullLinkedPhonetic}/
-                </p>
+              <div className="mb-4 flex flex-col items-center gap-2">
+                <div className="px-5 py-2 bg-white/5 rounded-full border border-white/10 backdrop-blur-xl shadow-lg">
+                  <p className="text-[12px] md:text-[14px] font-medium text-slate-400 tracking-[0.08em] font-mono select-none pointer-events-none text-center leading-relaxed">
+                    /{result.fullLinkedPhonetic.split('ˈ').map((part, i) =>
+                      i === 0
+                        ? <React.Fragment key={i}>{part}</React.Fragment>
+                        : <React.Fragment key={i}><span className="text-indigo-300 font-bold">ˈ</span>{part}</React.Fragment>
+                    )}/
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowIPALegend(true)}
+                  className="text-[9px] font-bold text-blue-400 hover:text-blue-300 uppercase tracking-wider transition-colors flex items-center gap-1 pointer-events-auto"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  查看音标说明
+                </button>
               </div>
             )}
 
@@ -247,6 +268,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
                         token={mapTokens[i]}
                         isLast={i === words.length - 1}
                         firstWord={words[0]}
+                        fullText={result.fullLinkedSentence || result.speechScript || ""}
                       />
                     </div>
                   </div>
@@ -294,6 +316,9 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
           </div>
         </div>
       )}
+
+      {/* IPA Legend Modal */}
+      <IPALegend show={showIPALegend} onClose={() => setShowIPALegend(false)} />
     </div>
   );
 };
