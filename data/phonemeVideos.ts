@@ -8,8 +8,8 @@ export const PHONEME_VIDEOS: Record<string, string> = {
   'e':  'xKxV8XfigaE',  // DRESS — Short E
   'æ':  '-i7-DDAW-ok',  // TRAP — Short A
   'ɑː': 'DEJGBC4xZzI',  // START — Ah vowel
-  'ɒ':  'opMab62SybY',  // LOT
-  'ɔː': 'opMab62SybY',  // THOUGHT — Aw sound
+  'ɒ':  'A3l-yWQfIW4',  // LOT — Short O (British)
+  'ɔː': 'Bc1tCtP2ZSg',  // THOUGHT — Long AW sound
   'ʊ':  'phlnzlzCPqE',  // FOOT — Short OO
   'uː': 'IwahymIkGJ0',  // GOOSE — Long OO
   'ʌ':  '_63fTgbG-yQ',  // STRUT — Short U
@@ -22,12 +22,12 @@ export const PHONEME_VIDEOS: Record<string, string> = {
   'əʊ': 'Civ7UBZP99M',  // GOAT (British)
   'oʊ': 'Civ7UBZP99M',  // GOAT (American)
   'aʊ': 'i8KThVR713Q',  // MOUTH
-  'ɪə': 'JbP4wcNyv3o',  // NEAR
-  'eə': 'JbP4wcNyv3o',  // SQUARE
-  'ʊə': 'JbP4wcNyv3o',  // CURE
+  'ɪə': 'ftwSXO8Fsjk',  // NEAR — Ear sound
+  'eə': '0J7-5maJJIk',  // SQUARE — Air sound
+  'ʊə': 'nHSqluHrD-U',  // CURE — Pure sound
   // ─── Consonants: plosives ───
   'p':  'JPUr5MgeDHM',
-  'b':  'JPUr5MgeDHM',
+  'b':  'JPUr5MgeDHM',  // voiced/voiceless pair
   't':  'hGZ9GwrNWmU',
   'd':  'hGZ9GwrNWmU',
   'k':  'O_NisgL1dvY',
