@@ -4,55 +4,89 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EchoCoach - English Pronunciation Master</title>
+    <title>Nebula - AI Pronunciation Coach</title>
+    <link rel="icon" type="image/svg+xml" href="/nebula-favicon.svg" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Syne:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-      body {
-        font-family: 'Inter', sans-serif;
-        -webkit-tap-highlight-color: transparent;
+      :root {
+        --bg-deep: #f8f9fb;
+        --bg-surface: #f0f1f5;
+        --bg-card: #ffffff;
+        --bg-elevated: #f3f4f7;
+        --border-subtle: rgba(0,0,0,0.06);
+        --border-medium: rgba(0,0,0,0.1);
+        --pink: #E8587A;
+        --pink-dim: rgba(232,88,122,0.08);
+        --pink-glow: rgba(232,88,122,0.15);
+        --text-primary: #1a1a2e;
+        --text-secondary: #5f6577;
+        --text-muted: #9ca3af;
+        --green: #22c55e;
+        --amber: #f59e0b;
+        --red: #ef4444;
       }
-      
-      /* Refined Scrollbar Styling - Exquisite Thin Look */
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg-deep: #0f1117;
+          --bg-surface: #13151f;
+          --bg-card: #1a1d2e;
+          --bg-elevated: #1e2135;
+          --border-subtle: rgba(255,255,255,0.07);
+          --border-medium: rgba(255,255,255,0.12);
+          --text-primary: #f0f1f5;
+          --text-secondary: #9ba3b8;
+          --text-muted: #4b5563;
+          --pink-dim: rgba(232,88,122,0.15);
+          --pink-glow: rgba(232,88,122,0.25);
+        }
+      }
+
+      body {
+        font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        -webkit-tap-highlight-color: transparent;
+        background-color: var(--bg-deep);
+        color: var(--text-primary);
+      }
+
+      /* Subtle noise grain overlay */
+      body::after {
+        content: '';
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        pointer-events: none;
+        opacity: 0.018;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        background-repeat: repeat;
+        background-size: 128px;
+      }
+
+      ::selection {
+        background: var(--pink-glow);
+      }
+
       * {
         scrollbar-width: thin;
-        scrollbar-color: #e2e8f0 transparent;
+        scrollbar-color: rgba(0,0,0,0.08) transparent;
       }
+      ::-webkit-scrollbar { width: 5px; height: 5px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.18); }
 
-      /* Webkit Browsers (Chrome, Safari, Edge) */
-      ::-webkit-scrollbar {
-        width: 4px;
-        height: 4px;
-      }
+      .font-brand { font-family: 'Syne', sans-serif; }
+      .font-mono { font-family: 'JetBrains Mono', monospace; }
 
-      ::-webkit-scrollbar-track {
-        background: transparent;
-      }
-
-      ::-webkit-scrollbar-thumb {
-        background: #e2e8f0; /* SLATE 200 - Very light and elegant */
-        border-radius: 10px;
-      }
-
-      ::-webkit-scrollbar-thumb:hover {
-        background: #cbd5e1; /* SLATE 300 - Slightly darker on interaction */
-      }
-
-      /* Fix for specific textarea scrollbar that might be using browser default */
-      textarea::-webkit-scrollbar {
-        width: 4px;
-      }
-      textarea::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      textarea::-webkit-scrollbar-thumb {
-        background: #e2e8f0;
-        border-radius: 10px;
-      }
-
+      /* Staggered entrance animations */
       @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(10px); }
+        from { opacity: 0; transform: translateY(16px); }
         to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
       }
       @keyframes bounceIn {
         0% { opacity: 0; transform: translate(-50%, 10px) scale(0.9); }
@@ -61,34 +95,101 @@
       }
       @keyframes pulse-custom {
         0%, 100% { opacity: 1; transform: scale(1); }
-        50% { opacity: 0.8; transform: scale(0.98); }
+        50% { opacity: 0.8; transform: scale(0.99); }
       }
-      @keyframes loading {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(300%); }
+      @keyframes shimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
       }
+      @keyframes glow-pulse {
+        0%, 100% { box-shadow: 0 0 12px var(--pink-dim), 0 0 32px rgba(232,88,122,0.04); }
+        50% { box-shadow: 0 0 20px var(--pink-glow), 0 0 48px rgba(232,88,122,0.08); }
+      }
+
       .animate-fade-in { animation: fadeInUp 0.5s ease-out forwards; }
-      .animate-fade-in-up { animation: fadeInUp 0.5s ease-out forwards; }
+      .animate-fade-in-up { animation: fadeInUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
       .animate-playing { animation: pulse-custom 1.5s infinite ease-in-out; }
       .animate-bounce-in { animation: bounceIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+      .animate-glow { animation: glow-pulse 2.5s ease-in-out infinite; }
+
+      .stagger-1 { animation-delay: 0.05s; opacity: 0; }
+      .stagger-2 { animation-delay: 0.1s; opacity: 0; }
+      .stagger-3 { animation-delay: 0.15s; opacity: 0; }
+      .stagger-4 { animation-delay: 0.2s; opacity: 0; }
+
+      /* Glass card */
+      .glass {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid var(--border-subtle);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .glass {
+          background: rgba(255, 255, 255, 0.04);
+          box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.2);
+        }
+      }
+
+      /* Nebula glow gradient behind analysis area */
+      .nebula-glow {
+        background: radial-gradient(ellipse at 40% 40%, rgba(232,88,122,0.04) 0%, transparent 60%),
+                    radial-gradient(ellipse at 70% 70%, rgba(147,51,234,0.03) 0%, transparent 50%);
+      }
+
+      /* ─── Recording visualizer ─── */
+      @keyframes rec-ring-pulse {
+        0%, 100% { transform: scale(1); opacity: 0.3; }
+        50% { transform: scale(1.35); opacity: 0; }
+      }
+      @keyframes rec-bar {
+        0%, 100% { transform: scaleY(0.3); }
+        50% { transform: scaleY(1); }
+      }
+      @keyframes scale-in {
+        from { opacity: 0; transform: scale(0.92); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      @keyframes float-up {
+        from { opacity: 0; transform: translateY(8px) scale(0.95); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      .animate-scale-in { animation: scale-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+      .animate-float-up { animation: float-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+      .rec-ring {
+        animation: rec-ring-pulse 1.8s ease-out infinite;
+      }
+      .rec-bar {
+        transform-origin: bottom;
+        animation: rec-bar 0.8s ease-in-out infinite;
+      }
+
+      /* Word pill horizontal scroll */
+      .word-pills-scroll {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      .word-pills-scroll::-webkit-scrollbar { display: none; }
+
+      /* Score ring glow effect */
+      .score-glow {
+        filter: drop-shadow(0 0 8px var(--pink-dim));
+      }
+
+      /* Interactive hover lift */
+      .hover-lift {
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+      .hover-lift:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      }
     </style>
-  <!-- Import map removed - using local npm packages instead -->
-  <!--
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "vite": "https://esm.sh/vite@^7.3.1",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
-  }
-}
-</script>
-  -->
 </head>
-  <body class="bg-slate-50 text-slate-900 overflow-x-hidden">
+  <body class="overflow-x-hidden">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
