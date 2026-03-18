@@ -4,16 +4,18 @@ import { Button } from './components/Button';
 import { FeedbackCard } from './components/FeedbackCard';
 import { HistoryList } from './components/HistoryList';
 import { SnailIcon, SpeakerIcon, MicrophoneIcon, WaveformIcon } from './components/Icons';
+import { NebulaLogo } from './components/NebulaLogo';
 import { generateSpeech, analyzePronunciation, getLinkingAnalysisForText, generateTutorAudio } from './services/geminiService';
 import { playBase64Audio, speakWithWebSpeech, cleanupAudioResources } from './services/audioUtils';
 import { shouldLink } from './services/linkingUtils';
 import { generateIntonationMap } from './services/intonationUtils';
 import { AnalysisResult, AppState, HistoryItem } from './types';
-import { CACHE_CONFIG, UI_CONFIG } from './config/constants';
+import { CACHE_CONFIG, UI_CONFIG, SILENCE_DETECTION } from './config/constants';
 import { safeGetJSON, safeSetJSON, safeRemoveItem } from './services/storageUtils';
 
 const ttsCache = new Map<string, string>();
-const analysisCache = new Map<string, AnalysisResult>();
+const referenceCache = new Map<string, AnalysisResult>(); // For playAndAnalyze (linking/phonetics, score=0)
+const recordingCache = new Map<string, AnalysisResult>(); // For recording evaluation (has real score)
 
 const App: React.FC = () => {
   const [text, setText] = useState<string>('How is it going?');
@@ -21,11 +23,20 @@ const App: React.FC = () => {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [activeAudioSource, setActiveAudioSource] = useState<string | null>(null);
   const [isAudioLoading, setIsAudioLoading] = useState(false);
-  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const [userAudioBlob, setUserAudioBlob] = useState<Blob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeStream, setActiveStream] = useState<MediaStream | null>(null);
   const [activeBlobUrl, setActiveBlobUrl] = useState<string | null>(null);
+  const [showMobileHistory, setShowMobileHistory] = useState(false);
+
+  const VOICES = [
+    { id: 'Kore', label: 'Kore', desc: 'Firm' },
+    { id: 'Puck', label: 'Puck', desc: 'Upbeat' },
+    { id: 'Charon', label: 'Charon', desc: 'Informative' },
+    { id: 'Aoede', label: 'Aoede', desc: 'Breezy' },
+  ] as const;
+  const [selectedVoice, setSelectedVoice] = useState('Kore');
 
   const showError = (message: string) => {
     setError(message);
@@ -36,8 +47,8 @@ const App: React.FC = () => {
     const parsed = safeGetJSON<HistoryItem[]>(CACHE_CONFIG.HISTORY_KEY, []);
     // Populate caches from history
     parsed.forEach(h => {
-      if (h.result) analysisCache.set(h.text, h.result);
-      if (h.ttsAudio) ttsCache.set(`${h.text}_normal`, h.ttsAudio);
+      if (h.result && h.result.score > 0) recordingCache.set(h.text, h.result);
+      else if (h.result) referenceCache.set(h.text, h.result);
     });
     return parsed;
   });
@@ -52,7 +63,6 @@ const App: React.FC = () => {
         score: res.score,
         timestamp: Date.now(),
         result: res,
-        ttsAudio: ttsCache.get(`${newText}_normal`)
       };
       const updated = [newItem, ...filtered].slice(0, CACHE_CONFIG.MAX_HISTORY_ITEMS);
 
@@ -68,8 +78,12 @@ const App: React.FC = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const isPlayingRef = useRef(false); // Synchronous mutex - prevents race condition from React state lag
+  const silenceTimerRef = useRef<number | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const mediaSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
 
-  // Cleanup audio resources on unmount to prevent memory leaks
+  // Cleanup audio resources when stream/blob changes
   useEffect(() => {
     return () => {
       cleanupAudioResources();
@@ -84,12 +98,54 @@ const App: React.FC = () => {
     };
   }, [activeStream, activeBlobUrl]);
 
+  // Separate cleanup for silence detection — only on unmount
+  useEffect(() => {
+    return () => {
+      stopSilenceDetection();
+    };
+  }, []);
+
+  // Clear TTS cache when voice changes — cached audio is voice-specific
+  useEffect(() => {
+    ttsCache.clear();
+  }, [selectedVoice]);
+
+  // Keyboard shortcuts: Enter=Listen, Space=Play, S=Slow, R=Record/Stop
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      if (e.key === 'Enter' && !isAudioLoading && text.trim()) {
+        e.preventDefault();
+        playAndAnalyze(text);
+      } else if (e.key === ' ') {
+        e.preventDefault();
+        if (appState !== AppState.RECORDING && appState !== AppState.ANALYZING && text.trim()) {
+          handlePlayTTS(text, false);
+        }
+      } else if ((e.key === 's' || e.key === 'S') && text.trim()) {
+        e.preventDefault();
+        handlePlayTTS(text, true);
+      } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        if (appState === AppState.RECORDING) {
+          mediaRecorderRef.current?.stop();
+        } else if (appState === AppState.IDLE || appState === AppState.SHOWING_RESULT) {
+          startRecording();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [text, appState, isAudioLoading]);
+
   const ensureAudioContext = async (): Promise<AudioContext> => {
-    let ctx = audioContext;
+    let ctx = audioContextRef.current;
     if (!ctx) {
       const Ctx = window.AudioContext || (window as any).webkitAudioContext;
       ctx = new Ctx();
-      setAudioContext(ctx);
+      audioContextRef.current = ctx;
     }
     if (ctx.state === 'suspended') await ctx.resume();
     return ctx;
@@ -97,17 +153,9 @@ const App: React.FC = () => {
 
   const playAudio = async (base64Audio: string, sourceKey: string) => {
     try {
-      console.log("playAudio called, sourceKey:", sourceKey, "audio length:", base64Audio?.length);
-
-      // Prevent overlapping audio playback
-      if (activeAudioSource && activeAudioSource !== 'tutor_loading') {
-        console.log("⚠️ Audio already playing, ignoring new playback request");
-        return;
-      }
-
       if (!base64Audio || base64Audio.length < UI_CONFIG.MIN_AUDIO_LENGTH) {
         console.error("Audio data too short or empty:", base64Audio);
-        showError("音频数据无效，请重试");
+        showError("Invalid audio data. Please try again.");
         return;
       }
       setActiveAudioSource(sourceKey);
@@ -115,89 +163,89 @@ const App: React.FC = () => {
       setActiveAudioSource(null);
     } catch (e) {
       console.error("Audio playback error:", e);
-      showError("音频播放失败: " + (e as Error).message);
+      showError("Audio playback failed: " + (e as Error).message);
       setActiveAudioSource(null);
     }
   };
 
   const handlePlayTutor = async (selectedText: string) => {
     if (!selectedText.trim()) return;
-
-    // Prevent overlapping playback - early check
-    if (activeAudioSource && activeAudioSource !== 'tutor_loading') {
-      console.log("⚠️ Playback in progress, ignoring tutor request");
-      return;
-    }
-
-    const cacheKey = `tutor_${selectedText}`;
-    const cached = ttsCache.get(cacheKey);
-    if (cached && cached.length > UI_CONFIG.MIN_BASE64_LENGTH) {
-      await playAudio(cached, 'tutor');
-      return;
-    }
-    ttsCache.delete(cacheKey);
-    setActiveAudioSource('tutor_loading'); 
+    if (isPlayingRef.current) return;
+    isPlayingRef.current = true;
     try {
-      const base64 = await generateTutorAudio(selectedText);
-      ttsCache.set(cacheKey, base64);
-      await playAudio(base64, 'tutor');
-    } catch (e) { 
-      console.error("Tutor playback error", e);
-      setActiveAudioSource(null); 
+      const cacheKey = `tutor_${selectedText}`;
+      const cached = ttsCache.get(cacheKey);
+      if (cached && cached.length > UI_CONFIG.MIN_BASE64_LENGTH) {
+        await playAudio(cached, 'tutor');
+        return;
+      }
+      ttsCache.delete(cacheKey);
+      setActiveAudioSource('tutor_loading');
+      try {
+        const base64 = await generateTutorAudio(selectedText, selectedVoice);
+        ttsCache.set(cacheKey, base64);
+        await playAudio(base64, 'tutor');
+      } catch (e) {
+        console.error("Tutor playback error", e);
+        setActiveAudioSource(null);
+      }
+    } finally {
+      isPlayingRef.current = false;
     }
   };
 
   const handlePlayTTS = async (textToSpeak: string, isSlow: boolean = false) => {
     if (!textToSpeak.trim()) return;
-
-    // Prevent overlapping playback - early check
-    if (activeAudioSource && activeAudioSource !== 'tutor_loading') {
-      console.log("⚠️ Playback in progress, ignoring TTS request");
-      return;
-    }
-
-    const cacheKey = `${textToSpeak}_${isSlow ? 'slow' : 'normal'}`;
-    const sourceKey = isSlow ? 'input_slow' : 'input_normal';
-    const cached = ttsCache.get(cacheKey);
-    if (cached && cached.length > UI_CONFIG.MIN_BASE64_LENGTH) {
-      await playAudio(cached, sourceKey);
-      return;
-    }
-    ttsCache.delete(cacheKey);
-    setAppState(AppState.GENERATING_TTS);
-    setActiveAudioSource(sourceKey);
+    if (isPlayingRef.current) return;
+    isPlayingRef.current = true;
     try {
-      const base64 = await generateSpeech(textToSpeak, isSlow);
-      ttsCache.set(cacheKey, base64);
-      await playAudio(base64, sourceKey);
-    } catch (e: any) {
-      console.error("TTS playback error", e);
-      if (e?.code === 'REQUEST_TIMEOUT') {
-        showError("请求超时，请检查网络连接或稍后重试");
-      } else if (e?.code === 'RATE_LIMIT') {
-        showError("今日 MiniMax 额度已用完，请更换密钥或稍后重试");
-      } else if (e?.code === 'INSUFFICIENT_BALANCE') {
-        // 静默切换到本地朗读，不再弹出提示
-        try { await speakWithWebSpeech(textToSpeak, isSlow ? 0.8 : 1); } catch (_) {}
-      } else if (e?.code === 'NO_AUDIO') {
-        showError("MiniMax 未返回音频，请稍后重试");
-      } else if (typeof e?.message === 'string') {
-        showError(e.message);
-      } else {
-        showError("语音合成失败，请稍后重试");
+      const cacheKey = `${textToSpeak}_${isSlow ? 'slow' : 'normal'}`;
+      const sourceKey = isSlow ? 'input_slow' : 'input_normal';
+      const cached = ttsCache.get(cacheKey);
+      if (cached && cached.length > UI_CONFIG.MIN_BASE64_LENGTH) {
+        await playAudio(cached, sourceKey);
+        return;
       }
-      setActiveAudioSource(null); 
+      ttsCache.delete(cacheKey);
+      setAppState(AppState.GENERATING_TTS);
+      setActiveAudioSource(sourceKey);
+      try {
+        const base64 = await generateSpeech(textToSpeak, isSlow, selectedVoice);
+        ttsCache.set(cacheKey, base64);
+        await playAudio(base64, sourceKey);
+      } catch (e: any) {
+        console.error("TTS playback error", e);
+        if (e?.code === 'REQUEST_TIMEOUT') {
+          showError("Request timed out. Check your connection and try again.");
+        } else if (e?.code === 'RATE_LIMIT') {
+          showError("API rate limit reached. Please try again later.");
+        } else if (e?.code === 'INSUFFICIENT_BALANCE') {
+          try { await speakWithWebSpeech(textToSpeak, isSlow ? 0.8 : 1); } catch (_) {}
+        } else if (e?.code === 'NO_AUDIO') {
+          showError("No audio returned from API. Please try again.");
+        } else if (typeof e?.message === 'string') {
+          showError(e.message);
+        } else {
+          showError("Speech synthesis failed. Please try again.");
+        }
+        setActiveAudioSource(null);
+      } finally {
+        setAppState(AppState.IDLE);
+      }
+    } finally {
+      isPlayingRef.current = false;
     }
-    finally { setAppState(AppState.IDLE); }
   };
 
   const playAndAnalyze = async (textToSpeak: string) => {
     if (!textToSpeak.trim()) return;
-    
-    // Check cache first for instant feedback
-    const cachedAnalysis = analysisCache.get(textToSpeak);
-    if (cachedAnalysis) {
-      setResult(cachedAnalysis);
+
+    // Check reference cache first (linking/phonetics analysis)
+    const cachedRef = referenceCache.get(textToSpeak);
+    if (cachedRef) {
+      // If user has a recording result, merge linking data with it
+      const cachedRecording = recordingCache.get(textToSpeak);
+      setResult(cachedRecording || cachedRef);
       setAppState(AppState.SHOWING_RESULT);
       await handlePlayTTS(textToSpeak, false);
       return;
@@ -207,9 +255,9 @@ const App: React.FC = () => {
     setAppState(AppState.GENERATING_TTS);
     
     try {
-      // 分开请求，链接分析失败时用本地兜底
+      // Run TTS and linking analysis in parallel, fallback to local heuristics if linking fails
       const [ttsResult, linkingResult] = await Promise.allSettled([
-        generateSpeech(textToSpeak, false),
+        generateSpeech(textToSpeak, false, selectedVoice),
         getLinkingAnalysisForText(textToSpeak)
       ]);
 
@@ -264,8 +312,8 @@ const App: React.FC = () => {
       };
       
       setResult(res);
-      analysisCache.set(textToSpeak, res);
-      saveToHistory(textToSpeak, res); // IMMEDIATELY SAVE TO HISTORY
+      referenceCache.set(textToSpeak, res);
+      saveToHistory(textToSpeak, res);
       
       setIsAudioLoading(false);
       setAppState(AppState.SHOWING_RESULT);
@@ -273,39 +321,118 @@ const App: React.FC = () => {
     } catch (e: any) {
       console.error("PlayAndAnalyze major failure", e);
       if (e?.code === 'REQUEST_TIMEOUT') {
-        showError("请求超时，请检查网络连接或稍后重试");
+        showError("Request timed out. Check your connection and try again.");
       } else if (e?.code === 'RATE_LIMIT') {
-        showError("今日 MiniMax 额度已用完，请更换密钥或稍后重试");
+        showError("API rate limit reached. Please try again later.");
       } else if (e?.code === 'INSUFFICIENT_BALANCE') {
-        // 静默切换到本地朗读，不再弹出提示
         try { await speakWithWebSpeech(textToSpeak, 1); } catch (_) {}
       } else if (e?.code === 'NO_AUDIO') {
-        showError("MiniMax 未返回音频，请稍后重试");
+        showError("No audio returned from API. Please try again.");
       } else if (typeof e?.message === 'string') {
         showError(e.message);
       } else {
-        showError("生成语音失败，请检查网络连接");
+        showError("Speech generation failed. Check your connection.");
       }
       setIsAudioLoading(false);
       setAppState(AppState.IDLE);
     }
   };
 
+  const stopSilenceDetection = () => {
+    if (silenceTimerRef.current) {
+      clearInterval(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    if (mediaSourceRef.current) {
+      mediaSourceRef.current.disconnect();
+      mediaSourceRef.current = null;
+    }
+    analyserRef.current = null;
+  };
+
+  const startSilenceDetection = (stream: MediaStream, ctx: AudioContext) => {
+    console.log('🎙️ startSilenceDetection called, ctx.state:', ctx.state);
+    // Store source in ref to prevent garbage collection — GC kills the audio pipeline
+    const source = ctx.createMediaStreamSource(stream);
+    mediaSourceRef.current = source;
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = SILENCE_DETECTION.FFT_SIZE;
+    source.connect(analyser);
+    analyserRef.current = analyser;
+
+    // Use Uint8Array with getByteTimeDomainData — more reliable across browsers
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    const recordingStartTime = Date.now();
+    let silenceStartTime: number | null = null;
+    let hasSpoken = false;
+    let noiseFloor = 0;
+    let calibrationSamples = 0;
+    const CALIBRATION_COUNT = 5;
+    let tickCount = 0;
+
+    const getRMS = (): number => {
+      analyser.getByteTimeDomainData(dataArray);
+      let sum = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        const normalized = (dataArray[i] - 128) / 128;
+        sum += normalized * normalized;
+      }
+      return Math.sqrt(sum / bufferLength);
+    };
+
+    silenceTimerRef.current = window.setInterval(() => {
+      tickCount++;
+
+      if (!analyserRef.current || !mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') {
+        stopSilenceDetection();
+        return;
+      }
+
+      const rms = getRMS();
+      const elapsed = Date.now() - recordingStartTime;
+
+      // Calibration phase
+      if (calibrationSamples < CALIBRATION_COUNT) {
+        noiseFloor = Math.max(noiseFloor, rms);
+        calibrationSamples++;
+        return;
+      }
+
+      if (elapsed < SILENCE_DETECTION.MIN_RECORDING_TIME) return;
+
+      const speechThreshold = Math.max(noiseFloor * 3, SILENCE_DETECTION.THRESHOLD);
+
+      if (rms > speechThreshold) {
+        hasSpoken = true;
+        silenceStartTime = null;
+      } else if (hasSpoken) {
+        if (!silenceStartTime) {
+          silenceStartTime = Date.now();
+        } else if (Date.now() - silenceStartTime >= SILENCE_DETECTION.DURATION) {
+          stopSilenceDetection();
+          mediaRecorderRef.current?.stop();
+        }
+      }
+    }, SILENCE_DETECTION.CHECK_INTERVAL);
+
+    console.log('🎙️ Silence detection interval started, timerId:', silenceTimerRef.current);
+  };
+
   const startRecording = async () => {
     try {
-      await ensureAudioContext();
+      const ctx = await ensureAudioContext();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      setActiveStream(stream); // Track stream for cleanup
+      setActiveStream(stream);
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
       mediaRecorder.ondataavailable = (e) => audioChunksRef.current.push(e.data);
       mediaRecorder.onstop = async () => {
+        stopSilenceDetection();
         // Stop all stream tracks immediately to release microphone
-        if (activeStream) {
-          activeStream.getTracks().forEach(track => track.stop());
-          setActiveStream(null);
-        }
+        stream.getTracks().forEach(track => track.stop());
+        setActiveStream(null);
 
         setAppState(AppState.ANALYZING);
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
@@ -317,11 +444,11 @@ const App: React.FC = () => {
             const res = await analyzePronunciation(text, base64);
             setResult(res);
             setAppState(AppState.SHOWING_RESULT);
-            analysisCache.set(text, res);
+            recordingCache.set(text, res);
             saveToHistory(text, res);
           } catch (err: any) {
             console.error("Recording evaluation failure", err);
-            showError(err?.message || "分析失败，请重试");
+            showError(err?.message || "Analysis failed. Please try again.");
             setAppState(AppState.IDLE);
           }
         };
@@ -329,29 +456,31 @@ const App: React.FC = () => {
       };
       mediaRecorder.start();
       setAppState(AppState.RECORDING);
+      // Start monitoring for silence to auto-stop
+      startSilenceDetection(stream, ctx);
     } catch (e: any) {
       console.error("Microphone access failure", e);
-      // Cleanup stream if it was created but recording failed
+      stopSilenceDetection();
       if (activeStream) {
         activeStream.getTracks().forEach(track => track.stop());
         setActiveStream(null);
       }
-      showError("无法访问麦克风，请检查权限设置");
+      showError("Microphone access denied. Please check your browser permissions.");
       setAppState(AppState.IDLE);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100/50 pb-20 selection:bg-indigo-100 font-sans antialiased">
+    <div className="min-h-screen pb-16 antialiased">
       {/* Error Toast */}
       {error && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
-          <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-3 rounded-2xl shadow-xl flex items-center gap-3">
-            <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+          <div className="glass px-5 py-3 rounded-2xl flex items-center gap-3" style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.1)' }}>
+            <svg className="w-4 h-4 shrink-0" style={{ color: 'var(--red)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span className="text-sm font-semibold">{error}</span>
-            <button onClick={() => setError(null)} className="ml-2 text-red-400 hover:text-red-600">
+            <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{error}</span>
+            <button onClick={() => setError(null)} className="ml-1 transition-colors" style={{ color: 'var(--text-muted)' }}>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -362,160 +491,203 @@ const App: React.FC = () => {
 
       <div className="flex">
         {/* Main Content Area */}
-        <div className="flex-1 px-4">
-          <header className="max-w-2xl mx-auto py-10 flex items-center justify-between mb-10">
-            <div className="flex items-center gap-4">
-              <div className="relative w-14 h-14 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-[18px] flex items-center justify-center text-white font-black shadow-lg shadow-indigo-200/50 transform -rotate-2 transition-all hover:rotate-0 hover:shadow-xl hover:shadow-indigo-300/50">
-                <span className="relative z-10">E</span>
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-transparent rounded-[18px]"></div>
-              </div>
-              <div>
-                <h1 className="font-black text-3xl tracking-tight bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent leading-none">EchoCoach</h1>
-                <p className="text-[11px] font-bold text-indigo-400 uppercase tracking-[0.12em] mt-1.5">AI-Powered Pronunciation Master</p>
-              </div>
+        <div className="flex-1 px-6 lg:px-8">
+          <header className="max-w-[660px] mx-auto pt-7 pb-4 flex items-center gap-3.5 animate-fade-in stagger-1">
+            <NebulaLogo size={38} />
+            <div>
+              <h1 className="font-brand font-bold text-[22px] tracking-tight leading-none" style={{ color: 'var(--text-primary)' }}>Nebula</h1>
+              <p className="text-[10px] font-medium tracking-widest uppercase mt-1" style={{ color: 'var(--text-muted)' }}>Pronunciation Coach</p>
             </div>
           </header>
 
-          <main className="max-w-2xl mx-auto space-y-12 pb-10">
-        <section className="bg-white p-12 rounded-[32px] shadow-xl shadow-slate-200/60 border border-slate-200/80 flex flex-col gap-9 transition-all hover:shadow-2xl">
-          <label className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.15em]">Practice Sentence</label>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            className="w-full text-xl font-semibold bg-gradient-to-br from-slate-50 to-slate-100/50 outline-none resize-none min-h-[140px] placeholder:text-slate-300 text-slate-700 leading-relaxed p-6 rounded-[20px] border-2 border-slate-200 focus:border-indigo-300 focus:bg-white focus:shadow-inner transition-all"
-            placeholder="Type your English sentence here..."
-          />
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-6 border-t border-slate-100 gap-6">
-             <div className="flex items-center gap-4">
-               <button
-                 onClick={() => playAndAnalyze(text)}
-                 disabled={isAudioLoading}
-                 className="h-[60px] px-10 rounded-[18px] bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[13px] font-black uppercase tracking-[0.1em] shadow-lg shadow-indigo-300/50 hover:shadow-xl hover:shadow-indigo-400/50 active:scale-95 transition-all flex items-center gap-3 disabled:opacity-60"
-               >
-                 <WaveformIcon size={20} />
-                 {isAudioLoading ? 'Analyzing...' : 'Analyze'}
-               </button>
-               <div className="flex bg-gradient-to-br from-white to-slate-50 rounded-[18px] p-2.5 gap-2.5 border-2 border-slate-200">
+          <main className="max-w-[660px] mx-auto space-y-5 pb-16">
+            {/* Input Section */}
+            <section className="glass p-6 rounded-2xl flex flex-col gap-3 animate-fade-in-up stagger-2">
+              <label className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Practice Sentence</label>
+              <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    if (e.metaKey) return;
+                    e.preventDefault();
+                    if (text.trim() && !isAudioLoading) playAndAnalyze(text);
+                  }
+                }}
+                className="w-full text-[17px] font-medium outline-none resize-none min-h-[56px] leading-relaxed p-4 rounded-xl transition-all duration-200"
+                style={{ backgroundColor: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--pink)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--pink-dim)'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.boxShadow = 'none'; }}
+                placeholder="Type an English sentence to practice..."
+              />
+
+              {/* Action Buttons — primary row */}
+              <div className="flex items-center justify-between pt-3 gap-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                <div className="flex items-center gap-2.5">
+                  <button
+                    onClick={() => playAndAnalyze(text)}
+                    disabled={isAudioLoading}
+                    className="h-10 px-6 rounded-full text-white text-[13px] font-semibold hover:brightness-110 active:scale-[0.96] transition-all flex items-center gap-2 disabled:opacity-40"
+                    style={{ backgroundColor: 'var(--pink)', boxShadow: '0 2px 12px var(--pink-dim)' }}
+                  >
+                    <SpeakerIcon size={15} />
+                    {isAudioLoading ? 'Loading...' : 'Listen'}
+                  </button>
                   <button
                     onClick={() => handlePlayTTS(text, true)}
-                    className={`h-12 px-6 rounded-[14px] text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
-                      activeAudioSource === 'input_slow'
-                        ? 'bg-gradient-to-br from-amber-50 to-amber-100 text-amber-600 shadow-md border-[1.5px] border-amber-400'
-                        : 'text-slate-500 hover:text-amber-600 hover:bg-amber-50/50'
-                    }`}
+                    className="h-10 px-4 rounded-full text-[13px] font-medium transition-all flex items-center gap-1.5 active:scale-[0.96]"
+                    style={{
+                      backgroundColor: activeAudioSource === 'input_slow' ? 'var(--pink-dim)' : 'var(--bg-elevated)',
+                      color: activeAudioSource === 'input_slow' ? 'var(--pink)' : 'var(--text-secondary)'
+                    }}
+                    title="Slow playback"
                   >
-                    <SnailIcon size={20} />
+                    <SnailIcon size={15} />
+                    Slow
                   </button>
+                </div>
+
+                {appState === AppState.RECORDING ? (
                   <button
-                    onClick={() => handlePlayTTS(text, false)}
-                    className={`h-12 px-6 rounded-[14px] text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
-                      activeAudioSource === 'input_normal'
-                        ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600 shadow-md border-[1.5px] border-emerald-400'
-                        : 'text-slate-500 hover:text-emerald-600 hover:bg-emerald-50/50'
-                    }`}
+                    onClick={() => mediaRecorderRef.current?.stop()}
+                    className="relative h-10 px-5 rounded-full text-[13px] font-semibold flex items-center gap-2.5 active:scale-[0.96] transition-all"
+                    style={{ backgroundColor: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}
                   >
-                    <SpeakerIcon size={20} />
+                    <span className="absolute inset-0 rounded-full rec-ring" style={{ border: '2px solid var(--red)' }}></span>
+                    <span className="flex items-center gap-[3px] h-5">
+                      {[0, 0.15, 0.3, 0.1, 0.25].map((d, i) => (
+                        <span key={i} className="rec-bar w-[3px] rounded-full" style={{ height: '100%', backgroundColor: 'var(--red)', animationDelay: `${d}s` }}></span>
+                      ))}
+                    </span>
+                    Stop
                   </button>
-               </div>
-             </div>
+                ) : appState === AppState.ANALYZING ? (
+                  <div className="h-10 px-5 rounded-full flex items-center gap-2.5" style={{ backgroundColor: 'var(--pink-dim)', border: '1px solid rgba(232,88,122,0.15)' }}>
+                    <div className="w-4 h-4 border-2 rounded-full animate-spin shrink-0" style={{ borderColor: 'rgba(232,88,122,0.2)', borderTopColor: 'var(--pink)' }}></div>
+                    <span className="text-[13px] font-medium" style={{ color: 'var(--pink)' }}>Analyzing...</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={startRecording}
+                    className="h-10 px-5 rounded-full text-[13px] font-medium flex items-center gap-2 transition-all active:scale-[0.96] hover-lift"
+                    style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
+                  >
+                    <MicrophoneIcon size={15} />
+                    Record
+                  </button>
+                )}
+              </div>
 
-             {appState === AppState.RECORDING ? (
-                <button onClick={() => mediaRecorderRef.current?.stop()} className="h-[60px] px-10 rounded-[18px] bg-gradient-to-br from-red-50 to-red-100 text-[13px] font-black text-red-600 uppercase flex items-center justify-center gap-3 animate-pulse border-2 border-red-300 shadow-lg shadow-red-200/50 active:scale-95 transition-all">
-                  <span className="w-3 h-3 bg-red-600 rounded-full animate-ping"></span> Stop
-                </button>
-             ) : (
-                <button onClick={startRecording} className="h-[60px] px-10 rounded-[18px] bg-gradient-to-br from-white to-amber-50 text-[13px] font-black text-amber-600 uppercase flex items-center justify-center gap-3 border-2 border-amber-400 hover:bg-gradient-to-br hover:from-amber-50 hover:to-amber-100 hover:border-amber-500 transition-all shadow-md shadow-amber-200/50 active:scale-95">
-                   <MicrophoneIcon size={20} />
-                   Record
-                </button>
-             )}
-          </div>
-        </section>
+              {/* Secondary row: Voice + YouTube + keyboard hints */}
+              <div className="flex items-center gap-2 flex-wrap" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '10px' }}>
+                {VOICES.map(v => (
+                  <button
+                    key={v.id}
+                    onClick={() => setSelectedVoice(v.id)}
+                    className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all active:scale-95"
+                    style={{
+                      backgroundColor: selectedVoice === v.id ? 'var(--pink-dim)' : 'var(--bg-deep)',
+                      color: selectedVoice === v.id ? 'var(--pink)' : 'var(--text-muted)',
+                      border: `1px solid ${selectedVoice === v.id ? 'var(--pink)' : 'var(--border-subtle)'}`,
+                    }}
+                    title={v.desc}
+                  >
+                    {v.label}
+                  </button>
+                ))}
+                <a
+                  href={`https://youglish.com/pronounce/${encodeURIComponent(text.replace(/[?.!,;:'"]/g, '').trim())}/english`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium transition-colors"
+                  style={{ color: 'var(--text-muted)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--pink)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                  title="Watch native speakers say this on YouTube"
+                >
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                  </svg>
+                  YouTube
+                </a>
+              </div>
 
-        {result && (
-          <FeedbackCard 
-            result={result} 
-            isUpdating={appState === AppState.ANALYZING}
-            onPlayNormal={() => handlePlayTTS(text, false)}
-            onPlaySlow={() => handlePlayTTS(text, true)}
-            activeAudioSource={activeAudioSource}
-            onPlayWord={(w) => handlePlayTutor(w)}
-            onPlayTutor={(s) => handlePlayTutor(s)}
-            playingWord={null}
-            onPlayUserRecording={() => {
-              if (userAudioBlob) {
-                // Revoke previous Blob URL to prevent memory leak
-                if (activeBlobUrl) {
-                  URL.revokeObjectURL(activeBlobUrl);
-                }
+              {/* Keyboard hints — compact single line */}
+              <div className="flex items-center gap-3">
+                {(['Enter','Space','S','R'] as const).map((key) => (
+                  <span key={key} className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-muted)', opacity: 0.6 }}>
+                    <kbd className="px-1.5 py-0.5 rounded text-[9px] font-mono"
+                      style={{ backgroundColor: 'var(--bg-deep)', border: '1px solid var(--border-subtle)' }}>
+                      {key}
+                    </kbd>
+                  </span>
+                ))}
+              </div>
+            </section>
 
-                // Create new Blob URL and track it
-                const blobUrl = URL.createObjectURL(userAudioBlob);
-                setActiveBlobUrl(blobUrl);
+            {/* Loading State */}
+            {appState === AppState.ANALYZING && !result && (
+              <div className="glass rounded-2xl p-12 flex flex-col items-center gap-6 animate-fade-in-up nebula-glow">
+                <div className="relative w-16 h-16">
+                  <div className="absolute inset-0 border-[3px] rounded-full" style={{ borderColor: 'var(--border-subtle)' }}></div>
+                  <div className="absolute inset-0 border-[3px] rounded-full animate-spin" style={{ borderTopColor: 'var(--pink)', borderRightColor: 'rgba(232,88,122,0.3)', borderBottomColor: 'transparent', borderLeftColor: 'transparent' }}></div>
+                </div>
+                <div className="text-center space-y-2">
+                  <p className="font-semibold text-base" style={{ color: 'var(--text-primary)' }}>Analyzing your pronunciation</p>
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Comparing phonemes, rhythm, and intonation...</p>
+                </div>
+              </div>
+            )}
 
-                const audio = new Audio(blobUrl);
-
-                // Revoke Blob URL after playback ends
-                audio.onended = () => {
-                  URL.revokeObjectURL(blobUrl);
-                  setActiveBlobUrl(null);
-                };
-
-                // Also revoke on error
-                audio.onerror = () => {
-                  URL.revokeObjectURL(blobUrl);
-                  setActiveBlobUrl(null);
-                };
-
-                audio.play();
-              }
-            }}
-          />
-        )}
+            {/* Results */}
+            {result && (
+              <FeedbackCard
+                result={result}
+                isUpdating={appState === AppState.ANALYZING}
+                activeAudioSource={activeAudioSource}
+                onPlayWord={(w) => handlePlayTutor(w)}
+                onPlayTutor={(s) => handlePlayTutor(s)}
+                playingWord={null}
+                hasUserRecording={!!userAudioBlob}
+                onPlayUserRecording={() => {
+                  if (userAudioBlob) {
+                    if (activeBlobUrl) URL.revokeObjectURL(activeBlobUrl);
+                    const blobUrl = URL.createObjectURL(userAudioBlob);
+                    setActiveBlobUrl(blobUrl);
+                    const audio = new Audio(blobUrl);
+                    audio.onended = () => { URL.revokeObjectURL(blobUrl); setActiveBlobUrl(null); };
+                    audio.onerror = () => { URL.revokeObjectURL(blobUrl); setActiveBlobUrl(null); };
+                    audio.play();
+                  }
+                }}
+              />
+            )}
           </main>
         </div>
 
         {/* Right Sidebar - History */}
-        <aside className="w-[400px] h-screen sticky top-0 overflow-y-auto bg-gradient-to-b from-white to-slate-50 border-l border-slate-200 px-9 py-12">
+        <aside className="w-[300px] h-screen sticky top-0 overflow-y-auto px-5 py-7 hidden lg:block" style={{ backgroundColor: 'var(--bg-surface)', borderLeft: '1px solid var(--border-subtle)' }}>
           <HistoryList
             history={history}
+            onQuickAnalyze={(t) => { setText(t); playAndAnalyze(t); }}
+            onQuickRecord={(t) => { setText(t); startRecording(); }}
             onSelect={async (t) => {
               setText(t);
               const item = history.find(h => h.text.trim().toLowerCase() === t.trim().toLowerCase());
-
               if (item?.result) {
-                // Check if the result has valid intonationMap
                 const wordCount = (item.result.fullLinkedSentence || item.result.speechScript || "").trim().split(/\s+/).length;
                 const tokenCount = (item.result.intonationMap || "").trim().split(/\s+/).filter(Boolean).length;
-
                 if (!item.result.intonationMap || tokenCount !== wordCount || tokenCount === 0) {
-                  console.warn("⚠️ History data incomplete, regenerating...");
-                  // Regenerate linking analysis for old data
                   try {
                     const linking = await getLinkingAnalysisForText(t);
-                    const fixedResult = {
-                      ...item.result,
-                      fullLinkedSentence: linking.fullLinkedSentence,
-                      fullLinkedPhonetic: linking.fullLinkedPhonetic,
-                      intonationMap: linking.intonationMap
-                    };
+                    const fixedResult = { ...item.result, fullLinkedSentence: linking.fullLinkedSentence, fullLinkedPhonetic: linking.fullLinkedPhonetic, intonationMap: linking.intonationMap };
                     setResult(fixedResult);
-                    // Update cache and history
-                    analysisCache.set(t, fixedResult);
-                    const newHistory = history.map(h =>
-                      h.text.trim().toLowerCase() === t.trim().toLowerCase()
-                        ? { ...h, result: fixedResult }
-                        : h
-                    );
+                    referenceCache.set(t, fixedResult);
+                    const newHistory = history.map(h => h.text.trim().toLowerCase() === t.trim().toLowerCase() ? { ...h, result: fixedResult } : h);
                     setHistory(newHistory);
-                    // Safely save updated history
-                    if (!safeSetJSON(CACHE_CONFIG.HISTORY_KEY, newHistory)) {
-                      console.warn('Failed to save updated history to localStorage');
-                    }
-                    console.log("✅ History data fixed");
+                    safeSetJSON(CACHE_CONFIG.HISTORY_KEY, newHistory);
                   } catch (e) {
-                    console.error("Failed to fix history data:", e);
-                    setResult(item.result); // Use original even if incomplete
+                    setResult(item.result);
                   }
                 } else {
                   setResult(item.result);
@@ -523,17 +695,63 @@ const App: React.FC = () => {
               }
             }}
             onClear={() => {
-              if(confirm("确定清空练习历史吗？")) {
+              if (confirm("Clear all practice history?")) {
                 setHistory([]);
-                // Safely remove history from localStorage
-                if (!safeRemoveItem(CACHE_CONFIG.HISTORY_KEY)) {
-                  console.warn('Failed to remove history from localStorage');
-                }
+                safeRemoveItem(CACHE_CONFIG.HISTORY_KEY);
               }
             }}
           />
         </aside>
       </div>
+
+      {/* Mobile: floating history button */}
+      {history.length > 0 && (
+        <button
+          onClick={() => setShowMobileHistory(true)}
+          className="fixed bottom-6 right-6 z-40 lg:hidden w-12 h-12 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+          style={{ backgroundColor: 'var(--pink)', boxShadow: '0 4px 20px var(--pink-dim)' }}
+          title="Practice history"
+        >
+          <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center text-white"
+            style={{ backgroundColor: 'var(--red)' }}>
+            {Math.min(history.length, 9)}
+          </span>
+        </button>
+      )}
+
+      {/* Mobile history drawer */}
+      {showMobileHistory && (
+        <div className="fixed inset-0 z-50 lg:hidden" onClick={() => setShowMobileHistory(false)}>
+          <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} />
+          <div
+            className="absolute bottom-0 left-0 right-0 rounded-t-2xl p-6 overflow-y-auto"
+            style={{ backgroundColor: 'var(--bg-surface)', maxHeight: '80vh' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ backgroundColor: 'var(--border-medium)' }} />
+            <HistoryList
+              history={history}
+              onQuickAnalyze={(t) => { setShowMobileHistory(false); setText(t); playAndAnalyze(t); }}
+              onQuickRecord={(t) => { setShowMobileHistory(false); setText(t); startRecording(); }}
+              onSelect={async (t) => {
+                setShowMobileHistory(false);
+                setText(t);
+                const item = history.find(h => h.text.trim().toLowerCase() === t.trim().toLowerCase());
+                if (item?.result) setResult(item.result);
+              }}
+              onClear={() => {
+                if (confirm("Clear all practice history?")) {
+                  setHistory([]);
+                  safeRemoveItem(CACHE_CONFIG.HISTORY_KEY);
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
