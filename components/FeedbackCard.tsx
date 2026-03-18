@@ -376,11 +376,14 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
              <h4 className="font-semibold text-[10px] uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Word Breakdown</h4>
              <div className="h-px flex-1" style={{ background: 'linear-gradient(to left, transparent, var(--border-subtle))' }}></div>
           </div>
-          <div className="flex flex-wrap gap-3 justify-center">
+          <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
             {result.wordBreakdown.map((item, idx) => (
               <WordSmallItem key={idx} item={item} onPlay={() => setDetailWord(item)} isPlaying={playingWord === item.word} />
             ))}
           </div>
+          {result.wordBreakdown.length > 5 && (
+            <p className="text-center text-[9px] mt-1" style={{ color: 'var(--text-muted)', opacity: 0.5 }}>← scroll →</p>
+          )}
         </div>
       )}
 
@@ -415,7 +418,7 @@ const WordSmallItem: React.FC<{ item: WordAnalysis; onPlay: () => void; isPlayin
   const showComparison = item.status !== 'correct' && item.phoneticUser && item.phoneticUser !== item.phoneticCorrect;
 
   return (
-    <button onClick={onPlay} className={`flex flex-col items-center px-4 py-2.5 rounded-xl border transition-all active:scale-95 hover-lift ${isPlaying ? 'ring-2 scale-105' : ''}`}
+    <button onClick={onPlay} className={`flex-shrink-0 flex flex-col items-center px-4 py-2.5 rounded-xl border transition-all active:scale-95 hover-lift ${isPlaying ? 'ring-2 scale-105' : ''}`}
       style={{ backgroundColor: c.bg, borderColor: c.border, color: c.text, ...(isPlaying ? { ringColor: 'var(--pink)' } : {}) }}>
       <span className="text-[14px] font-semibold tracking-tight">{item.word}</span>
       {showComparison ? (
