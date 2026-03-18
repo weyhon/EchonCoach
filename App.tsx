@@ -522,7 +522,7 @@ const App: React.FC = () => {
               />
 
               {/* Action Buttons — primary row */}
-              <div className="flex items-center justify-between pt-3 gap-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+              <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
                 <div className="flex items-center gap-2.5">
                   <button
                     onClick={() => playAndAnalyze(text)}
@@ -579,7 +579,7 @@ const App: React.FC = () => {
               </div>
 
               {/* Secondary row: Voice + YouTube + keyboard hints */}
-              <div className="flex items-center gap-2 flex-wrap" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '10px' }}>
+              <div className="flex items-center gap-2 flex-wrap pt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
                 {VOICES.map(v => (
                   <button
                     key={v.id}
