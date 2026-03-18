@@ -1,41 +1,40 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AnalysisResult, WordAnalysis } from '../types';
-import { isYesNoQuestion } from '../services/linkingUtils';
+import { isYesNoQuestion, getSentenceIntonation } from '../services/linkingUtils';
 import { generateIntonationTokens } from '../services/intonationUtils';
 import { IPALegend } from './IPALegend';
-import { SnailIcon, SpeakerIcon } from './Icons';
+import { WordDetailModal } from './WordDetailModal';
 
 interface FeedbackCardProps {
   result: AnalysisResult;
   isUpdating?: boolean;
-  onPlayNormal: () => void;
-  onPlaySlow: () => void;
   activeAudioSource: string | null;
   onPlayWord: (word: string) => void;
   onPlayTutor: (selectedText: string) => void;
   playingWord: string | null;
   onPlayUserRecording: () => void;
+  hasUserRecording?: boolean;
 }
 
 const ScoreRing: React.FC<{ score: number }> = ({ score = 0 }) => {
   const safeScore = Math.max(0, Math.min(100, score));
-  const radius = 24;
+  const radius = 22;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (safeScore / 100) * circumference;
-  const colorClass = safeScore >= 80 ? 'text-emerald-500' : safeScore >= 60 ? 'text-indigo-500' : 'text-orange-500';
-  
+  const strokeColor = safeScore >= 80 ? 'var(--green)' : safeScore >= 60 ? 'var(--amber)' : 'var(--red)';
+
   return (
-    <div className="relative flex items-center justify-center w-16 h-16 shrink-0">
-      <svg className="transform -rotate-90 w-16 h-16">
-        <circle cx="32" cy="32" r={radius} stroke="currentColor" strokeWidth="6" fill="transparent" className="text-slate-100" />
+    <div className="relative flex items-center justify-center w-14 h-14 shrink-0">
+      <svg className="transform -rotate-90 w-14 h-14">
+        <circle cx="28" cy="28" r={radius} stroke="var(--border-medium)" strokeWidth="4" fill="transparent" />
         <circle
-          cx="32" cy="32" r={radius} stroke="currentColor" strokeWidth="6" fill="transparent"
+          cx="28" cy="28" r={radius} stroke={strokeColor} strokeWidth="4" fill="transparent"
           strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round"
-          className={`${colorClass} transition-all duration-700`}
+          className="transition-all duration-700"
         />
       </svg>
-      <span className={`absolute text-sm font-black ${colorClass}`}>{safeScore > 0 ? safeScore : "--"}</span>
+      <span className="absolute text-sm font-bold" style={{ color: strokeColor }}>{safeScore > 0 ? safeScore : "--"}</span>
     </div>
   );
 };
@@ -48,12 +47,10 @@ interface SymbolSpanProps {
 }
 
 const SymbolSpan: React.FC<SymbolSpanProps> = ({ token, isLast, firstWord, fullText }) => {
-  // 确定显示什么符号
   let stressSymbol: string | null = null;
   let toneSymbol: string | null = null;
 
   if (token && token.trim()) {
-    // 更宽松的解析：检查字符是否存在
     const t = token.trim();
     if (t.includes('●')) stressSymbol = '●';
     else if (t.includes('·')) stressSymbol = '·';
@@ -62,39 +59,28 @@ const SymbolSpan: React.FC<SymbolSpanProps> = ({ token, isLast, firstWord, fullT
     else if (t.includes('↘')) toneSymbol = '↘';
   }
 
-  // 如果没有提供符号，使用默认值
   if (!stressSymbol && !toneSymbol) {
     if (isLast) {
-      // 最后一个词：使用专业的语调判断逻辑
-      // Wh-questions (What, Where, etc.) use falling intonation ↘
-      // Yes/No questions (Do you, Are you, etc.) use rising intonation ↗
-      // Statements use falling intonation ↘
       const sentenceIntonation = fullText ? getSentenceIntonation(fullText) : '↘';
       const isYesNo = firstWord ? isYesNoQuestion(fullText || firstWord) : false;
-
       stressSymbol = isYesNo ? '·' : '●';
       toneSymbol = sentenceIntonation;
     } else {
-      // 非最后一个词：默认弱读
       stressSymbol = '·';
     }
   }
 
   return (
     <div className="flex flex-col items-center justify-start gap-0">
-      {/* 语调符号 - 精致小巧 */}
       {toneSymbol && (
-        <span className={`font-black text-[20px] leading-none drop-shadow-lg animate-symbol-pop ${
-          toneSymbol === '↗' ? 'text-orange-400 drop-shadow-[0_0_12px_rgba(251,146,60,0.8)]' : 'text-sky-400 drop-shadow-[0_0_12px_rgba(56,189,248,0.8)]'
-        }`}>
+        <span className="font-bold text-[16px] leading-none animate-symbol-pop"
+          style={{ color: toneSymbol === '↗' ? 'var(--amber)' : 'var(--pink)' }}>
           {toneSymbol}
         </span>
       )}
-      {/* 重读符号 */}
       {stressSymbol && (
-        <span className={`font-black text-[10px] ${
-          stressSymbol === '●' ? 'text-indigo-400 drop-shadow-[0_0_6px_rgba(129,140,248,0.8)]' : 'text-slate-500 opacity-40'
-        }`}>
+        <span className="font-bold text-[10px]"
+          style={{ color: stressSymbol === '●' ? 'var(--pink)' : 'var(--text-muted)' }}>
           {stressSymbol}
         </span>
       )}
@@ -103,15 +89,19 @@ const SymbolSpan: React.FC<SymbolSpanProps> = ({ token, isLast, firstWord, fullT
 };
 
 export const FeedbackCard: React.FC<FeedbackCardProps> = ({
-  result, isUpdating, onPlayNormal, onPlaySlow, activeAudioSource, onPlayWord, onPlayTutor, playingWord, onPlayUserRecording
+  result, isUpdating, activeAudioSource, onPlayWord, onPlayTutor, playingWord, onPlayUserRecording, hasUserRecording
 }) => {
   const [selectedText, setSelectedText] = useState<string | null>(null);
   const [showIPALegend, setShowIPALegend] = useState<boolean>(false);
+  const [karaokeIndex, setKaraokeIndex] = useState<number>(-1);
+  const [detailWord, setDetailWord] = useState<WordAnalysis | null>(null);
+  const karaokeTimerRef = useRef<number | null>(null);
   const isPlayingNormal = activeAudioSource === 'input_normal';
   const isPlayingSlow = activeAudioSource === 'input_slow';
+  const isKaraokePlaying = isPlayingNormal || isPlayingSlow;
   const isPlayingTutor = activeAudioSource === 'tutor';
   const isTutorLoading = activeAudioSource === 'tutor_loading';
-  
+
   const handleMouseUp = () => {
     setTimeout(() => {
       const sel = window.getSelection();
@@ -128,114 +118,176 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
     }, 50);
   };
 
+  // Karaoke highlight effect — advance word index during TTS playback
+  useEffect(() => {
+    if (!isKaraokePlaying) {
+      setKaraokeIndex(-1);
+      if (karaokeTimerRef.current) {
+        clearInterval(karaokeTimerRef.current);
+        karaokeTimerRef.current = null;
+      }
+      return;
+    }
+
+    const allWords = (result.fullLinkedSentence || result.speechScript || "").trim().split(/\s+/);
+    if (allWords.length === 0) return;
+
+    const baseMs = isPlayingSlow ? 520 : 340;
+    const avgLen = allWords.reduce((s, w) => s + w.length, 0) / allWords.length;
+
+    const schedule: number[] = [];
+    let cumulative = 120;
+    for (const w of allWords) {
+      schedule.push(cumulative);
+      const factor = Math.max(0.6, w.replace(/[‿?.!,;]/g, '').length / Math.max(avgLen, 1));
+      cumulative += baseMs * factor;
+    }
+
+    setKaraokeIndex(0);
+    let wordIdx = 0;
+
+    const startTime = Date.now();
+    karaokeTimerRef.current = window.setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      while (wordIdx < allWords.length - 1 && elapsed >= schedule[wordIdx + 1]) {
+        wordIdx++;
+      }
+      setKaraokeIndex(wordIdx);
+
+      if (wordIdx >= allWords.length - 1 && elapsed > cumulative + 200) {
+        clearInterval(karaokeTimerRef.current!);
+        karaokeTimerRef.current = null;
+      }
+    }, 50);
+
+    return () => {
+      if (karaokeTimerRef.current) {
+        clearInterval(karaokeTimerRef.current);
+        karaokeTimerRef.current = null;
+      }
+    };
+  }, [isKaraokePlaying, isPlayingSlow, result.fullLinkedSentence, result.speechScript]);
+
   const words = (result.fullLinkedSentence || result.speechScript || "").trim().split(/\s+/);
   const sentenceText = result.fullLinkedSentence || result.speechScript || "";
 
-  const rawTokens = (result.intonationMap || "").trim().split(/\s+/).filter(Boolean);
-  console.log("🎯 FeedbackCard token matching:", {
-    words: words.length,
-    rawTokens: rawTokens.length,
-    usingFallback: rawTokens.length !== words.length,
-    result: result.intonationMap
-  });
+  const wordStatusMap = new Map<string, WordAnalysis['status']>(
+    (result.wordBreakdown || []).map(w => [w.word.toLowerCase().replace(/[^a-z]/g, ''), w.status])
+  );
 
-  // Use centralized intonation generation for fallback
+  const rawTokens = (result.intonationMap || "").trim().split(/\s+/).filter(Boolean);
+
   const mapTokens = rawTokens.length === words.length
     ? rawTokens
     : generateIntonationTokens(sentenceText, words);
 
   return (
-    <div className={`bg-gradient-to-br from-white to-purple-50/30 rounded-[32px] shadow-xl border-2 border-purple-100/50 p-10 md:p-12 space-y-8 animate-fade-in-up relative transition-all duration-500 ${isUpdating ? 'opacity-50 scale-[0.97] blur-[1px]' : 'opacity-100 scale-100'}`}>
+    <div className={`glass rounded-2xl p-5 space-y-4 animate-fade-in-up relative transition-all duration-500 ${isUpdating ? 'opacity-50 scale-[0.97] blur-[1px]' : 'opacity-100 scale-100'}`}>
       <style>{`
         @keyframes symbol-pop {
-          0%, 100% { transform: translateY(0) scale(1); filter: brightness(1.1); }
-          50% { transform: translateY(-3px) scale(1.1); filter: brightness(1.3); }
+          0%, 100% { transform: translateY(0) scale(1); }
+          50% { transform: translateY(-1px) scale(1.03); }
         }
         .animate-symbol-pop { animation: symbol-pop 2s infinite ease-in-out; }
       `}</style>
 
-      {/* Header Info */}
-      <div className="flex flex-col sm:flex-row gap-6 items-start">
-        {result.overallComment && result.score > 0 && (
-          <div className="flex items-center gap-5 flex-1 w-full">
-            <ScoreRing score={result.score} />
-            <div className="flex-1 bg-gradient-to-br from-emerald-50 to-emerald-100/50 p-6 rounded-[20px] border-[1.5px] border-emerald-300/60 relative min-h-[70px] flex flex-col gap-3 shadow-sm">
-              <div className="text-[11px] font-black text-emerald-600 uppercase tracking-[0.15em]">✨ Expert Advice</div>
-              <p className="text-emerald-800 text-[14px] leading-relaxed font-semibold">
-                {result.overallComment}
-              </p>
+      {/* Score + Feedback Header */}
+      {result.overallComment && result.score > 0 && (
+        <div className="flex items-center gap-3 w-full">
+          <ScoreRing score={result.score} />
+          <div className="flex-1 p-3.5 rounded-xl relative min-h-[48px] flex flex-col gap-1" style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
+            <div className="flex items-center justify-between">
+              <div className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Feedback</div>
+              <button onClick={onPlayUserRecording} className="text-[10px] font-semibold transition-colors flex items-center gap-1" style={{ color: 'var(--text-muted)' }}
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--pink)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4l16 8-16 8V4z" /></svg>
+                Replay Mine
+              </button>
             </div>
+            <p className="text-[13px] leading-relaxed font-medium" style={{ color: 'var(--text-primary)' }}>
+              {result.overallComment}
+            </p>
           </div>
-        )}
-        <div className="flex flex-row sm:flex-col gap-3 shrink-0 items-center sm:items-end w-full sm:w-auto justify-between sm:justify-center">
-           <button onClick={onPlayUserRecording} className="text-[11px] font-bold text-slate-400 hover:text-indigo-600 uppercase tracking-wider transition-all hover:scale-105">Replay Mine</button>
-           <div className="flex gap-2.5 bg-gradient-to-br from-slate-100 to-slate-50 p-2.5 rounded-[12px] border border-slate-200">
-             <button
-               onClick={onPlaySlow}
-               className={`px-5 py-2 rounded-[10px] transition-all flex items-center gap-2 ${
-                 isPlayingSlow
-                   ? 'bg-gradient-to-br from-amber-50 to-amber-100 text-amber-600 shadow-md border-[1.5px] border-amber-400'
-                   : 'text-slate-500 hover:text-amber-600 hover:bg-amber-50/50'
-               }`}
-             >
-               <SnailIcon size={18} />
-             </button>
-             <button
-               onClick={onPlayNormal}
-               className={`px-5 py-2 rounded-[10px] transition-all flex items-center gap-2 ${
-                 isPlayingNormal
-                   ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600 shadow-md border-[1.5px] border-emerald-400'
-                   : 'text-slate-500 hover:text-emerald-600 hover:bg-emerald-50/50'
-               }`}
-             >
-               <SpeakerIcon size={18} />
-             </button>
-           </div>
         </div>
-      </div>
+      )}
 
       {/* Analysis Display */}
       <div
-        className="analysis-box bg-gradient-to-br from-slate-900 to-slate-800 rounded-[24px] p-7 md:p-8 shadow-2xl relative border border-slate-700 min-h-[220px] overflow-hidden group"
+        className="analysis-box nebula-glow rounded-xl p-5 relative min-h-[150px] overflow-hidden"
+        style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
         onMouseUp={handleMouseUp}
       >
-          <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/10 to-transparent pointer-events-none transition-opacity duration-1000 group-hover:opacity-40"></div>
-
-          <div className="flex flex-col items-center w-full z-10 pb-12">
+          <div className="flex flex-col items-center w-full z-10 pb-10">
+            {/* Section label */}
+            <div className="self-stretch mb-3 px-3 py-1.5 rounded-lg flex items-center gap-2" style={{ backgroundColor: 'rgba(232,88,122,0.07)' }}>
+              <svg className="w-3 h-3 shrink-0" style={{ color: 'var(--pink)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5.586V18.414a1 1 0 01-1.707.707L5.586 15z" />
+              </svg>
+              <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: 'var(--pink)' }}>Pronunciation Guide</span>
+            </div>
             {/* Phonics at top */}
             {result.fullLinkedPhonetic && (
-              <div className="mb-4 flex flex-col items-center gap-2">
-                <div className="px-5 py-2 bg-white/5 rounded-full border border-white/10 backdrop-blur-xl shadow-lg">
-                  <p className="text-[12px] md:text-[14px] font-medium text-slate-400 tracking-[0.08em] font-mono select-none pointer-events-none text-center leading-relaxed">
+              <div className="mb-3 flex flex-col items-center gap-1.5">
+                <div className="px-4 py-1.5 rounded-full" style={{ backgroundColor: 'var(--pink-dim)' }}>
+                  <p className="text-[12px] md:text-[14px] font-medium tracking-[0.06em] font-mono select-none pointer-events-none text-center leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                     /{result.fullLinkedPhonetic.split('ˈ').map((part, i) =>
                       i === 0
                         ? <React.Fragment key={i}>{part}</React.Fragment>
-                        : <React.Fragment key={i}><span className="text-indigo-300 font-bold">ˈ</span>{part}</React.Fragment>
+                        : <React.Fragment key={i}><span className="font-bold" style={{ color: 'var(--pink)' }}>ˈ</span>{part}</React.Fragment>
                     )}/
                   </p>
                 </div>
                 <button
                   onClick={() => setShowIPALegend(true)}
-                  className="text-[9px] font-bold text-blue-400 hover:text-blue-300 uppercase tracking-wider transition-colors flex items-center gap-1 pointer-events-auto"
+                  className="text-[9px] font-semibold uppercase tracking-wider transition-colors flex items-center gap-1 pointer-events-auto"
+                  style={{ color: 'var(--text-muted)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--pink)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
                 >
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  查看音标说明
+                  IPA Guide
                 </button>
               </div>
             )}
 
             <div className="flex flex-wrap justify-center gap-x-2 md:gap-x-3 gap-y-2 w-full">
               {words.map((word, i) => {
-                // Clean word for pronunciation (remove punctuation and linking symbols)
                 const cleanWord = word.replace(/[‿?.!,;]/g, '').trim();
+                const cleanKey = cleanWord.toLowerCase().replace(/[^a-z]/g, '');
+                const status = wordStatusMap.get(cleanKey);
                 const isPlaying = playingWord === cleanWord || (isPlayingTutor && selectedText === cleanWord);
+                const isKaraokeCurrent = isKaraokePlaying && karaokeIndex === i;
+                const isKaraokePast = isKaraokePlaying && karaokeIndex > i;
+                const isKaraokeFuture = isKaraokePlaying && karaokeIndex < i;
+
+                const statusColor = isPlaying
+                  ? 'scale-105 animate-pulse'
+                  : isKaraokeCurrent
+                    ? 'scale-[1.08]'
+                    : 'hover:scale-105 active:scale-95';
+
+                const statusInlineColor = isPlaying
+                  ? 'var(--green)'
+                  : isKaraokeCurrent
+                    ? 'var(--pink)'
+                    : isKaraokePast
+                      ? 'var(--text-muted)'
+                      : isKaraokeFuture
+                        ? 'var(--border-medium)'
+                        : status === 'incorrect'
+                          ? 'var(--red)'
+                          : status === 'needs_improvement'
+                            ? 'var(--amber)'
+                            : 'var(--text-primary)';
 
                 return (
                   <div
                     key={i}
-                    className="flex flex-col items-center min-w-fit group/word transition-all duration-200"
+                    className={`flex flex-col items-center min-w-fit group/word transition-all duration-200 ${isKaraokeCurrent ? 'z-10' : ''}`}
                   >
                     <button
                       onClick={(e) => {
@@ -245,24 +297,20 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
                           onPlayTutor(cleanWord);
                         }
                       }}
-                      className={`text-white text-lg md:text-xl font-black leading-none mb-1 break-words text-center tracking-tight transition-all drop-shadow-[0_3px_10px_rgba(0,0,0,0.4)] relative cursor-pointer
-                        ${isPlaying
-                          ? 'text-emerald-400 scale-110 animate-pulse'
-                          : 'hover:text-indigo-300 hover:scale-110 active:scale-95'
-                        }`}
+                      className={`text-xl md:text-2xl font-bold leading-none mb-1 break-words text-center tracking-tight relative cursor-pointer transition-all duration-150 ${statusColor}`}
+                      style={{ color: statusInlineColor }}
                       title={`Click to hear: "${cleanWord}"`}
                     >
                       {word.split('‿').map((part, idx, arr) => (
                         <React.Fragment key={idx}>
                           {part}
                           {idx < arr.length - 1 && (
-                            <span className="text-indigo-400 font-black mx-1 opacity-80 animate-pulse pointer-events-none">‿</span>
+                            <span className="font-bold mx-1 pointer-events-none" style={{ color: 'var(--pink)', opacity: 0.7 }}>‿</span>
                           )}
                         </React.Fragment>
                       ))}
                     </button>
 
-                    {/* Symbols exactly under the word/phrase */}
                     <div className="h-7 flex items-start justify-center select-none pointer-events-none mt-0.5">
                       <SymbolSpan
                         token={mapTokens[i]}
@@ -277,12 +325,23 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
             </div>
           </div>
 
+          {/* Karaoke progress bar */}
+          {isKaraokePlaying && words.length > 0 && (
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-b-xl overflow-hidden" style={{ backgroundColor: 'var(--border-subtle)' }}>
+              <div
+                className="h-full transition-all duration-150 ease-linear rounded-r-full"
+                style={{ backgroundColor: 'var(--pink)', width: `${Math.min(100, ((karaokeIndex + 1) / words.length) * 100)}%` }}
+              />
+            </div>
+          )}
+
           {/* Tutorial UI for selections */}
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full flex justify-center pointer-events-none px-10 z-20">
              {selectedText ? (
                <button
                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onPlayTutor(selectedText); }}
-                 className={`pointer-events-auto bg-indigo-600/95 backdrop-blur-xl text-white px-4 h-8 rounded-full text-[9px] font-bold uppercase tracking-[0.1em] shadow-[0_4px_16px_rgba(79,70,229,0.4)] flex items-center gap-1.5 hover:bg-indigo-500 border border-white/30 active:scale-95 transition-all`}
+                 className="pointer-events-auto text-white px-4 h-8 rounded-full text-[9px] font-semibold uppercase tracking-wider flex items-center gap-1.5 active:scale-95 transition-all animate-bounce-in"
+                 style={{ backgroundColor: 'var(--pink)', boxShadow: '0 2px 12px var(--pink-dim)' }}
                >
                  {isTutorLoading ? (
                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -292,29 +351,52 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
                  {isTutorLoading ? "Loading..." : isPlayingTutor ? "Playing..." : `"${selectedText.length > 15 ? selectedText.slice(0, 15) + '...' : selectedText}"`}
                </button>
              ) : (
-               <div className="flex flex-col items-center gap-1.5 opacity-20 transition-opacity hover:opacity-40">
-                 <p className="text-[9px] font-black text-white uppercase tracking-[0.4em] select-none text-center">Click word to hear</p>
-                 <p className="text-[8px] font-bold text-white/50 tracking-[0.2em] select-none text-center">Or drag for phrases</p>
-                 <div className="w-24 h-0.5 bg-gradient-to-r from-transparent via-white/50 to-transparent rounded-full"></div>
+               <div className="flex flex-col items-center gap-1 opacity-30 transition-opacity hover:opacity-50">
+                 <p className="text-[9px] font-medium uppercase tracking-widest select-none text-center" style={{ color: 'var(--text-muted)' }}>Click word to hear</p>
+                 <p className="text-[8px] font-medium tracking-wider select-none text-center" style={{ color: 'var(--text-muted)' }}>Select text for phrases</p>
                </div>
              )}
           </div>
       </div>
 
+      {/* Color Legend */}
+      {result.wordBreakdown?.length > 0 && (
+        <div className="flex items-center gap-4 text-[10px] font-medium justify-center flex-wrap" style={{ color: 'var(--text-muted)' }}>
+          <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: 'var(--green)' }}></span>Correct</span>
+          <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: 'var(--amber)' }}></span>Improve</span>
+          <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: 'var(--red)' }}></span>Incorrect</span>
+        </div>
+      )}
+
       {/* Analysis Details */}
       {result.wordBreakdown?.length > 0 && (
-        <div className="pt-6 space-y-8">
-          <div className="flex items-center gap-6">
-             <div className="h-px flex-1 bg-gradient-to-r from-transparent to-slate-200"></div>
-             <h4 className="font-black text-slate-300 text-[12px] uppercase tracking-[0.5em]">Evaluated Words</h4>
-             <div className="h-px flex-1 bg-gradient-to-l from-transparent to-slate-200"></div>
+        <div className="pt-3 space-y-4">
+          <div className="flex items-center gap-4">
+             <div className="h-px flex-1" style={{ background: 'linear-gradient(to right, transparent, var(--border-subtle))' }}></div>
+             <h4 className="font-semibold text-[10px] uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Word Breakdown</h4>
+             <div className="h-px flex-1" style={{ background: 'linear-gradient(to left, transparent, var(--border-subtle))' }}></div>
           </div>
-          <div className="flex flex-wrap gap-5 justify-center">
+          <div className="flex flex-wrap gap-3 justify-center">
             {result.wordBreakdown.map((item, idx) => (
-              <WordSmallItem key={idx} item={item} onPlay={() => onPlayWord(item.word)} isPlaying={playingWord === item.word} />
+              <WordSmallItem key={idx} item={item} onPlay={() => setDetailWord(item)} isPlaying={playingWord === item.word} />
             ))}
           </div>
         </div>
+      )}
+
+      {/* Word Detail Modal */}
+      {detailWord && (
+        <WordDetailModal
+          item={detailWord}
+          allWords={result.wordBreakdown}
+          onSelectWord={(w) => setDetailWord(w)}
+          onClose={() => setDetailWord(null)}
+          onPlayCoach={(w) => onPlayTutor(w)}
+          onPlayUser={onPlayUserRecording}
+          onPlayPhoneme={(phonemeText) => onPlayTutor(phonemeText)}
+          isCoachPlaying={activeAudioSource === 'tutor'}
+          hasUserRecording={!!hasUserRecording}
+        />
       )}
 
       {/* IPA Legend Modal */}
@@ -324,16 +406,33 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
 };
 
 const WordSmallItem: React.FC<{ item: WordAnalysis; onPlay: () => void; isPlaying: boolean; }> = ({ item, onPlay, isPlaying }) => {
-  const colors = {
-    correct: "bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100 hover:border-emerald-200 shadow-emerald-50",
-    incorrect: "bg-red-50 text-red-700 border-red-100 hover:bg-red-100 hover:border-red-200 shadow-red-50",
-    needs_improvement: "bg-orange-50 text-orange-700 border-orange-100 hover:bg-orange-100 hover:border-orange-200 shadow-orange-50"
+  const colors: Record<string, { bg: string; text: string; border: string }> = {
+    correct: { bg: 'rgba(74,222,128,0.1)', text: 'var(--green)', border: 'rgba(74,222,128,0.2)' },
+    incorrect: { bg: 'rgba(248,113,113,0.1)', text: 'var(--red)', border: 'rgba(248,113,113,0.2)' },
+    needs_improvement: { bg: 'rgba(251,191,36,0.1)', text: 'var(--amber)', border: 'rgba(251,191,36,0.2)' },
   };
-  const colorClass = (colors as any)[item.status] || colors.needs_improvement;
+  const c = colors[item.status] || colors.needs_improvement;
+  const showComparison = item.status !== 'correct' && item.phoneticUser && item.phoneticUser !== item.phoneticCorrect;
+
   return (
-    <button onClick={onPlay} className={`flex flex-col items-center px-6 py-4 rounded-[1.75rem] border-2 transition-all active:scale-95 shadow-lg ${colorClass} ${isPlaying ? 'ring-4 ring-indigo-500/30 shadow-2xl scale-110' : ''}`}>
-      <span className="text-[17px] font-black tracking-tighter">{item.word}</span>
-      <span className="text-[12px] opacity-75 mt-1 font-mono font-bold">/{item.phoneticCorrect}/</span>
+    <button onClick={onPlay} className={`flex flex-col items-center px-4 py-2.5 rounded-xl border transition-all active:scale-95 hover-lift ${isPlaying ? 'ring-2 scale-105' : ''}`}
+      style={{ backgroundColor: c.bg, borderColor: c.border, color: c.text, ...(isPlaying ? { ringColor: 'var(--pink)' } : {}) }}>
+      <span className="text-[14px] font-semibold tracking-tight">{item.word}</span>
+      {showComparison ? (
+        <div className="flex flex-col items-center gap-0.5 mt-1">
+          <span className="text-[10px] font-mono flex items-center gap-1" style={{ color: 'var(--green)', opacity: 0.9 }}>
+            <span className="text-[8px] font-bold">✓</span>/{item.phoneticCorrect}/
+          </span>
+          <span className="text-[10px] font-mono flex items-center gap-1" style={{ color: 'var(--red)', opacity: 0.9 }}>
+            <span className="text-[8px] font-bold">✗</span>/{item.phoneticUser}/
+          </span>
+        </div>
+      ) : (
+        <span className="text-[10px] opacity-60 mt-0.5 font-mono">/{item.phoneticCorrect}/</span>
+      )}
+      {item.wordScore != null && (
+        <span className="text-[9px] font-bold mt-1 px-1.5 py-0.5 rounded-full" style={{ backgroundColor: c.border, color: c.text }}>{item.wordScore}%</span>
+      )}
     </button>
   );
 };
