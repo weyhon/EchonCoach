@@ -134,7 +134,11 @@ Parameters:
 
 ### VideoIcon
 
-A small inline SVG camera/video icon added to the existing icon set in `App.tsx` or a shared icons file.
+A small inline SVG camera/video icon defined locally in `WordDetailModal.tsx` alongside the existing `SpeakerSmallIcon` — consistent with the file's existing convention.
+
+### IPA key fidelity note
+
+The `phoneme` field comes from the MiniMax API. During implementation, add a `console.warn` for any phoneme that has no matching entry in `PHONEME_VIDEOS`, to detect any API symbol variants that differ from standard IPA Unicode. A missed lookup is safe (no icon shown), but the warning helps identify gaps during testing.
 
 ---
 
