@@ -472,9 +472,36 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-16 antialiased">
+      {/* Fixed Top Header */}
+      <header className="fixed top-0 w-full flex items-center justify-between px-6 h-14 z-50 backdrop-blur-xl"
+        style={{ backgroundColor: 'rgba(15,17,23,0.85)', borderBottom: '1px solid var(--border-subtle)', boxShadow: '0 1px 20px rgba(0,0,0,0.12)' }}>
+        <div className="flex items-center gap-3">
+          <NebulaLogo size={24} />
+          <div className="flex items-baseline gap-2">
+            <span className="font-brand font-bold text-lg tracking-tight" style={{ color: 'var(--pink)' }}>Nebula</span>
+            <span className="text-[10px] font-medium uppercase tracking-widest hidden sm:block" style={{ color: 'var(--gold)', opacity: 0.8 }}>Pronunciation Coach</span>
+          </div>
+        </div>
+        {history.length > 0 && (
+          <button
+            onClick={() => setShowMobileHistory(true)}
+            className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all"
+            style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            History
+            <span className="w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center text-white" style={{ backgroundColor: 'var(--pink)' }}>
+              {Math.min(history.length, 9)}
+            </span>
+          </button>
+        )}
+      </header>
+
       {/* Error Toast */}
       {error && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
           <div className="glass px-5 py-3 rounded-2xl flex items-center gap-3" style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.1)' }}>
             <svg className="w-4 h-4 shrink-0" style={{ color: 'var(--red)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -489,21 +516,15 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <div className="flex">
+      <div className="flex pt-14">
         {/* Main Content Area */}
         <div className="flex-1 px-6 lg:px-8">
-          <header className="max-w-[660px] mx-auto pt-7 pb-4 flex items-center gap-3.5 animate-fade-in stagger-1">
-            <NebulaLogo size={38} />
-            <div>
-              <h1 className="font-brand font-bold text-[22px] tracking-tight leading-none" style={{ color: 'var(--text-primary)' }}>Nebula</h1>
-              <p className="text-[10px] font-medium tracking-widest uppercase mt-1" style={{ color: 'var(--text-muted)' }}>Pronunciation Coach</p>
-            </div>
-          </header>
-
-          <main className="max-w-[660px] mx-auto space-y-5 pb-16">
+          <main className="max-w-[660px] mx-auto space-y-5 pt-7 pb-16">
             {/* Input Section */}
-            <section className="glass p-6 rounded-2xl flex flex-col gap-3 animate-fade-in-up stagger-2">
-              <label className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Practice Sentence</label>
+            <section className="glass p-6 rounded-2xl flex flex-col gap-4 animate-fade-in-up stagger-2">
+              <label className="label-micro" style={{ color: 'var(--text-muted)' }}>Practice Sentence</label>
+
+              {/* Hero text input — display-scale typography, no box */}
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
@@ -514,114 +535,150 @@ const App: React.FC = () => {
                     if (text.trim() && !isAudioLoading) playAndAnalyze(text);
                   }
                 }}
-                className="w-full text-[17px] font-medium outline-none resize-none min-h-[56px] leading-relaxed p-4 rounded-xl transition-all duration-200"
-                style={{ backgroundColor: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--pink)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--pink-dim)'; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.boxShadow = 'none'; }}
-                placeholder="Type an English sentence to practice..."
+                className="font-brand font-bold outline-none resize-none w-full transition-colors duration-200"
+                style={{
+                  fontSize: 'clamp(1.6rem, 4.5vw, 2.4rem)',
+                  lineHeight: '1.2',
+                  letterSpacing: '-0.02em',
+                  color: 'var(--text-primary)',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  minHeight: '2.6em',
+                  padding: '0',
+                }}
+                onFocus={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+                onBlur={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+                placeholder="Type a sentence…"
               />
 
-              {/* Action Buttons — primary row */}
-              <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                <div className="flex items-center gap-2.5">
-                  <button
-                    onClick={() => playAndAnalyze(text)}
-                    disabled={isAudioLoading}
-                    className="h-10 px-6 rounded-full text-white text-[13px] font-semibold hover:brightness-110 active:scale-[0.96] transition-all flex items-center gap-2 disabled:opacity-40"
-                    style={{ backgroundColor: 'var(--pink)', boxShadow: '0 2px 12px var(--pink-dim)' }}
-                  >
-                    <SpeakerIcon size={15} />
-                    {isAudioLoading ? 'Loading...' : 'Listen'}
-                  </button>
+              {/* Action Bar — Stitch-style centered glass pill */}
+              <div className="flex flex-col items-center gap-3 pt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                <div className="flex items-center gap-1 p-1.5 rounded-2xl action-bar-glow ghost-border"
+                  style={{ backgroundColor: 'var(--bg-elevated)' }}>
+
+                  {/* Record / Stop / Analyzing */}
+                  {appState === AppState.RECORDING ? (
+                    <button
+                      onClick={() => mediaRecorderRef.current?.stop()}
+                      className="relative flex flex-col items-center gap-1 px-4 py-2.5 rounded-xl transition-all active:scale-95"
+                      style={{ backgroundColor: 'rgba(248,113,113,0.1)', color: 'var(--red)' }}
+                    >
+                      <span className="absolute inset-0 rounded-xl rec-ring" style={{ border: '1px solid var(--red)' }}></span>
+                      <span className="flex items-center gap-[2px] h-5">
+                        {[0, 0.15, 0.3, 0.1, 0.25].map((d, i) => (
+                          <span key={i} className="rec-bar w-[2px] rounded-full" style={{ height: '100%', backgroundColor: 'var(--red)', animationDelay: `${d}s` }}></span>
+                        ))}
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-tighter">Stop</span>
+                    </button>
+                  ) : appState === AppState.ANALYZING ? (
+                    <div className="flex flex-col items-center gap-1 px-4 py-2.5 rounded-xl"
+                      style={{ backgroundColor: 'var(--pink-dim)', color: 'var(--pink)' }}>
+                      <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: 'rgba(232,88,122,0.2)', borderTopColor: 'var(--pink)' }}></div>
+                      <span className="text-[10px] font-bold uppercase tracking-tighter">Analyzing</span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={startRecording}
+                      className="flex flex-col items-center gap-1 px-4 py-2.5 rounded-xl transition-all hover-lift active:scale-95"
+                      style={{ color: 'var(--text-muted)' }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--bg-card)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--pink)'; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
+                    >
+                      <MicrophoneIcon size={20} />
+                      <span className="text-[10px] font-bold uppercase tracking-tighter">Record</span>
+                    </button>
+                  )}
+
+                  {/* Slow */}
                   <button
                     onClick={() => handlePlayTTS(text, true)}
-                    className="h-10 px-4 rounded-full text-[13px] font-medium transition-all flex items-center gap-1.5 active:scale-[0.96]"
+                    className="flex flex-col items-center gap-1 px-4 py-2.5 rounded-xl transition-all active:scale-95"
                     style={{
-                      backgroundColor: activeAudioSource === 'input_slow' ? 'var(--pink-dim)' : 'var(--bg-elevated)',
-                      color: activeAudioSource === 'input_slow' ? 'var(--pink)' : 'var(--text-secondary)'
+                      backgroundColor: activeAudioSource === 'input_slow' ? 'var(--pink-dim)' : 'transparent',
+                      color: activeAudioSource === 'input_slow' ? 'var(--pink)' : 'var(--text-muted)'
                     }}
-                    title="Slow playback"
+                    onMouseEnter={(e) => { if (activeAudioSource !== 'input_slow') { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--bg-card)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--pink)'; } }}
+                    onMouseLeave={(e) => { if (activeAudioSource !== 'input_slow') { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; } }}
+                    title="Slow playback (S)"
                   >
-                    <SnailIcon size={15} />
-                    Slow
+                    <SnailIcon size={20} />
+                    <span className="text-[10px] font-bold uppercase tracking-tighter">Slow</span>
                   </button>
+
+                  {/* Video / YouTube */}
+                  <a
+                    href={`https://youglish.com/pronounce/${encodeURIComponent(text.replace(/[?.!,;:'"]/g, '').trim())}/english`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col items-center gap-1 px-4 py-2.5 rounded-xl transition-all active:scale-95"
+                    style={{ color: 'var(--text-muted)', textDecoration: 'none' }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--bg-card)'; (e.currentTarget as HTMLAnchorElement).style.color = 'var(--pink)'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'transparent'; (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-muted)'; }}
+                    title="Watch native speakers on YouTube"
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
+                    <span className="text-[10px] font-bold uppercase tracking-tighter">Video</span>
+                  </a>
                 </div>
 
-                {appState === AppState.RECORDING ? (
-                  <button
-                    onClick={() => mediaRecorderRef.current?.stop()}
-                    className="relative h-10 px-5 rounded-full text-[13px] font-semibold flex items-center gap-2.5 active:scale-[0.96] transition-all"
-                    style={{ backgroundColor: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}
-                  >
-                    <span className="absolute inset-0 rounded-full rec-ring" style={{ border: '2px solid var(--red)' }}></span>
-                    <span className="flex items-center gap-[3px] h-5">
-                      {[0, 0.15, 0.3, 0.1, 0.25].map((d, i) => (
-                        <span key={i} className="rec-bar w-[3px] rounded-full" style={{ height: '100%', backgroundColor: 'var(--red)', animationDelay: `${d}s` }}></span>
-                      ))}
-                    </span>
-                    Stop
-                  </button>
-                ) : appState === AppState.ANALYZING ? (
-                  <div className="h-10 px-5 rounded-full flex items-center gap-2.5" style={{ backgroundColor: 'var(--pink-dim)', border: '1px solid rgba(232,88,122,0.15)' }}>
-                    <div className="w-4 h-4 border-2 rounded-full animate-spin shrink-0" style={{ borderColor: 'rgba(232,88,122,0.2)', borderTopColor: 'var(--pink)' }}></div>
-                    <span className="text-[13px] font-medium" style={{ color: 'var(--pink)' }}>Analyzing...</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={startRecording}
-                    className="h-10 px-5 rounded-full text-[13px] font-medium flex items-center gap-2 transition-all active:scale-[0.96] hover-lift"
-                    style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
-                  >
-                    <MicrophoneIcon size={15} />
-                    Record
-                  </button>
-                )}
-              </div>
-
-              {/* Secondary row: Voice + YouTube + keyboard hints */}
-              <div className="flex items-center gap-2 flex-wrap pt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                {VOICES.map(v => (
-                  <button
-                    key={v.id}
-                    onClick={() => setSelectedVoice(v.id)}
-                    className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all active:scale-95"
-                    style={{
-                      backgroundColor: selectedVoice === v.id ? 'var(--pink-dim)' : 'var(--bg-deep)',
-                      color: selectedVoice === v.id ? 'var(--pink)' : 'var(--text-muted)',
-                      border: `1px solid ${selectedVoice === v.id ? 'var(--pink)' : 'var(--border-subtle)'}`,
-                    }}
-                    title={v.desc}
-                  >
-                    {v.label}
-                  </button>
-                ))}
-                <a
-                  href={`https://youglish.com/pronounce/${encodeURIComponent(text.replace(/[?.!,;:'"]/g, '').trim())}/english`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium transition-colors"
-                  style={{ color: 'var(--text-muted)' }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--pink)'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
-                  title="Watch native speakers say this on YouTube"
+                {/* Listen — Full-width hero CTA */}
+                <button
+                  onClick={() => playAndAnalyze(text)}
+                  disabled={isAudioLoading || !text.trim()}
+                  className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl text-white font-bold transition-all active:scale-[0.97] disabled:opacity-40"
+                  style={{
+                    fontSize: 'var(--text-md)',
+                    letterSpacing: '-0.01em',
+                    background: 'linear-gradient(135deg, #E8587A 0%, #d43d63 50%, #c0285a 100%)',
+                    boxShadow: '0 6px 28px rgba(232,88,122,0.35), 0 2px 8px rgba(232,88,122,0.2)',
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 8px 36px rgba(232,88,122,0.5), 0 2px 8px rgba(232,88,122,0.25)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 28px rgba(232,88,122,0.35), 0 2px 8px rgba(232,88,122,0.2)'; }}
+                  title="Listen (Enter)"
                 >
-                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                  </svg>
-                  YouTube
-                </a>
-              </div>
+                  {isAudioLoading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <SpeakerIcon size={22} />
+                  )}
+                  {isAudioLoading ? 'Loading…' : 'Listen'}
+                </button>
 
-              {/* Keyboard hints — compact single line */}
-              <div className="flex items-center gap-3">
-                {(['Enter','Space','S','R'] as const).map((key) => (
-                  <span key={key} className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-muted)', opacity: 0.6 }}>
-                    <kbd className="px-1.5 py-0.5 rounded text-[9px] font-mono"
-                      style={{ backgroundColor: 'var(--bg-deep)', border: '1px solid var(--border-subtle)' }}>
-                      {key}
-                    </kbd>
-                  </span>
-                ))}
+                {/* Voice selector row */}
+                <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                  <span className="text-[9px] font-bold uppercase tracking-widest mr-1" style={{ color: 'var(--text-muted)' }}>Voice</span>
+                  {VOICES.map(v => (
+                    <button
+                      key={v.id}
+                      onClick={() => setSelectedVoice(v.id)}
+                      className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all active:scale-95"
+                      style={{
+                        backgroundColor: selectedVoice === v.id ? 'var(--pink-dim)' : 'var(--bg-deep)',
+                        color: selectedVoice === v.id ? 'var(--pink)' : 'var(--text-muted)',
+                        border: `1px solid ${selectedVoice === v.id ? 'var(--pink)' : 'var(--border-subtle)'}`,
+                      }}
+                      title={v.desc}
+                    >
+                      {v.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Keyboard hints */}
+                <div className="flex items-center gap-3 opacity-40">
+                  {[['Enter', 'Listen'], ['Space', 'Play'], ['S', 'Slow'], ['R', 'Record']].map(([key, label]) => (
+                    <span key={key} className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                      <kbd className="px-1.5 py-0.5 rounded text-[9px] font-mono"
+                        style={{ backgroundColor: 'var(--bg-deep)', border: '1px solid var(--border-subtle)' }}>
+                        {key}
+                      </kbd>
+                      <span>{label}</span>
+                    </span>
+                  ))}
+                </div>
               </div>
             </section>
 
@@ -660,13 +717,14 @@ const App: React.FC = () => {
                     audio.play();
                   }
                 }}
+                onRetry={() => setAppState(AppState.IDLE)}
               />
             )}
           </main>
         </div>
 
         {/* Right Sidebar - History */}
-        <aside className="w-[300px] h-screen sticky top-0 overflow-y-auto px-5 py-7 hidden lg:block" style={{ backgroundColor: 'var(--bg-surface)', borderLeft: '1px solid var(--border-subtle)' }}>
+        <aside className="w-[300px] h-[calc(100vh-56px)] sticky top-14 overflow-y-auto px-5 py-7 hidden lg:block" style={{ backgroundColor: 'var(--bg-surface)', borderLeft: '1px solid var(--border-subtle)' }}>
           <HistoryList
             history={history}
             onQuickAnalyze={(t) => { setText(t); playAndAnalyze(t); }}
