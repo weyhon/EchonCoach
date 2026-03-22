@@ -5,6 +5,11 @@ import { isYesNoQuestion, getSentenceIntonation } from '../services/linkingUtils
 import { generateIntonationTokens } from '../services/intonationUtils';
 import { IPALegend } from './IPALegend';
 import { WordDetailModal } from './WordDetailModal';
+import { SentenceAnnotation } from './SentenceAnnotation';
+
+function youTubeSearchUrl(text: string): string {
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(text + ' pronunciation')}`;
+}
 
 interface FeedbackCardProps {
   result: AnalysisResult;
@@ -15,29 +20,28 @@ interface FeedbackCardProps {
   playingWord: string | null;
   onPlayUserRecording: () => void;
   hasUserRecording?: boolean;
+  onRetry?: () => void;
 }
 
-const ScoreRing: React.FC<{ score: number }> = ({ score = 0 }) => {
-  const safeScore = Math.max(0, Math.min(100, score));
-  const radius = 22;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (safeScore / 100) * circumference;
-  const strokeColor = safeScore >= 80 ? 'var(--green)' : safeScore >= 60 ? 'var(--amber)' : 'var(--red)';
-
+const ScoreNumber: React.FC<{ score: number }> = ({ score }) => {
+  const safe = Math.max(0, Math.min(100, score));
+  const color = safe >= 80 ? 'var(--green)' : safe >= 60 ? 'var(--amber)' : 'var(--red)';
   return (
-    <div className="relative flex items-center justify-center w-14 h-14 shrink-0">
-      <svg className="transform -rotate-90 w-14 h-14">
-        <circle cx="28" cy="28" r={radius} stroke="var(--border-medium)" strokeWidth="4" fill="transparent" />
-        <circle
-          cx="28" cy="28" r={radius} stroke={strokeColor} strokeWidth="4" fill="transparent"
-          strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round"
-          className="transition-all duration-700"
-        />
-      </svg>
-      <span className="absolute text-sm font-bold" style={{ color: strokeColor }}>{safeScore > 0 ? safeScore : "--"}</span>
+    <div className="flex flex-col items-center shrink-0">
+      <span className="font-brand num leading-none" style={{ fontSize: 44, fontWeight: 800, letterSpacing: '-0.05em', color }}>
+        {safe > 0 ? safe : '--'}
+      </span>
+      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-placeholder)', marginTop: 3 }}>
+        SCORE
+      </span>
     </div>
   );
 };
+
+const statusBg = (s: WordAnalysis['status']) =>
+  s === 'correct' ? 'var(--green-bg)' : s === 'incorrect' ? 'var(--red-bg)' : 'var(--amber-bg)';
+const statusColor = (s: WordAnalysis['status']) =>
+  s === 'correct' ? '#15803d' : s === 'incorrect' ? '#be185d' : '#92400e';
 
 interface SymbolSpanProps {
   token?: string;
@@ -89,7 +93,7 @@ const SymbolSpan: React.FC<SymbolSpanProps> = ({ token, isLast, firstWord, fullT
 };
 
 export const FeedbackCard: React.FC<FeedbackCardProps> = ({
-  result, isUpdating, activeAudioSource, onPlayWord, onPlayTutor, playingWord, onPlayUserRecording, hasUserRecording
+  result, isUpdating, activeAudioSource, onPlayWord, onPlayTutor, playingWord, onPlayUserRecording, hasUserRecording, onRetry
 }) => {
   const [selectedText, setSelectedText] = useState<string | null>(null);
   const [showIPALegend, setShowIPALegend] = useState<boolean>(false);
@@ -182,7 +186,8 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
     : generateIntonationTokens(sentenceText, words);
 
   return (
-    <div className={`glass rounded-2xl p-5 space-y-4 animate-fade-in-up relative transition-all duration-500 ${isUpdating ? 'opacity-50 scale-[0.97] blur-[1px]' : 'opacity-100 scale-100'}`}>
+    <div className={`animate-fade-in-up relative transition-all duration-500 rounded-2xl overflow-hidden ${isUpdating ? 'opacity-50 scale-[0.97] blur-[1px]' : 'opacity-100 scale-100'}`}
+      style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
       <style>{`
         @keyframes symbol-pop {
           0%, 100% { transform: translateY(0) scale(1); }
@@ -191,32 +196,85 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
         .animate-symbol-pop { animation: symbol-pop 2s infinite ease-in-out; }
       `}</style>
 
-      {/* Score + Feedback Header */}
-      {result.overallComment && result.score > 0 && (
-        <div className="flex items-center gap-3 w-full">
-          <ScoreRing score={result.score} />
-          <div className="flex-1 p-3.5 rounded-xl relative min-h-[48px] flex flex-col gap-1" style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
-            <div className="flex items-center justify-between">
-              <div className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Feedback</div>
-              <button onClick={onPlayUserRecording} className="text-[10px] font-semibold transition-colors flex items-center gap-1" style={{ color: 'var(--text-muted)' }}
-                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--pink)'}
-                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
-              >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4l16 8-16 8V4z" /></svg>
-                Replay Mine
-              </button>
-            </div>
-            <p className="text-[13px] leading-relaxed font-medium" style={{ color: 'var(--text-primary)' }}>
-              {result.overallComment}
-            </p>
+      {/* Score + sentence row */}
+      <div className="flex items-start gap-4 p-5 border-b" style={{ borderColor: 'var(--border)' }}>
+        <ScoreNumber score={result.score} />
+        <div className="w-px self-stretch shrink-0" style={{ background: 'var(--border)' }} />
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap gap-x-1" style={{ fontSize: 15, fontWeight: 500, lineHeight: 1.7 }}>
+            {result.wordBreakdown.map((w, i) => {
+              const color = w.status === 'correct' ? 'var(--green)' : w.status === 'incorrect' ? 'var(--red)' : 'var(--amber)';
+              return (
+                <span key={i} style={{ color, fontWeight: w.status === 'correct' ? 500 : 600,
+                  textDecoration: w.status === 'incorrect' ? 'underline' : 'none',
+                  textDecorationColor: 'rgba(239,68,68,0.3)' }}>
+                  {w.word}
+                </span>
+              );
+            })}
           </div>
         </div>
-      )}
+      </div>
+
+      {/* Playback row */}
+      <div className="flex items-center gap-2 px-5 py-3 flex-wrap border-b" style={{ borderColor: 'var(--border)' }}>
+        <button
+          onClick={() => onPlayWord(result.speechScript || '')}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+          style={{ border: '1.5px solid var(--rose)', color: 'var(--rose)', background: 'var(--surface)' }}
+        >
+          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          Reference
+        </button>
+
+        {hasUserRecording && (
+          <button
+            onClick={onPlayUserRecording}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+            style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)', background: 'var(--surface)' }}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth={2}/><polygon points="10,8 16,12 10,16" fill="currentColor"/></svg>
+            Your Recording
+          </button>
+        )}
+
+        <a
+          href={youTubeSearchUrl(result.speechScript || '')}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+          style={{ border: '1.5px solid #ff0000', color: '#cc0000', background: '#fff7f7', textDecoration: 'none' }}
+        >
+          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 11, background: '#ff0000', borderRadius: 2, flexShrink: 0 }}>
+            <span style={{ width: 0, height: 0, borderStyle: 'solid', borderWidth: '3.5px 0 3.5px 7px', borderColor: 'transparent transparent transparent #fff' }} />
+          </span>
+          Watch on YouTube
+        </a>
+
+        <button
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ml-auto transition-all"
+          style={{ border: '1px solid var(--border)', color: 'var(--text-muted)', background: 'var(--surface-muted)' }}
+          onClick={onRetry}
+        >
+          ⏺ Try Again
+        </button>
+      </div>
+
+      {/* Ruby annotation row */}
+      <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-placeholder)', marginBottom: 12 }}>
+          PRONUNCIATION GUIDE
+        </div>
+        <SentenceAnnotation
+          text={result.speechScript || ''}
+          wordBreakdown={result.wordBreakdown}
+        />
+      </div>
 
       {/* Analysis Display */}
       <div
-        className="analysis-box nebula-glow rounded-xl p-5 relative min-h-[150px] overflow-hidden"
-        style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
+        className="analysis-box rounded-xl p-5 relative min-h-[150px] overflow-hidden"
+        style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', margin: '0 16px 16px' }}
         onMouseUp={handleMouseUp}
       >
           <div className="flex flex-col items-center w-full z-10 pb-10">
@@ -225,7 +283,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
               <svg className="w-3 h-3 shrink-0" style={{ color: 'var(--pink)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5.586V18.414a1 1 0 01-1.707.707L5.586 15z" />
               </svg>
-              <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: 'var(--pink)' }}>Pronunciation Guide</span>
+              <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: 'var(--pink)' }}>Intonation & Linking</span>
             </div>
             {/* Phonics at top */}
             {result.fullLinkedPhonetic && (
@@ -264,7 +322,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
                 const isKaraokePast = isKaraokePlaying && karaokeIndex > i;
                 const isKaraokeFuture = isKaraokePlaying && karaokeIndex < i;
 
-                const statusColor = isPlaying
+                const statusColorClass = isPlaying
                   ? 'scale-105 animate-pulse'
                   : isKaraokeCurrent
                     ? 'scale-[1.08]'
@@ -297,7 +355,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
                           onPlayTutor(cleanWord);
                         }
                       }}
-                      className={`text-xl md:text-2xl font-bold leading-none mb-1 break-words text-center tracking-tight relative cursor-pointer transition-all duration-150 ${statusColor}`}
+                      className={`text-xl md:text-2xl font-bold leading-none mb-1 break-words text-center tracking-tight relative cursor-pointer transition-all duration-150 ${statusColorClass}`}
                       style={{ color: statusInlineColor }}
                       title={`Click to hear: "${cleanWord}"`}
                     >
@@ -361,29 +419,53 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
 
       {/* Color Legend */}
       {result.wordBreakdown?.length > 0 && (
-        <div className="flex items-center gap-4 text-[10px] font-medium justify-center flex-wrap" style={{ color: 'var(--text-muted)' }}>
+        <div className="flex items-center gap-4 text-[10px] font-medium justify-center flex-wrap pb-4" style={{ color: 'var(--text-muted)' }}>
           <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: 'var(--green)' }}></span>Correct</span>
           <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: 'var(--amber)' }}></span>Improve</span>
           <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: 'var(--red)' }}></span>Incorrect</span>
         </div>
       )}
 
-      {/* Analysis Details */}
+      {/* Analysis Details — Word Breakdown pills */}
       {result.wordBreakdown?.length > 0 && (
-        <div className="pt-3 space-y-4">
+        <div className="px-5 pb-5 space-y-4">
           <div className="flex items-center gap-4">
              <div className="h-px flex-1" style={{ background: 'linear-gradient(to right, transparent, var(--border-subtle))' }}></div>
              <h4 className="font-semibold text-[10px] uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Word Breakdown</h4>
              <div className="h-px flex-1" style={{ background: 'linear-gradient(to left, transparent, var(--border-subtle))' }}></div>
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
-            {result.wordBreakdown.map((item, idx) => (
-              <WordSmallItem key={idx} item={item} onPlay={() => setDetailWord(item)} isPlaying={playingWord === item.word} />
+          <div className="flex gap-2 overflow-x-auto pb-2 flex-wrap" style={{ scrollbarWidth: 'none' }}>
+            {result.wordBreakdown.map((wa, i) => (
+              <button
+                key={i}
+                onClick={() => setDetailWord(wa)}
+                className="flex flex-col items-center gap-0.5 px-2.5 py-2 rounded-lg transition-all"
+                style={{
+                  background: statusBg(wa.status),
+                  color: statusColor(wa.status),
+                  minWidth: 40,
+                }}
+              >
+                <span style={{ fontSize: 12, fontWeight: 600 }}>{wa.word}</span>
+                {wa.phoneticCorrect && (
+                  <span className="font-mono" style={{ fontSize: 9, opacity: 0.7 }}>{wa.phoneticCorrect}</span>
+                )}
+              </button>
             ))}
           </div>
           {result.wordBreakdown.length > 5 && (
             <p className="text-center text-[9px] mt-1" style={{ color: 'var(--text-muted)', opacity: 0.5 }}>← scroll →</p>
           )}
+        </div>
+      )}
+
+      {/* AI feedback annotation (overall comment) */}
+      {result.overallComment && result.score > 0 && (
+        <div className="mx-5 mb-5 p-3.5 rounded-xl" style={{ backgroundColor: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.18)' }}>
+          <div className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--amber)' }}>AI Feedback</div>
+          <p className="text-[13px] leading-relaxed font-medium" style={{ color: 'var(--text-primary)' }}>
+            {result.overallComment}
+          </p>
         </div>
       )}
 
@@ -405,37 +487,5 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
       {/* IPA Legend Modal */}
       <IPALegend show={showIPALegend} onClose={() => setShowIPALegend(false)} />
     </div>
-  );
-};
-
-const WordSmallItem: React.FC<{ item: WordAnalysis; onPlay: () => void; isPlaying: boolean; }> = ({ item, onPlay, isPlaying }) => {
-  const colors: Record<string, { bg: string; text: string; border: string }> = {
-    correct: { bg: 'rgba(74,222,128,0.1)', text: 'var(--green)', border: 'rgba(74,222,128,0.2)' },
-    incorrect: { bg: 'rgba(248,113,113,0.1)', text: 'var(--red)', border: 'rgba(248,113,113,0.2)' },
-    needs_improvement: { bg: 'rgba(251,191,36,0.1)', text: 'var(--amber)', border: 'rgba(251,191,36,0.2)' },
-  };
-  const c = colors[item.status] || colors.needs_improvement;
-  const showComparison = item.status !== 'correct' && item.phoneticUser && item.phoneticUser !== item.phoneticCorrect;
-
-  return (
-    <button onClick={onPlay} className={`flex-shrink-0 flex flex-col items-center px-4 py-2.5 rounded-xl border transition-all active:scale-95 hover-lift ${isPlaying ? 'ring-2 scale-105' : ''}`}
-      style={{ backgroundColor: c.bg, borderColor: c.border, color: c.text, ...(isPlaying ? { ringColor: 'var(--pink)' } : {}) }}>
-      <span className="text-[14px] font-semibold tracking-tight">{item.word}</span>
-      {showComparison ? (
-        <div className="flex flex-col items-center gap-0.5 mt-1">
-          <span className="text-[10px] font-mono flex items-center gap-1" style={{ color: 'var(--green)', opacity: 0.9 }}>
-            <span className="text-[8px] font-bold">✓</span>/{item.phoneticCorrect}/
-          </span>
-          <span className="text-[10px] font-mono flex items-center gap-1" style={{ color: 'var(--red)', opacity: 0.9 }}>
-            <span className="text-[8px] font-bold">✗</span>/{item.phoneticUser}/
-          </span>
-        </div>
-      ) : (
-        <span className="text-[10px] opacity-60 mt-0.5 font-mono">/{item.phoneticCorrect}/</span>
-      )}
-      {item.wordScore != null && (
-        <span className="text-[9px] font-bold mt-1 px-1.5 py-0.5 rounded-full" style={{ backgroundColor: c.border, color: c.text }}>{item.wordScore}%</span>
-      )}
-    </button>
   );
 };
