@@ -7,47 +7,90 @@
     <title>Nebula - AI Pronunciation Coach</title>
     <link rel="icon" type="image/svg+xml" href="/nebula-favicon.svg" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Syne:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
       :root {
-        --bg-deep: #f8f9fb;
-        --bg-surface: #f0f1f5;
-        --bg-card: #ffffff;
-        --bg-elevated: #f3f4f7;
-        --border-subtle: rgba(0,0,0,0.06);
-        --border-medium: rgba(0,0,0,0.1);
-        --pink: #E8587A;
-        --pink-dim: rgba(232,88,122,0.08);
-        --pink-glow: rgba(232,88,122,0.15);
-        --text-primary: #1a1a2e;
-        --text-secondary: #5f6577;
-        --text-muted: #9ca3af;
-        --green: #22c55e;
-        --amber: #f59e0b;
-        --red: #ef4444;
+        --bg:              #f9fafb;
+        --surface:         #ffffff;
+        --surface-muted:   #f3f4f6;
+        --border:          #e5e7eb;
+        --border-focus:    #E8587A;
+        --text-primary:    #111827;
+        --text-secondary:  #374151;
+        --text-muted:      #6b7280;
+        --text-placeholder:#9ca3af;
+        --rose:            #E8587A;
+        --rose-50:         #fce7ee;
+        --green:           #22c55e;
+        --green-bg:        #dcfce7;
+        --amber:           #f59e0b;
+        --amber-bg:        #fef3c7;
+        --red:             #ef4444;
+        --red-bg:          #fee2e2;
+        /* Legacy aliases — keep so existing components don't break */
+        --bg-deep:         var(--bg);
+        --bg-surface:      #f3f4f6;
+        --bg-card:         var(--surface);
+        --bg-elevated:     var(--surface-muted);
+        --border-subtle:   var(--border);
+        --border-medium:   #d1d5db;
+        --pink:            var(--rose);
+        --pink-dim:        rgba(232,88,122,0.08);
+        --pink-glow:       rgba(232,88,122,0.15);
       }
 
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg-deep: #0f1117;
-          --bg-surface: #13151f;
-          --bg-card: #1a1d2e;
-          --bg-elevated: #1e2135;
-          --border-subtle: rgba(255,255,255,0.07);
-          --border-medium: rgba(255,255,255,0.12);
-          --text-primary: #f0f1f5;
-          --text-secondary: #9ba3b8;
-          --text-muted: #6b7280;
-          --pink-dim: rgba(232,88,122,0.15);
-          --pink-glow: rgba(232,88,122,0.25);
-        }
+      /* ── Type scale (1.25 ratio, rem-based) ──────────────────────
+         xs:   0.6875rem / 11px  — absolute minimum for labels
+         sm:   0.8125rem / 13px  — secondary info, timestamps
+         base: 1rem      / 16px  — body copy (browser default, zoomable)
+         md:   1.125rem  / 18px  — comfortable reading
+         lg:   1.375rem  / 22px  — subheadings
+         xl:   1.75rem   / 28px  — headings
+         2xl:  2.25rem   / 36px  — display
+      ──────────────────────────────────────────────────────────── */
+      :root {
+        --text-xs:   0.6875rem;
+        --text-sm:   0.8125rem;
+        --text-base: 1rem;
+        --text-md:   1.125rem;
+        --text-lg:   1.375rem;
+        --text-xl:   1.75rem;
+
+        /* Role-based line heights */
+        --lh-tight:  1.15;   /* headings, display */
+        --lh-snug:   1.35;   /* subheadings, labels */
+        --lh-body:   1.65;   /* body copy */
+        --lh-relaxed:1.8;    /* long-form reading */
+
+        /* Letter spacing roles */
+        --ls-tight:  -0.02em; /* display headings */
+        --ls-normal:  0;
+        --ls-wide:    0.04em; /* labels */
+        --ls-wider:   0.08em; /* micro-labels, ALL CAPS */
       }
 
       body {
-        font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-        -webkit-tap-highlight-color: transparent;
-        background-color: var(--bg-deep);
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        background-color: var(--bg);
         color: var(--text-primary);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      /* Tabular numbers — prevents score digits from jumping width */
+      .num { font-variant-numeric: tabular-nums; }
+
+      /* Brand / headline role */
+      .font-brand { font-family: 'Inter', sans-serif; font-weight: 800; letter-spacing: -0.03em; }
+
+      /* Micro-label — ALL CAPS, never below 11px */
+      .label-micro {
+        font-size: var(--text-xs);
+        font-weight: 700;
+        letter-spacing: var(--ls-wider);
+        text-transform: uppercase;
+        line-height: var(--lh-snug);
       }
 
       /* Subtle noise grain overlay */
@@ -67,17 +110,13 @@
         background: var(--pink-glow);
       }
 
-      * {
-        scrollbar-width: thin;
-        scrollbar-color: rgba(0,0,0,0.08) transparent;
-      }
+      * { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.1) transparent; }
       ::-webkit-scrollbar { width: 5px; height: 5px; }
       ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
       ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.18); }
 
-      .font-brand { font-family: 'Syne', sans-serif; }
-      .font-mono { font-family: 'JetBrains Mono', monospace; }
+      .font-mono  { font-family: 'JetBrains Mono', monospace; }
 
       /* Staggered entrance animations */
       @keyframes fadeInUp {
@@ -119,30 +158,9 @@
 
       /* Glass card */
       .glass {
-        background: rgba(255, 255, 255, 0.85);
-        backdrop-filter: blur(24px);
-        -webkit-backdrop-filter: blur(24px);
-        border: 1px solid var(--border-subtle);
-        box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
-      }
-
-      @media (prefers-color-scheme: dark) {
-        .glass {
-          background: rgba(255, 255, 255, 0.04);
-          box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.2);
-        }
-      }
-
-      @media (prefers-color-scheme: dark) {
-        ::-webkit-scrollbar-track {
-          background: rgba(255,255,255,0.03);
-        }
-        ::-webkit-scrollbar-thumb {
-          background: rgba(255,255,255,0.12);
-        }
-        ::-webkit-scrollbar-thumb:hover {
-          background: rgba(255,255,255,0.2);
-        }
+        background: var(--surface);
+        border: 1px solid var(--border);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
       }
 
       /* Nebula glow gradient behind analysis area */
@@ -199,6 +217,36 @@
         transform: translateY(-2px);
         box-shadow: 0 4px 16px rgba(0,0,0,0.08);
       }
+
+      /* ─── Stitch Design System utilities ─── */
+      .ghost-border {
+        outline: 1px solid rgba(166, 138, 141, 0.15);
+      }
+      .action-bar-glow {
+        box-shadow: 0 0 30px -5px rgba(255, 178, 190, 0.15);
+      }
+      .glass-card {
+        background: rgba(25, 27, 34, 0.4);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+      }
+
+      /* ─── Stitch animations ─── */
+      @keyframes circleGrow {
+        0% { stroke-dashoffset: 276; transform: rotate(-100deg); }
+        100% { transform: rotate(-90deg); }
+      }
+      @keyframes progressSlide {
+        0% { width: 0%; opacity: 0; }
+        100% { opacity: 1; }
+      }
+      @keyframes modalEntrance {
+        0% { opacity: 0; transform: scale(0.95); }
+        100% { opacity: 1; transform: scale(1); }
+      }
+      .animate-modal-in { animation: modalEntrance 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+      .animate-circle-grow { animation: circleGrow 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards; transform-origin: center; }
+      .animate-slide-in { animation: progressSlide 0.6s ease-out forwards; }
     </style>
 </head>
   <body class="overflow-x-hidden">
