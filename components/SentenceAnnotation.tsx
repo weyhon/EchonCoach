@@ -20,7 +20,9 @@ export function buildAnnotationWords(
   text: string,
   wordBreakdown: WordAnalysis[] | undefined
 ): AnnotationWord[] {
-  const rawWords = text.trim().split(/\s+/);
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+  const rawWords = trimmed.split(/\s+/);
   const tokens = getTokens(text, rawWords); // e.g. ['●', '·', '●↘']
 
   return rawWords.map((word, i) => {

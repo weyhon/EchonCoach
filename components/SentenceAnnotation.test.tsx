@@ -14,10 +14,10 @@ describe('buildAnnotationWords', () => {
     expect(words[0].linksToNext).toBe(true); // pick‿up
   });
 
-  it('adds intonation marker to last word only', () => {
+  it('adds falling intonation to last word only for unpunctuated input (no ? = statement)', () => {
     const words = buildAnnotationWords('do you like it', undefined);
     const last = words[words.length - 1];
-    expect(last.intonation).toBe('↘'); // statement
+    expect(last.intonation).toBe('↘'); // no terminal punctuation → treated as statement → falling
     words.slice(0, -1).forEach(w => expect(w.intonation).toBeUndefined());
   });
 
