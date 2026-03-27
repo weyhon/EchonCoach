@@ -9,6 +9,7 @@ import { generateSpeech, analyzePronunciation, getLinkingAnalysisForText, genera
 import { playBase64Audio, speakWithWebSpeech, cleanupAudioResources } from './services/audioUtils';
 import { shouldLink } from './services/linkingUtils';
 import { generateIntonationMap } from './services/intonationUtils';
+import { IPALegend } from './components/IPALegend';
 import { AnalysisResult, AppState, HistoryItem } from './types';
 import { CACHE_CONFIG, UI_CONFIG, SILENCE_DETECTION } from './config/constants';
 import { safeGetJSON, safeSetJSON, safeRemoveItem } from './services/storageUtils';
@@ -608,6 +609,14 @@ const App: React.FC = () => {
                 </div>
               )}
 
+              {/* Generating TTS state */}
+              {appState === AppState.GENERATING_TTS && (
+                <div className="flex items-center gap-2 mt-4 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+                  <div className="w-3.5 h-3.5 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--rose)', borderTopColor: 'transparent' }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Generating audio...</span>
+                </div>
+              )}
+
               {/* Analyzing state */}
               {appState === AppState.ANALYZING && (
                 <div className="flex items-center gap-2 mt-4 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
@@ -717,6 +726,9 @@ const App: React.FC = () => {
       )}
 
       {/* Mobile history drawer */}
+      {/* IPA Legend modal */}
+      <IPALegend show={showIPALegend} onClose={() => setShowIPALegend(false)} />
+
       {showMobileHistory && (
         <div className="fixed inset-0 z-50 lg:hidden" onClick={() => setShowMobileHistory(false)}>
           <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} />
