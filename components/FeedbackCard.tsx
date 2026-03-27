@@ -196,70 +196,6 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
         .animate-symbol-pop { animation: symbol-pop 2s infinite ease-in-out; }
       `}</style>
 
-      {/* Score + sentence row */}
-      <div className="flex items-start gap-4 p-5 border-b" style={{ borderColor: 'var(--border)' }}>
-        <ScoreNumber score={result.score} />
-        <div className="w-px self-stretch shrink-0" style={{ background: 'var(--border)' }} />
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap gap-x-1" style={{ fontSize: 15, fontWeight: 500, lineHeight: 1.7 }}>
-            {result.wordBreakdown.map((w, i) => {
-              const color = w.status === 'correct' ? 'var(--green)' : w.status === 'incorrect' ? 'var(--red)' : 'var(--amber)';
-              return (
-                <span key={i} style={{ color, fontWeight: w.status === 'correct' ? 500 : 600,
-                  textDecoration: w.status === 'incorrect' ? 'underline' : 'none',
-                  textDecorationColor: 'rgba(239,68,68,0.3)' }}>
-                  {w.word}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Playback row */}
-      <div className="flex items-center gap-2 px-5 py-3 flex-wrap border-b" style={{ borderColor: 'var(--border)' }}>
-        <button
-          onClick={() => onPlayWord(result.speechScript || '')}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-          style={{ border: '1.5px solid var(--rose)', color: 'var(--rose)', background: 'var(--surface)' }}
-        >
-          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-          Reference
-        </button>
-
-        {hasUserRecording && (
-          <button
-            onClick={onPlayUserRecording}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-            style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)', background: 'var(--surface)' }}
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth={2}/><polygon points="10,8 16,12 10,16" fill="currentColor"/></svg>
-            Your Recording
-          </button>
-        )}
-
-        <a
-          href={youTubeSearchUrl(result.speechScript || '')}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-          style={{ border: '1.5px solid #ff0000', color: '#cc0000', background: '#fff7f7', textDecoration: 'none' }}
-        >
-          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 11, background: '#ff0000', borderRadius: 2, flexShrink: 0 }}>
-            <span style={{ width: 0, height: 0, borderStyle: 'solid', borderWidth: '3.5px 0 3.5px 7px', borderColor: 'transparent transparent transparent #fff' }} />
-          </span>
-          Watch on YouTube
-        </a>
-
-        <button
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ml-auto transition-all"
-          style={{ border: '1px solid var(--border)', color: 'var(--text-muted)', background: 'var(--surface-muted)' }}
-          onClick={onRetry}
-        >
-          ⏺ Try Again
-        </button>
-      </div>
-
       {/* Ruby annotation row */}
       <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-placeholder)', marginBottom: 12 }}>
@@ -429,9 +365,19 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
       {/* Analysis Details — Word Breakdown pills */}
       {result.wordBreakdown?.length > 0 && (
         <div className="px-5 pb-5 space-y-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
              <div className="h-px flex-1" style={{ background: 'linear-gradient(to right, transparent, var(--border-subtle))' }}></div>
              <h4 className="font-semibold text-[10px] uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Word Breakdown</h4>
+             {result.score > 0 && (() => {
+               const s = result.score;
+               const color = s >= 80 ? 'var(--green)' : s >= 60 ? 'var(--amber)' : 'var(--red)';
+               const bg = s >= 80 ? 'var(--green-bg)' : s >= 60 ? 'var(--amber-bg)' : 'var(--red-bg)';
+               return (
+                 <span className="num font-bold" style={{ fontSize: 11, color, background: bg, padding: '2px 8px', borderRadius: 12 }}>
+                   {s}%
+                 </span>
+               );
+             })()}
              <div className="h-px flex-1" style={{ background: 'linear-gradient(to left, transparent, var(--border-subtle))' }}></div>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-2 flex-wrap" style={{ scrollbarWidth: 'none' }}>
