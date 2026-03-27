@@ -9,8 +9,8 @@ export const IPALegend: React.FC<IPALegendProps> = ({ show, onClose }) => {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-      <div className="glass rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto" style={{ boxShadow: '0 8px 48px rgba(0,0,0,0.1)' }}>
+    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+      <div role="dialog" aria-label="IPA Symbol Guide" className="glass rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto" style={{ boxShadow: '0 8px 48px rgba(0,0,0,0.1)' }} onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 px-6 py-5 flex items-center justify-between rounded-t-2xl" style={{ backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' }}>
           <div>
             <h2 className="text-lg font-bold font-brand" style={{ color: 'var(--text-primary)' }}>IPA Symbol Guide</h2>
@@ -18,6 +18,7 @@ export const IPALegend: React.FC<IPALegendProps> = ({ show, onClose }) => {
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
             style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
           >

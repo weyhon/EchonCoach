@@ -49,7 +49,7 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.15)', backdropFilter: 'blur(8px)' }}
       onClick={onClose}>
-      <div className="rounded-2xl overflow-hidden w-full max-w-md max-h-[85vh] flex flex-col animate-modal-in"
+      <div role="dialog" aria-label="Word detail" className="rounded-2xl overflow-hidden w-full max-w-md max-h-[85vh] flex flex-col animate-modal-in"
         style={{ background: 'var(--surface)', boxShadow: '0 8px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)' }}
         onClick={e => e.stopPropagation()}>
 
@@ -86,7 +86,7 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
             <span className="font-brand" style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-0.03em', color: scoreColor }}>
               {item.word}
             </span>
-            <button onClick={onClose} className="w-7 h-7 rounded-md flex items-center justify-center text-sm"
+            <button onClick={onClose} aria-label="Close" className="w-7 h-7 rounded-md flex items-center justify-center text-sm"
               style={{ background: 'var(--surface-muted)', color: 'var(--text-muted)', border: 'none', cursor: 'pointer' }}>
               ✕
             </button>

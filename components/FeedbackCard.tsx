@@ -41,7 +41,7 @@ const ScoreNumber: React.FC<{ score: number }> = ({ score }) => {
 const statusBg = (s: WordAnalysis['status']) =>
   s === 'correct' ? 'var(--green-bg)' : s === 'incorrect' ? 'var(--red-bg)' : 'var(--amber-bg)';
 const statusColor = (s: WordAnalysis['status']) =>
-  s === 'correct' ? '#15803d' : s === 'incorrect' ? '#be185d' : '#92400e';
+  s === 'correct' ? 'var(--green)' : s === 'incorrect' ? 'var(--red)' : 'var(--amber)';
 
 interface SymbolSpanProps {
   token?: string;

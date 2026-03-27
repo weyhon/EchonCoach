@@ -183,7 +183,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
                 borderRadius: 20,
                 flexShrink: 0,
                 background: item.score >= 80 ? 'var(--green-bg)' : item.score >= 60 ? 'var(--amber-bg)' : 'var(--red-bg)',
-                color: item.score >= 80 ? '#15803d' : item.score >= 60 ? '#92400e' : '#991b1b',
+                color: item.score >= 80 ? 'var(--green)' : item.score >= 60 ? 'var(--amber)' : 'var(--red)',
               }}>
                 {item.score > 0 ? `${item.score}%` : '—'}
               </span>
