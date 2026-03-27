@@ -29,6 +29,8 @@ const App: React.FC = () => {
   const [activeStream, setActiveStream] = useState<MediaStream | null>(null);
   const [activeBlobUrl, setActiveBlobUrl] = useState<string | null>(null);
   const [showMobileHistory, setShowMobileHistory] = useState(false);
+  const [showIPALegend, setShowIPALegend] = useState(false);
+  const [ttsSpeed, setTtsSpeed] = useState<'normal' | 'slow'>('normal');
 
   const VOICES = [
     { id: 'Kore', label: 'Kore', desc: 'Firm' },
@@ -473,30 +475,33 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen pb-16 antialiased">
       {/* Fixed Top Header */}
-      <header className="fixed top-0 w-full flex items-center justify-between px-6 h-14 z-50 backdrop-blur-xl"
-        style={{ backgroundColor: 'rgba(15,17,23,0.85)', borderBottom: '1px solid var(--border-subtle)', boxShadow: '0 1px 20px rgba(0,0,0,0.12)' }}>
-        <div className="flex items-center gap-3">
-          <NebulaLogo size={24} />
-          <div className="flex items-baseline gap-2">
-            <span className="font-brand font-bold text-lg tracking-tight" style={{ color: 'var(--pink)' }}>Nebula</span>
-            <span className="text-[10px] font-medium uppercase tracking-widest hidden sm:block" style={{ color: 'var(--gold)', opacity: 0.8 }}>Pronunciation Coach</span>
+      <header className="fixed top-0 w-full z-50 flex items-center justify-between px-5 h-[52px]"
+        style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center rounded-lg shrink-0"
+            style={{ width: 22, height: 22, background: 'var(--rose)', borderRadius: 6 }}>
+            <NebulaLogo size={12} />
           </div>
+          <span className="font-brand font-extrabold tracking-tight" style={{ fontSize: 15, color: 'var(--text-primary)' }}>Nebula</span>
+          <span className="hidden sm:block font-semibold uppercase tracking-widest" style={{ fontSize: 10, color: 'var(--rose)', marginLeft: 4 }}>Coach</span>
         </div>
-        {history.length > 0 && (
-          <button
-            onClick={() => setShowMobileHistory(true)}
-            className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all"
-            style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            History
-            <span className="w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center text-white" style={{ backgroundColor: 'var(--pink)' }}>
-              {Math.min(history.length, 9)}
-            </span>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowIPALegend(true)}
+            className="px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
+            style={{ background: 'var(--surface-muted)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+            IPA Guide
           </button>
-        )}
+          {history.length > 0 && (
+            <button onClick={() => setShowMobileHistory(true)}
+              className="lg:hidden px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5"
+              style={{ background: 'var(--surface-muted)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+              History
+              <span className="w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center text-white" style={{ background: 'var(--rose)' }}>
+                {Math.min(history.length, 9)}
+              </span>
+            </button>
+          )}
+        </div>
       </header>
 
       {/* Error Toast */}
@@ -516,18 +521,20 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <div className="flex pt-14">
+      <div className="flex pt-[52px]">
         {/* Main Content Area */}
         <div className="flex-1 px-6 lg:px-8">
           <main className="max-w-[660px] mx-auto space-y-5 pt-7 pb-16">
             {/* Input Section */}
-            <section className="glass p-6 rounded-2xl flex flex-col gap-4 animate-fade-in-up stagger-2">
-              <label className="label-micro" style={{ color: 'var(--text-muted)' }}>Practice Sentence</label>
-
-              {/* Hero text input — display-scale typography, no box */}
+            <div className="rounded-xl p-5" style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              {/* Label */}
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'var(--text-placeholder)', marginBottom: 10 }}>
+                PRACTICE SENTENCE
+              </div>
+              {/* Textarea */}
               <textarea
                 value={text}
-                onChange={(e) => setText(e.target.value)}
+                onChange={e => setText(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     if (e.metaKey) return;
@@ -535,152 +542,80 @@ const App: React.FC = () => {
                     if (text.trim() && !isAudioLoading) playAndAnalyze(text);
                   }
                 }}
-                className="font-brand font-bold outline-none resize-none w-full transition-colors duration-200"
+                placeholder="Type or paste a sentence to practice..."
+                className="w-full resize-none outline-none"
                 style={{
-                  fontSize: 'clamp(1.6rem, 4.5vw, 2.4rem)',
-                  lineHeight: '1.2',
-                  letterSpacing: '-0.02em',
-                  color: 'var(--text-primary)',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  minHeight: '2.6em',
-                  padding: '0',
+                  minHeight: 56, padding: '11px 13px',
+                  background: 'var(--surface-muted)', border: '1.5px solid var(--border)', borderRadius: 8,
+                  fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 500, color: 'var(--text-primary)',
+                  lineHeight: 1.55,
                 }}
-                onFocus={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
-                onBlur={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
-                placeholder="Type a sentence…"
+                onFocus={e => e.target.style.borderColor = 'var(--rose)'}
+                onBlur={e => e.target.style.borderColor = 'var(--border)'}
+                disabled={appState !== AppState.IDLE && appState !== AppState.SHOWING_RESULT}
               />
-
-              {/* Action Bar — Stitch-style centered glass pill */}
-              <div className="flex flex-col items-center gap-3 pt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                <div className="flex items-center gap-1 p-1.5 rounded-2xl action-bar-glow ghost-border"
-                  style={{ backgroundColor: 'var(--bg-elevated)' }}>
-
-                  {/* Record / Stop / Analyzing */}
-                  {appState === AppState.RECORDING ? (
-                    <button
-                      onClick={() => mediaRecorderRef.current?.stop()}
-                      className="relative flex flex-col items-center gap-1 px-4 py-2.5 rounded-xl transition-all active:scale-95"
-                      style={{ backgroundColor: 'rgba(248,113,113,0.1)', color: 'var(--red)' }}
-                    >
-                      <span className="absolute inset-0 rounded-xl rec-ring" style={{ border: '1px solid var(--red)' }}></span>
-                      <span className="flex items-center gap-[2px] h-5">
-                        {[0, 0.15, 0.3, 0.1, 0.25].map((d, i) => (
-                          <span key={i} className="rec-bar w-[2px] rounded-full" style={{ height: '100%', backgroundColor: 'var(--red)', animationDelay: `${d}s` }}></span>
-                        ))}
-                      </span>
-                      <span className="text-[10px] font-bold uppercase tracking-tighter">Stop</span>
-                    </button>
-                  ) : appState === AppState.ANALYZING ? (
-                    <div className="flex flex-col items-center gap-1 px-4 py-2.5 rounded-xl"
-                      style={{ backgroundColor: 'var(--pink-dim)', color: 'var(--pink)' }}>
-                      <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: 'rgba(232,88,122,0.2)', borderTopColor: 'var(--pink)' }}></div>
-                      <span className="text-[10px] font-bold uppercase tracking-tighter">Analyzing</span>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={startRecording}
-                      className="flex flex-col items-center gap-1 px-4 py-2.5 rounded-xl transition-all hover-lift active:scale-95"
-                      style={{ color: 'var(--text-muted)' }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--bg-card)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--pink)'; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
-                    >
-                      <MicrophoneIcon size={20} />
-                      <span className="text-[10px] font-bold uppercase tracking-tighter">Record</span>
-                    </button>
-                  )}
-
-                  {/* Slow */}
-                  <button
-                    onClick={() => handlePlayTTS(text, true)}
-                    className="flex flex-col items-center gap-1 px-4 py-2.5 rounded-xl transition-all active:scale-95"
-                    style={{
-                      backgroundColor: activeAudioSource === 'input_slow' ? 'var(--pink-dim)' : 'transparent',
-                      color: activeAudioSource === 'input_slow' ? 'var(--pink)' : 'var(--text-muted)'
-                    }}
-                    onMouseEnter={(e) => { if (activeAudioSource !== 'input_slow') { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--bg-card)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--pink)'; } }}
-                    onMouseLeave={(e) => { if (activeAudioSource !== 'input_slow') { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; } }}
-                    title="Slow playback (S)"
-                  >
-                    <SnailIcon size={20} />
-                    <span className="text-[10px] font-bold uppercase tracking-tighter">Slow</span>
-                  </button>
-
-                  {/* Video / YouTube */}
-                  <a
-                    href={`https://youglish.com/pronounce/${encodeURIComponent(text.replace(/[?.!,;:'"]/g, '').trim())}/english`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex flex-col items-center gap-1 px-4 py-2.5 rounded-xl transition-all active:scale-95"
-                    style={{ color: 'var(--text-muted)', textDecoration: 'none' }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--bg-card)'; (e.currentTarget as HTMLAnchorElement).style.color = 'var(--pink)'; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'transparent'; (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-muted)'; }}
-                    title="Watch native speakers on YouTube"
-                  >
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                    </svg>
-                    <span className="text-[10px] font-bold uppercase tracking-tighter">Video</span>
-                  </a>
-                </div>
-
-                {/* Listen — Full-width hero CTA */}
-                <button
-                  onClick={() => playAndAnalyze(text)}
-                  disabled={isAudioLoading || !text.trim()}
-                  className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl text-white font-bold transition-all active:scale-[0.97] disabled:opacity-40"
-                  style={{
-                    fontSize: 'var(--text-md)',
-                    letterSpacing: '-0.01em',
-                    background: 'linear-gradient(135deg, #E8587A 0%, #d43d63 50%, #c0285a 100%)',
-                    boxShadow: '0 6px 28px rgba(232,88,122,0.35), 0 2px 8px rgba(232,88,122,0.2)',
-                  }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 8px 36px rgba(232,88,122,0.5), 0 2px 8px rgba(232,88,122,0.25)'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 28px rgba(232,88,122,0.35), 0 2px 8px rgba(232,88,122,0.2)'; }}
-                  title="Listen (Enter)"
-                >
-                  {isAudioLoading ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <SpeakerIcon size={22} />
-                  )}
-                  {isAudioLoading ? 'Loading…' : 'Listen'}
+              {/* Action row */}
+              <div className="flex items-center gap-2 mt-3 flex-wrap">
+                {/* Play Reference */}
+                <button onClick={() => handlePlayTTS(text, ttsSpeed === 'slow')} disabled={!text.trim() || appState === AppState.RECORDING || appState === AppState.ANALYZING}
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
+                  style={{ background: 'var(--rose)', color: '#fff', border: 'none' }}>
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                  Play Reference
                 </button>
-
-                {/* Voice selector row */}
-                <div className="flex items-center gap-1.5 flex-wrap justify-center">
-                  <span className="text-[9px] font-bold uppercase tracking-widest mr-1" style={{ color: 'var(--text-muted)' }}>Voice</span>
-                  {VOICES.map(v => (
-                    <button
-                      key={v.id}
-                      onClick={() => setSelectedVoice(v.id)}
-                      className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all active:scale-95"
-                      style={{
-                        backgroundColor: selectedVoice === v.id ? 'var(--pink-dim)' : 'var(--bg-deep)',
-                        color: selectedVoice === v.id ? 'var(--pink)' : 'var(--text-muted)',
-                        border: `1px solid ${selectedVoice === v.id ? 'var(--pink)' : 'var(--border-subtle)'}`,
-                      }}
-                      title={v.desc}
-                    >
-                      {v.label}
+                {/* Record */}
+                {appState !== AppState.RECORDING ? (
+                  <button onClick={startRecording} disabled={!text.trim() || appState === AppState.ANALYZING || appState === AppState.GENERATING_TTS}
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
+                    style={{ background: 'var(--surface-muted)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2H3v2a9 9 0 0 0 8 8.94V23h2v-2.06A9 9 0 0 0 21 12v-2h-2z"/></svg>
+                    Record
+                  </button>
+                ) : (
+                  <button onClick={() => mediaRecorderRef.current?.stop()}
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold"
+                    style={{ background: '#111827', color: '#fff', border: 'none' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: '#fff', display: 'inline-block' }} />
+                    Stop Recording
+                  </button>
+                )}
+                {/* Speed toggle */}
+                <div className="flex ml-auto rounded-md overflow-hidden" style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', padding: 2 }}>
+                  {(['normal', 'slow'] as const).map(speed => (
+                    <button key={speed} onClick={() => setTtsSpeed(speed)}
+                      className="px-3 py-1 text-xs font-semibold rounded capitalize transition-all"
+                      style={ttsSpeed === speed
+                        ? { background: 'var(--surface)', color: 'var(--text-primary)', boxShadow: '0 1px 2px rgba(0,0,0,0.08)' }
+                        : { color: 'var(--text-muted)', background: 'transparent' }}>
+                      {speed.charAt(0).toUpperCase() + speed.slice(1)}
                     </button>
-                  ))}
-                </div>
-
-                {/* Keyboard hints */}
-                <div className="flex items-center gap-3 opacity-40">
-                  {[['Enter', 'Listen'], ['Space', 'Play'], ['S', 'Slow'], ['R', 'Record']].map(([key, label]) => (
-                    <span key={key} className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                      <kbd className="px-1.5 py-0.5 rounded text-[9px] font-mono"
-                        style={{ backgroundColor: 'var(--bg-deep)', border: '1px solid var(--border-subtle)' }}>
-                        {key}
-                      </kbd>
-                      <span>{label}</span>
-                    </span>
                   ))}
                 </div>
               </div>
-            </section>
+
+              {/* Recording state: waveform */}
+              {appState === AppState.RECORDING && (
+                <div className="flex items-center gap-3 mt-4 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: 'var(--red)' }} />
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Recording...</span>
+                  </div>
+                  <div className="flex items-center gap-0.5 h-6">
+                    {[1,2,3,4,5,6,7].map(n => (
+                      <div key={n} className="rec-bar" style={{ width: 3, background: 'var(--rose)', borderRadius: 2, height: `${12 + (n % 3) * 8}px` }} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Analyzing state */}
+              {appState === AppState.ANALYZING && (
+                <div className="flex items-center gap-2 mt-4 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+                  <div className="w-3.5 h-3.5 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--rose)', borderTopColor: 'transparent' }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Analyzing pronunciation...</span>
+                </div>
+              )}
+            </div>
 
             {/* Loading State */}
             {appState === AppState.ANALYZING && !result && (
@@ -724,7 +659,8 @@ const App: React.FC = () => {
         </div>
 
         {/* Right Sidebar - History */}
-        <aside className="w-[300px] h-[calc(100vh-56px)] sticky top-14 overflow-y-auto px-5 py-7 hidden lg:block" style={{ backgroundColor: 'var(--bg-surface)', borderLeft: '1px solid var(--border-subtle)' }}>
+        <aside className="hidden lg:flex flex-col w-[256px] shrink-0 h-[calc(100vh-52px)] sticky top-[52px] overflow-y-auto"
+          style={{ background: 'var(--surface)', borderLeft: '1px solid var(--border)' }}>
           <HistoryList
             history={history}
             onQuickAnalyze={(t) => { setText(t); playAndAnalyze(t); }}
