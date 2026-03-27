@@ -1,90 +1,244 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { HistoryItem } from '../types';
+import { ScoreChart } from './ScoreChart';
 
 interface HistoryListProps {
   history: HistoryItem[];
   onSelect: (text: string) => void;
   onClear: () => void;
+  onQuickAnalyze?: (text: string) => void;
+  onQuickRecord?: (text: string) => void;
 }
 
-const SearchIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+type TooltipState = { id: string; top: number; left: number } | null;
+
+const SearchIcon = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
   </svg>
 );
 
-export const HistoryList: React.FC<HistoryListProps> = ({ history, onSelect, onClear }) => {
+const TOOLTIP_WIDTH = 260;
+const TOOLTIP_GAP = 14;
+const HIDE_DELAY = 120;
+
+const formatTimestamp = (ts: number) => {
+  const d = new Date(ts);
+  return (
+    d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
+    ' · ' +
+    d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  );
+};
+
+export const HistoryList: React.FC<HistoryListProps> = ({
+  history, onSelect, onClear, onQuickAnalyze,
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [tooltip, setTooltip] = useState<TooltipState>(null);
+  const hideTimerRef = useRef<number | null>(null);
 
   const filteredHistory = useMemo(() => {
     if (!searchTerm.trim()) return history;
-    return history.filter(item => 
+    return history.filter(item =>
       item.text.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [history, searchTerm]);
 
+  const clearHideTimer = useCallback(() => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleHide = useCallback(() => {
+    clearHideTimer();
+    hideTimerRef.current = window.setTimeout(() => setTooltip(null), HIDE_DELAY);
+  }, [clearHideTimer]);
+
+  const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>, id: string) => {
+    clearHideTimer();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const left = Math.max(8, rect.left - TOOLTIP_WIDTH - TOOLTIP_GAP);
+    const top = Math.min(
+      Math.max(80, rect.top + rect.height / 2),
+      window.innerHeight - 100,
+    );
+    setTooltip({ id, top, left });
+  };
+
   if (history.length === 0) return null;
 
+  const hoveredItem = tooltip ? history.find(h => h.id === tooltip.id) : null;
+
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-4 animate-fade-in">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-[12px] font-black text-indigo-600 uppercase tracking-[0.15em]">Recent Practice</h3>
+        <span style={{
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          color: 'var(--text-placeholder)',
+        }}>
+          History
+        </span>
         <button
           onClick={onClear}
-          className="text-[10px] font-extrabold text-slate-400 hover:text-red-500 uppercase tracking-[0.12em] transition-colors"
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            color: 'var(--text-placeholder)',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--red)')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-placeholder)')}
         >
-          Clear All
+          Clear
         </button>
       </div>
 
+      {/* Search */}
       <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-          <SearchIcon className="text-slate-300 w-4 h-4" />
+        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none" style={{ color: 'var(--text-placeholder)' }}>
+          <SearchIcon />
         </div>
         <input
           type="text"
-          placeholder="Search history..."
+          placeholder="Search..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="block w-full pl-10 pr-4 py-3.5 border-[1.5px] border-slate-200 rounded-[16px] bg-white text-[12px] font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 focus:bg-white transition-all placeholder:text-slate-400 shadow-sm"
+          className="w-full pl-9 pr-4 py-2.5 rounded-lg text-[12px] font-medium focus:outline-none transition-colors"
+          style={{
+            background: 'var(--surface-muted)',
+            border: '1.5px solid var(--border)',
+            color: 'var(--text-primary)',
+          }}
+          onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--border-focus)')}
+          onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-2.5">
-        {filteredHistory.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => onSelect(item.text)}
-            className={`group w-full text-left p-5 rounded-[20px] shadow-md hover:shadow-lg transition-all flex items-center gap-4 active:scale-[0.98] ${
-              item.score >= 80
-                ? 'bg-gradient-to-br from-white to-emerald-50 border-[1.5px] border-emerald-300/60 hover:border-emerald-400'
-                : item.score >= 60
-                ? 'bg-gradient-to-br from-white to-indigo-50 border-[1.5px] border-indigo-200 hover:border-indigo-300'
-                : 'bg-gradient-to-br from-white to-orange-50 border-[1.5px] border-orange-200 hover:border-orange-300'
-            }`}
-          >
-            <div className={`w-[52px] h-[52px] shrink-0 rounded-full flex items-center justify-center font-black text-[16px] shadow-sm border-2 ${
-                item.score >= 80 ? 'bg-gradient-to-br from-emerald-100 to-emerald-200 text-emerald-700 border-emerald-400' :
-                item.score >= 60 ? 'bg-gradient-to-br from-indigo-100 to-indigo-200 text-indigo-700 border-indigo-400' :
-                'bg-gradient-to-br from-orange-100 to-orange-200 text-orange-700 border-orange-400'
-            }`}>
-              {item.score > 0 ? item.score : "-"}
+      {/* Progress chart */}
+      <ScoreChart history={history} />
+
+      {/* List */}
+      <div className="space-y-0.5">
+        {filteredHistory.map((item) => {
+          const isActive = tooltip?.id === item.id;
+
+          return (
+            <div
+              key={item.id}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors"
+              style={{ background: isActive ? 'var(--rose-50)' : 'transparent' }}
+              onMouseEnter={(e) => {
+                handleMouseEnter(e, item.id);
+                if (!isActive) e.currentTarget.style.background = 'var(--surface-muted)';
+              }}
+              onMouseLeave={(e) => {
+                scheduleHide();
+                if (!isActive) e.currentTarget.style.background = 'transparent';
+              }}
+              onClick={() => {
+                setTooltip(null);
+                if (onQuickAnalyze) {
+                  onQuickAnalyze(item.text);
+                } else {
+                  onSelect(item.text);
+                }
+              }}
+            >
+              {/* Text */}
+              <div className="flex-1 min-w-0">
+                <div style={{
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: 'var(--text-primary)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {item.text}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-placeholder)', marginTop: 1 }}>
+                  {formatTimestamp(item.timestamp)}
+                </div>
+              </div>
+
+              {/* Score badge */}
+              <span style={{
+                fontSize: 11,
+                fontWeight: 700,
+                padding: '3px 8px',
+                borderRadius: 20,
+                flexShrink: 0,
+                background: item.score >= 80 ? 'var(--green-bg)' : item.score >= 60 ? 'var(--amber-bg)' : 'var(--red-bg)',
+                color: item.score >= 80 ? '#15803d' : item.score >= 60 ? '#92400e' : '#991b1b',
+              }}>
+                {item.score > 0 ? `${item.score}%` : '—'}
+              </span>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-slate-700 font-bold text-[13px] truncate pr-2">{item.text}</p>
-              <p className="text-[9px] text-slate-400 uppercase font-bold mt-1 flex items-center gap-2 tracking-wider">
-                {new Date(item.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                {new Date(item.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-              </p>
-            </div>
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity pr-1">
-               <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
-            </div>
-          </button>
-        ))}
+          );
+        })}
       </div>
+
+      {/* Tooltip portal */}
+      {tooltip && hoveredItem && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: tooltip.top,
+            left: tooltip.left,
+            width: TOOLTIP_WIDTH,
+            transform: 'translateY(-50%)',
+            zIndex: 99999,
+            pointerEvents: 'none',
+          }}
+        >
+          <div style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 8,
+            padding: '10px 14px',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
+            position: 'relative',
+          }}>
+            <p style={{
+              color: 'var(--text-primary)',
+              fontSize: 13,
+              fontWeight: 500,
+              lineHeight: 1.5,
+              margin: 0,
+              wordBreak: 'break-word',
+            }}>
+              {hoveredItem.text}
+            </p>
+            {/* Arrow */}
+            <div style={{
+              position: 'absolute',
+              right: -6,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: 0,
+              height: 0,
+              borderTop: '6px solid transparent',
+              borderBottom: '6px solid transparent',
+              borderLeft: '6px solid var(--border)',
+            }} />
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
