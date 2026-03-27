@@ -561,7 +561,7 @@ const App: React.FC = () => {
                 {(() => {
                   const isBusy = appState === AppState.GENERATING_TTS || activeAudioSource?.startsWith('input_');
                   return (
-                    <button onClick={() => handlePlayTTS(text, ttsSpeed === 'slow')}
+                    <button onClick={() => playAndAnalyze(text)}
                       disabled={!text.trim() || isBusy || appState === AppState.RECORDING || appState === AppState.ANALYZING}
                       className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-60"
                       style={{ background: isBusy ? 'var(--rose-50)' : 'var(--rose)', color: isBusy ? 'var(--rose)' : '#fff', border: isBusy ? '1.5px solid var(--rose)' : 'none' }}>
