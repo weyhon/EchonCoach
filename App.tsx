@@ -462,14 +462,10 @@ const App: React.FC = () => {
     <div className="min-h-screen pb-16 antialiased">
       {/* Fixed Top Header */}
       <header className="fixed top-0 w-full z-50 flex items-center justify-between px-5 h-[52px]"
-        style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center rounded-lg shrink-0"
-            style={{ width: 22, height: 22, background: 'var(--rose)', borderRadius: 6 }}>
-            <NebulaLogo size={12} />
-          </div>
-          <span className="font-brand font-extrabold tracking-tight" style={{ fontSize: 15, color: 'var(--text-primary)' }}>Nebula</span>
-          <span className="hidden sm:block font-semibold uppercase tracking-widest" style={{ fontSize: 10, color: 'var(--rose)', marginLeft: 4 }}>Coach</span>
+        style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)' }}>
+        <div className="flex items-center gap-2.5">
+          <NebulaLogo size={28} />
+          <span className="font-brand font-extrabold tracking-tight" style={{ fontSize: 16, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>Nebula</span>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowIPALegend(true)}
