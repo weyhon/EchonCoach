@@ -20,31 +20,34 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("EchoCoach 错误：", error, errorInfo);
+    console.error("Nebula Error:", error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-          <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 border border-red-100">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <span className="text-3xl">⚠️</span>
+        <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: 'var(--bg-deep)' }}>
+          <div className="glass max-w-md w-full rounded-2xl p-8">
+            <div className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-5" style={{ backgroundColor: 'rgba(248,113,113,0.1)' }}>
+              <svg className="w-7 h-7" style={{ color: 'var(--red)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
             </div>
-            <h1 className="text-2xl font-black text-slate-800 text-center mb-4">
-              遇到错误
+            <h1 className="text-xl font-bold text-center mb-3 font-brand" style={{ color: 'var(--text-primary)' }}>
+              Something went wrong
             </h1>
-            <p className="text-slate-600 text-sm text-center mb-6">
-              {this.state.error?.message || "发生了未知错误"}
+            <p className="text-sm text-center mb-6" style={{ color: 'var(--text-secondary)' }}>
+              {this.state.error?.message || "An unexpected error occurred"}
             </p>
             <button
               onClick={() => window.location.reload()}
-              className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition-colors"
+              className="w-full text-white py-2.5 rounded-full font-semibold transition-colors text-sm hover:opacity-90"
+              style={{ backgroundColor: 'var(--pink)', boxShadow: '0 2px 12px var(--pink-dim)' }}
             >
-              重新加载
+              Reload
             </button>
-            <p className="text-xs text-slate-400 text-center mt-4">
-              请查看浏览器控制台获取详细信息
+            <p className="text-xs text-center mt-3" style={{ color: 'var(--text-muted)' }}>
+              Check browser console for details
             </p>
           </div>
         </div>

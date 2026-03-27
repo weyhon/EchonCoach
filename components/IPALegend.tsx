@@ -9,250 +9,164 @@ export const IPALegend: React.FC<IPALegendProps> = ({ show, onClose }) => {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-slate-200 px-8 py-6 flex items-center justify-between rounded-t-3xl">
+    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+      <div className="glass rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto" style={{ boxShadow: '0 8px 48px rgba(0,0,0,0.1)' }}>
+        <div className="sticky top-0 px-6 py-5 flex items-center justify-between rounded-t-2xl" style={{ backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' }}>
           <div>
-            <h2 className="text-2xl font-black text-slate-800">音标符号说明</h2>
-            <p className="text-sm text-slate-500 mt-1">IPA (International Phonetic Alphabet) Guide</p>
+            <h2 className="text-lg font-bold font-brand" style={{ color: 'var(--text-primary)' }}>IPA Symbol Guide</h2>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>International Phonetic Alphabet reference</p>
           </div>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+            style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <div className="px-8 py-6 space-y-8">
-          {/* Linking Section */}
+        <div className="px-6 py-5 space-y-6">
+          {/* Linking */}
           <section>
-            <h3 className="text-lg font-black text-slate-700 mb-4 flex items-center gap-2">
-              <span className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600 text-xl">‿</span>
-              连读符号 (Linking)
+            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <span className="w-7 h-7 rounded-md flex items-center justify-center text-lg" style={{ backgroundColor: 'var(--pink-dim)', color: 'var(--pink)' }}>‿</span>
+              Linking
             </h3>
-            <div className="bg-slate-50 rounded-2xl p-6 space-y-4">
-              <div className="flex items-start gap-4">
-                <span className="text-4xl text-indigo-600 font-black shrink-0">‿</span>
-                <div className="flex-1">
-                  <h4 className="font-bold text-slate-800 mb-2">连读线 (Linking Mark)</h4>
-                  <p className="text-sm text-slate-600 leading-relaxed mb-3">
-                    表示两个词之间要连读，通常发生在辅音结尾的词后面跟着元音开头的词时。连读是美式英语流利发音的关键特征。
-                  </p>
-                  <div className="bg-white rounded-xl p-4 border border-slate-200">
-                    <p className="text-xs text-slate-500 mb-2 font-semibold">示例 (Examples):</p>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-indigo-600 font-bold">pick‿it</span>
-                        <span className="text-slate-400">→</span>
-                        <span className="font-mono text-slate-600">/pɪ kɪt/</span>
-                        <span className="text-slate-500 text-xs">(听起来像 "pickit")</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-indigo-600 font-bold">turn‿on</span>
-                        <span className="text-slate-400">→</span>
-                        <span className="font-mono text-slate-600">/tɝ nɑn/</span>
-                        <span className="text-slate-500 text-xs">(听起来像 "turnon")</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-indigo-600 font-bold">have‿a</span>
-                        <span className="text-slate-400">→</span>
-                        <span className="font-mono text-slate-600">/hæ və/</span>
-                        <span className="text-slate-500 text-xs">(注意: "have" 发音结尾是 /v/)</span>
-                      </div>
-                    </div>
+            <div className="rounded-xl p-4 space-y-3" style={{ backgroundColor: 'var(--bg-elevated)' }}>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                Marks where two words flow together in natural speech. Typically occurs when a consonant-ending word is followed by a vowel-starting word.
+              </p>
+              <div className="rounded-lg p-3" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)' }}>
+                <p className="text-[10px] mb-2 font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Examples</p>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono font-semibold" style={{ color: 'var(--pink)' }}>pick‿it</span>
+                    <span style={{ color: 'var(--text-muted)' }}>/pɪ.kɪt/</span>
+                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>sounds like "pickit"</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono font-semibold" style={{ color: 'var(--pink)' }}>turn‿on</span>
+                    <span style={{ color: 'var(--text-muted)' }}>/tɝ.nɑn/</span>
+                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>sounds like "turnon"</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono font-semibold" style={{ color: 'var(--pink)' }}>have‿a</span>
+                    <span style={{ color: 'var(--text-muted)' }}>/hæ.və/</span>
+                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>"have" ends with /v/ sound</span>
                   </div>
                 </div>
               </div>
             </div>
           </section>
 
-          {/* Stress Section */}
+          {/* Stress */}
           <section>
-            <h3 className="text-lg font-black text-slate-700 mb-4 flex items-center gap-2">
-              <span className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600 text-xl">●</span>
-              重音符号 (Stress)
+            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <span className="w-7 h-7 rounded-md flex items-center justify-center text-lg" style={{ backgroundColor: 'var(--pink-dim)', color: 'var(--pink)' }}>●</span>
+              Stress
             </h3>
-            <div className="bg-slate-50 rounded-2xl p-6 space-y-4">
-              <div className="flex items-start gap-4">
-                <span className="text-4xl text-indigo-600 font-black shrink-0">●</span>
-                <div className="flex-1">
-                  <h4 className="font-bold text-slate-800 mb-2">重音 (Primary Stress)</h4>
-                  <p className="text-sm text-slate-600 leading-relaxed mb-3">
-                    标记需要重读的音节或单词。重读时声音更大、更清晰、时长更长。在句子中，实义词（名词、动词、形容词）通常需要重读。
-                  </p>
-                  <div className="bg-white rounded-xl p-4 border border-slate-200">
-                    <p className="text-xs text-slate-500 mb-2 font-semibold">示例 (Example):</p>
-                    <div className="text-sm">
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-purple-600 font-bold">●TELL us</span>
-                        <span className="text-slate-500 text-xs">(重读 "tell"，轻读 "us")</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+            <div className="rounded-xl p-4 space-y-4" style={{ backgroundColor: 'var(--bg-elevated)' }}>
+              <div>
+                <h4 className="font-semibold text-sm mb-1.5 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                  <span style={{ color: 'var(--pink)' }}>●</span> Stressed
+                </h4>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  Content words (nouns, verbs, adjectives) are spoken louder, longer, and clearer. They carry the main meaning.
+                </p>
               </div>
-
-              <div className="flex items-start gap-4 pt-4 border-t border-slate-200">
-                <span className="text-4xl text-slate-400 font-black shrink-0">·</span>
-                <div className="flex-1">
-                  <h4 className="font-bold text-slate-800 mb-2">非重音/弱读 (Unstressed)</h4>
-                  <p className="text-sm text-slate-600 leading-relaxed mb-3">
-                    标记轻读的音节或单词。弱读时声音更轻、更短、元音常常弱化为 /ə/（schwa）。功能词（冠词、介词、助动词）通常弱读。
-                  </p>
-                  <div className="bg-white rounded-xl p-4 border border-slate-200">
-                    <p className="text-xs text-slate-500 mb-2 font-semibold">示例 (Example):</p>
-                    <div className="text-sm">
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-slate-500 font-bold">tell ·us</span>
-                        <span className="text-slate-500 text-xs">(轻读 "us"，发音接近 /əs/)</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              <div className="pt-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                <h4 className="font-semibold text-sm mb-1.5 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>·</span> Unstressed
+                </h4>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  Function words (articles, prepositions, auxiliaries) are reduced. Vowels often weaken to schwa /ə/.
+                </p>
               </div>
             </div>
           </section>
 
-          {/* Intonation Section */}
+          {/* Intonation */}
           <section>
-            <h3 className="text-lg font-black text-slate-700 mb-4 flex items-center gap-2">
-              <span className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600 text-xl">↗</span>
-              语调符号 (Intonation)
+            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <span className="w-7 h-7 rounded-md flex items-center justify-center text-lg" style={{ backgroundColor: 'rgba(251,191,36,0.1)', color: 'var(--amber)' }}>↗</span>
+              Intonation
             </h3>
-            <div className="bg-slate-50 rounded-2xl p-6 space-y-4">
-              <div className="flex items-start gap-4">
-                <span className="text-4xl text-orange-500 font-black shrink-0">↗</span>
-                <div className="flex-1">
-                  <h4 className="font-bold text-slate-800 mb-2">升调 (Rising Intonation)</h4>
-                  <p className="text-sm text-slate-600 leading-relaxed mb-3">
-                    用于一般疑问句（Yes/No Questions）结尾。声调上扬，表示疑问、不确定或未完成的意思。
-                  </p>
-                  <div className="bg-white rounded-xl p-4 border border-slate-200">
-                    <p className="text-xs text-slate-500 mb-2 font-semibold">示例 (Examples):</p>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-orange-600 font-bold">Are you ready↗</span>
-                        <span className="text-slate-500 text-xs">(句尾声调上扬)</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-orange-600 font-bold">Do you like it↗</span>
-                        <span className="text-slate-500 text-xs">(期待 Yes/No 回答)</span>
-                      </div>
-                    </div>
-                  </div>
+            <div className="rounded-xl p-4 space-y-4" style={{ backgroundColor: 'var(--bg-elevated)' }}>
+              <div>
+                <h4 className="font-semibold text-sm mb-1.5 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                  <span style={{ color: 'var(--amber)' }}>↗</span> Rising
+                </h4>
+                <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>Used at the end of yes/no questions. Pitch goes up.</p>
+                <div className="flex gap-3 text-sm">
+                  <span className="font-mono" style={{ color: 'var(--amber)' }}>Are you ready↗</span>
+                  <span className="font-mono" style={{ color: 'var(--amber)' }}>Do you like it↗</span>
                 </div>
               </div>
-
-              <div className="flex items-start gap-4 pt-4 border-t border-slate-200">
-                <span className="text-4xl text-sky-500 font-black shrink-0">↘</span>
-                <div className="flex-1">
-                  <h4 className="font-bold text-slate-800 mb-2">降调 (Falling Intonation)</h4>
-                  <p className="text-sm text-slate-600 leading-relaxed mb-3">
-                    用于陈述句和特殊疑问句（Wh-Questions）结尾。声调下降，表示陈述、确定或完成的意思。
-                  </p>
-                  <div className="bg-white rounded-xl p-4 border border-slate-200">
-                    <p className="text-xs text-slate-500 mb-2 font-semibold">示例 (Examples):</p>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-sky-600 font-bold">What's your name↘</span>
-                        <span className="text-slate-500 text-xs">(特殊疑问句用降调)</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-sky-600 font-bold">I'm fine↘</span>
-                        <span className="text-slate-500 text-xs">(陈述句用降调)</span>
-                      </div>
-                    </div>
-                  </div>
+              <div className="pt-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                <h4 className="font-semibold text-sm mb-1.5 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                  <span style={{ color: 'var(--pink)' }}>↘</span> Falling
+                </h4>
+                <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>Used for statements and wh-questions. Pitch goes down.</p>
+                <div className="flex gap-3 text-sm">
+                  <span className="font-mono" style={{ color: 'var(--pink)' }}>What's your name↘</span>
+                  <span className="font-mono" style={{ color: 'var(--pink)' }}>I'm fine↘</span>
                 </div>
               </div>
             </div>
           </section>
 
-          {/* Pro Tips Section */}
-          <section className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-6 border-2 border-indigo-100">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shrink-0">
-                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h4 className="font-black text-indigo-900 mb-3 text-lg">专业提示 (Pro Tips)</h4>
-                <ul className="space-y-2 text-sm text-indigo-800">
-                  <li className="flex items-start gap-2">
-                    <span className="text-indigo-600 font-black shrink-0">•</span>
-                    <span><strong>连读基于发音，不是拼写:</strong> "have" 虽然以 e 结尾，但实际发音是 /hæv/（辅音结尾），所以 "have a" 会连读成 "have‿a"</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-indigo-600 font-black shrink-0">•</span>
-                    <span><strong>连读让语速更自然:</strong> 母语者说话时会自然连读，这是流利英语的标志。不要刻意停顿，让词语自然流动</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-indigo-600 font-black shrink-0">•</span>
-                    <span><strong>重音影响意思:</strong> 重音位置不同，句子含义可能完全不同。例如 "I didn't say he stole the money" 重读不同的词会有7种不同的意思</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-indigo-600 font-black shrink-0">•</span>
-                    <span><strong>语调传达情感:</strong> 同样的句子，用升调或降调会传达不同的情绪和意图。掌握语调能让你的英语更地道</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </section>
-
-          {/* Quick Reference Table */}
+          {/* Quick Reference */}
           <section>
-            <h3 className="text-lg font-black text-slate-700 mb-4">快速参考 (Quick Reference)</h3>
-            <div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden">
+            <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Quick Reference</h3>
+            <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-subtle)' }}>
               <table className="w-full">
                 <thead>
-                  <tr className="bg-slate-100">
-                    <th className="text-left px-6 py-3 text-xs font-black text-slate-600 uppercase tracking-wider">符号</th>
-                    <th className="text-left px-6 py-3 text-xs font-black text-slate-600 uppercase tracking-wider">名称</th>
-                    <th className="text-left px-6 py-3 text-xs font-black text-slate-600 uppercase tracking-wider">用途</th>
+                  <tr style={{ backgroundColor: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)' }}>
+                    <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Symbol</th>
+                    <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Name</th>
+                    <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Purpose</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
-                  <tr className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 text-2xl text-indigo-600 font-black">‿</td>
-                    <td className="px-6 py-4 text-sm font-semibold text-slate-700">连读线</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">标记两个词的连读位置</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 text-2xl text-purple-600 font-black">●</td>
-                    <td className="px-6 py-4 text-sm font-semibold text-slate-700">重音</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">标记需要重读的音节</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 text-2xl text-slate-400 font-black">·</td>
-                    <td className="px-6 py-4 text-sm font-semibold text-slate-700">非重音</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">标记轻读的音节</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 text-2xl text-orange-500 font-black">↗</td>
-                    <td className="px-6 py-4 text-sm font-semibold text-slate-700">升调</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">一般疑问句结尾，声调上扬</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 text-2xl text-sky-500 font-black">↘</td>
-                    <td className="px-6 py-4 text-sm font-semibold text-slate-700">降调</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">陈述句和特殊疑问句结尾，声调下降</td>
-                  </tr>
+                <tbody>
+                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}><td className="px-4 py-3 text-xl font-bold" style={{ color: 'var(--pink)' }}>‿</td><td className="px-4 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Link</td><td className="px-4 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>Words flow together</td></tr>
+                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}><td className="px-4 py-3 text-xl font-bold" style={{ color: 'var(--pink)' }}>●</td><td className="px-4 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Stress</td><td className="px-4 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>Emphasized syllable</td></tr>
+                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}><td className="px-4 py-3 text-xl font-bold" style={{ color: 'var(--text-muted)' }}>·</td><td className="px-4 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Unstressed</td><td className="px-4 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>Reduced syllable</td></tr>
+                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}><td className="px-4 py-3 text-xl font-bold" style={{ color: 'var(--amber)' }}>↗</td><td className="px-4 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Rise</td><td className="px-4 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>Yes/no questions</td></tr>
+                  <tr><td className="px-4 py-3 text-xl font-bold" style={{ color: 'var(--pink)' }}>↘</td><td className="px-4 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Fall</td><td className="px-4 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>Statements, wh-questions</td></tr>
                 </tbody>
               </table>
             </div>
           </section>
+
+          {/* Pro Tips */}
+          <section className="rounded-xl p-4" style={{ backgroundColor: 'var(--pink-dim)', border: '1px solid rgba(232,88,122,0.2)' }}>
+            <h4 className="font-semibold mb-3 text-sm" style={{ color: 'var(--pink)' }}>Pro Tips</h4>
+            <ul className="space-y-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+              <li className="flex items-start gap-2">
+                <span style={{ color: 'var(--pink)' }} className="shrink-0 mt-0.5">-</span>
+                <span><strong style={{ color: 'var(--text-primary)' }}>Linking is based on sound, not spelling.</strong> "Have" ends with the sound /v/, so "have a" links as "have‿a".</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span style={{ color: 'var(--pink)' }} className="shrink-0 mt-0.5">-</span>
+                <span><strong style={{ color: 'var(--text-primary)' }}>Stress changes meaning.</strong> "I didn't say HE stole it" vs "I didn't SAY he stole it" convey different things.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span style={{ color: 'var(--pink)' }} className="shrink-0 mt-0.5">-</span>
+                <span><strong style={{ color: 'var(--text-primary)' }}>Intonation conveys intent.</strong> The same words with different intonation can express surprise, certainty, or doubt.</span>
+              </li>
+            </ul>
+          </section>
         </div>
 
-        <div className="sticky bottom-0 bg-slate-50 border-t border-slate-200 px-8 py-4 rounded-b-3xl">
+        <div className="sticky bottom-0 px-6 py-4 rounded-b-2xl" style={{ backgroundColor: 'var(--bg-card)', borderTop: '1px solid var(--border-subtle)' }}>
           <button
             onClick={onClose}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-colors"
+            className="w-full text-white font-semibold py-2.5 px-6 rounded-full transition-colors text-sm hover:opacity-90"
+            style={{ backgroundColor: 'var(--pink)', boxShadow: '0 2px 12px var(--pink-dim)' }}
           >
-            我明白了 (Got it!)
+            Got it
           </button>
         </div>
       </div>
