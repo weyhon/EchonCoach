@@ -558,12 +558,22 @@ const App: React.FC = () => {
               {/* Action row */}
               <div className="flex items-center gap-2 mt-3 flex-wrap">
                 {/* Play Reference */}
-                <button onClick={() => handlePlayTTS(text, ttsSpeed === 'slow')} disabled={!text.trim() || appState === AppState.RECORDING || appState === AppState.ANALYZING}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
-                  style={{ background: 'var(--rose)', color: '#fff', border: 'none' }}>
-                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                  Play Reference
-                </button>
+                {(() => {
+                  const isBusy = appState === AppState.GENERATING_TTS || activeAudioSource?.startsWith('input_');
+                  return (
+                    <button onClick={() => handlePlayTTS(text, ttsSpeed === 'slow')}
+                      disabled={!text.trim() || isBusy || appState === AppState.RECORDING || appState === AppState.ANALYZING}
+                      className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-60"
+                      style={{ background: isBusy ? 'var(--rose-50)' : 'var(--rose)', color: isBusy ? 'var(--rose)' : '#fff', border: isBusy ? '1.5px solid var(--rose)' : 'none' }}>
+                      {isBusy ? (
+                        <div className="w-3.5 h-3.5 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--rose)', borderTopColor: 'transparent' }} />
+                      ) : (
+                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                      )}
+                      {appState === AppState.GENERATING_TTS ? 'Loading...' : activeAudioSource?.startsWith('input_') ? 'Playing...' : 'Play Reference'}
+                    </button>
+                  );
+                })()}
                 {/* Record */}
                 {appState !== AppState.RECORDING ? (
                   <button onClick={startRecording} disabled={!text.trim() || appState === AppState.ANALYZING || appState === AppState.GENERATING_TTS}
@@ -606,14 +616,6 @@ const App: React.FC = () => {
                       <div key={n} className="rec-bar" style={{ width: 3, background: 'var(--rose)', borderRadius: 2, height: `${12 + (n % 3) * 8}px` }} />
                     ))}
                   </div>
-                </div>
-              )}
-
-              {/* Generating TTS state */}
-              {appState === AppState.GENERATING_TTS && (
-                <div className="flex items-center gap-2 mt-4 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
-                  <div className="w-3.5 h-3.5 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--rose)', borderTopColor: 'transparent' }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Generating audio...</span>
                 </div>
               )}
 
