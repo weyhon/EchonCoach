@@ -254,75 +254,61 @@ const App: React.FC = () => {
       return;
     }
 
+    // 1) Show result IMMEDIATELY using local heuristics (no wait)
+    const words = textToSpeak.trim().split(/\s+/);
+    const intonationMap = generateIntonationMap(textToSpeak, words);
+    let linkedSentence = '';
+    for (let i = 0; i < words.length; i++) {
+      linkedSentence += words[i];
+      if (i < words.length - 1) {
+        linkedSentence += shouldLink(words[i], words[i + 1]) ? '‿' : ' ';
+      }
+    }
+    const localRes: AnalysisResult = {
+      score: 0,
+      overallComment: "",
+      speechScript: textToSpeak,
+      wordBreakdown: [],
+      fullLinkedSentence: linkedSentence,
+      fullLinkedPhonetic: words.map(w => w.replace(/[?.!,;]/g, '').toLowerCase()).join(' '),
+      intonationMap
+    };
+    setResult(localRes);
+    referenceCache.set(textToSpeak, localRes);
+    saveToHistory(textToSpeak, localRes);
+    setAppState(AppState.SHOWING_RESULT);
+
+    // 2) Fire TTS + remote linking in parallel (audio plays when ready)
     setIsAudioLoading(true);
-    setAppState(AppState.GENERATING_TTS);
-    
     try {
-      // Run TTS and linking analysis in parallel, fallback to local heuristics if linking fails
       const [ttsResult, linkingResult] = await Promise.allSettled([
         generateSpeech(textToSpeak, false, selectedVoice),
         getLinkingAnalysisForText(textToSpeak)
       ]);
 
-      console.log("🔍 App.tsx Analysis Results:", {
-        ttsStatus: ttsResult.status,
-        linkingStatus: linkingResult.status,
-        linkingValue: linkingResult.status === 'fulfilled' ? linkingResult.value : null,
-        linkingReason: linkingResult.status === 'rejected' ? linkingResult.reason : null
-      });
-
-      if (ttsResult.status !== 'fulfilled') {
-        throw ttsResult.reason;
+      // Update result with richer remote linking data if available
+      if (linkingResult.status === 'fulfilled') {
+        const linking = linkingResult.value;
+        const enrichedRes: AnalysisResult = {
+          ...localRes,
+          fullLinkedSentence: linking.fullLinkedSentence,
+          fullLinkedPhonetic: linking.fullLinkedPhonetic,
+          intonationMap: linking.intonationMap
+        };
+        setResult(enrichedRes);
+        referenceCache.set(textToSpeak, enrichedRes);
       }
 
-      // Smart fallback for linking analysis (should never be needed as geminiService has its own fallback)
-      const linking = linkingResult.status === 'fulfilled'
-        ? linkingResult.value
-        : (() => {
-            console.warn("⚠️ App.tsx fallback triggered (shouldn't happen)");
-            const words = textToSpeak.trim().split(/\s+/);
-
-            // Use centralized intonation generation
-            const intonationMap = generateIntonationMap(textToSpeak, words);
-
-            // Use pronunciation-based linking detection
-            let linkedSentence = '';
-            for (let i = 0; i < words.length; i++) {
-              linkedSentence += words[i];
-              if (i < words.length - 1) {
-                linkedSentence += shouldLink(words[i], words[i + 1]) ? '‿' : ' ';
-              }
-            }
-
-            return {
-              fullLinkedSentence: linkedSentence,
-              fullLinkedPhonetic: words.map(w => w.replace(/[?.!,;]/g, '').toLowerCase()).join(' '),
-              intonationMap
-            };
-          })();
-
-      const base64 = ttsResult.value;
-      ttsCache.set(`${textToSpeak}_normal`, base64);
-      
-      const res: AnalysisResult = {
-        score: 0,
-        overallComment: "",
-        speechScript: textToSpeak,
-        wordBreakdown: [],
-        fullLinkedSentence: linking.fullLinkedSentence,
-        fullLinkedPhonetic: linking.fullLinkedPhonetic,
-        intonationMap: linking.intonationMap
-      };
-      
-      setResult(res);
-      referenceCache.set(textToSpeak, res);
-      saveToHistory(textToSpeak, res);
-      
-      setIsAudioLoading(false);
-      setAppState(AppState.SHOWING_RESULT);
-      await playAudio(base64, 'input_normal');
+      if (ttsResult.status === 'fulfilled') {
+        const base64 = ttsResult.value;
+        ttsCache.set(`${textToSpeak}_normal`, base64);
+        setIsAudioLoading(false);
+        await playAudio(base64, 'input_normal');
+      } else {
+        throw ttsResult.reason;
+      }
     } catch (e: any) {
-      console.error("PlayAndAnalyze major failure", e);
+      console.error("PlayAndAnalyze TTS failure", e);
       if (e?.code === 'REQUEST_TIMEOUT') {
         showError("Request timed out. Check your connection and try again.");
       } else if (e?.code === 'RATE_LIMIT') {
@@ -337,7 +323,6 @@ const App: React.FC = () => {
         showError("Speech generation failed. Check your connection.");
       }
       setIsAudioLoading(false);
-      setAppState(AppState.IDLE);
     }
   };
 
@@ -574,6 +559,21 @@ const App: React.FC = () => {
                     </button>
                   );
                 })()}
+                {/* Watch on YouTube */}
+                {text.trim() && (
+                  <a
+                    href={`https://www.youtube.com/results?search_query=${encodeURIComponent(text.trim() + ' pronunciation')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
+                    style={{ border: '1.5px solid #ff0000', color: '#cc0000', background: '#fff7f7', textDecoration: 'none' }}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 11, background: '#ff0000', borderRadius: 2, flexShrink: 0 }}>
+                      <span style={{ width: 0, height: 0, borderStyle: 'solid', borderWidth: '3.5px 0 3.5px 7px', borderColor: 'transparent transparent transparent #fff' }} />
+                    </span>
+                    YouTube
+                  </a>
+                )}
                 {/* Record */}
                 {appState !== AppState.RECORDING ? (
                   <button onClick={startRecording} disabled={!text.trim() || appState === AppState.ANALYZING || appState === AppState.GENERATING_TTS}
