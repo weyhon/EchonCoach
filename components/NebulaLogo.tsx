@@ -6,8 +6,9 @@ interface NebulaLogoProps {
 }
 
 /**
- * Nebula logo — abstract sound wave ripple forming an "N" silhouette.
- * Rose-tinted gradient on light backgrounds, clean geometric aesthetic.
+ * Nebula logo — pixel dot matrix nebula radiating outward from a bright core.
+ * Rose gradient background, white dots with varying opacity create depth.
+ * Matches the favicon (nebula-favicon.svg) exactly.
  */
 export const NebulaLogo: React.FC<NebulaLogoProps> = ({ size = 36, className = '' }) => {
   const id = React.useId().replace(/:/g, '');
@@ -16,56 +17,66 @@ export const NebulaLogo: React.FC<NebulaLogoProps> = ({ size = 36, className = '
     <svg
       width={size}
       height={size}
-      viewBox="0 0 100 100"
+      viewBox="0 0 120 120"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
     >
       <defs>
-        {/* Main gradient — warm rose to coral */}
-        <linearGradient id={`${id}-main`} x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id={`${id}-bg`} x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#E8587A" />
-          <stop offset="50%" stopColor="#F06292" />
-          <stop offset="100%" stopColor="#FF8A65" />
+          <stop offset="100%" stopColor="#C2185B" />
         </linearGradient>
-
-        {/* Subtle inner glow */}
-        <radialGradient id={`${id}-glow`} cx="35%" cy="30%" r="60%">
-          <stop offset="0%" stopColor="#fff" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="#fff" stopOpacity="0" />
-        </radialGradient>
-
-        {/* Rounded square clip */}
-        <clipPath id={`${id}-clip`}>
-          <rect x="4" y="4" width="92" height="92" rx="22" />
-        </clipPath>
       </defs>
 
-      {/* Background shape — squircle */}
-      <rect x="4" y="4" width="92" height="92" rx="22" fill={`url(#${id}-main)`} />
+      {/* Background squircle */}
+      <rect width="120" height="120" rx="26" fill={`url(#${id}-bg)`} />
 
-      {/* Inner glow overlay */}
-      <rect x="4" y="4" width="92" height="92" rx="22" fill={`url(#${id}-glow)`} />
+      {/* Outer wisps */}
+      <rect x="49" y="4" width="13" height="13" rx="3" fill="white" opacity=".08"/>
+      <rect x="64" y="4" width="13" height="13" rx="3" fill="white" opacity=".10"/>
+      <rect x="79" y="4" width="13" height="13" rx="3" fill="white" opacity=".06"/>
+      <rect x="34" y="19" width="13" height="13" rx="3" fill="white" opacity=".10"/>
+      <rect x="79" y="19" width="13" height="13" rx="3" fill="white" opacity=".15"/>
+      <rect x="94" y="19" width="13" height="13" rx="3" fill="white" opacity=".08"/>
+      <rect x="19" y="94" width="13" height="13" rx="3" fill="white" opacity=".08"/>
+      <rect x="34" y="94" width="13" height="13" rx="3" fill="white" opacity=".12"/>
+      <rect x="49" y="109" width="13" height="13" rx="3" fill="white" opacity=".06"/>
+      <rect x="64" y="109" width="13" height="13" rx="3" fill="white" opacity=".10"/>
+      <rect x="79" y="109" width="13" height="13" rx="3" fill="white" opacity=".08"/>
 
-      {/* Sound wave ripples — three concentric arcs radiating from center-left */}
-      <g clipPath={`url(#${id}-clip)`} opacity="0.18" stroke="#fff" strokeWidth="2.5" fill="none" strokeLinecap="round">
-        <path d="M 30 50 Q 50 20, 70 50 Q 50 80, 30 50" />
-        <path d="M 22 50 Q 50 10, 78 50 Q 50 90, 22 50" />
-        <path d="M 14 50 Q 50 0, 86 50 Q 50 100, 14 50" />
-      </g>
+      {/* Mid ring */}
+      <rect x="49" y="19" width="13" height="13" rx="3" fill="white" opacity=".20"/>
+      <rect x="64" y="19" width="13" height="13" rx="3" fill="white" opacity=".25"/>
+      <rect x="19" y="34" width="13" height="13" rx="3" fill="white" opacity=".12"/>
+      <rect x="34" y="34" width="13" height="13" rx="3" fill="white" opacity=".30"/>
+      <rect x="79" y="34" width="13" height="13" rx="3" fill="white" opacity=".35"/>
+      <rect x="94" y="34" width="13" height="13" rx="3" fill="white" opacity=".15"/>
+      <rect x="19" y="49" width="13" height="13" rx="3" fill="white" opacity=".18"/>
+      <rect x="94" y="49" width="13" height="13" rx="3" fill="white" opacity=".22"/>
+      <rect x="19" y="64" width="13" height="13" rx="3" fill="white" opacity=".15"/>
+      <rect x="94" y="64" width="13" height="13" rx="3" fill="white" opacity=".18"/>
+      <rect x="34" y="79" width="13" height="13" rx="3" fill="white" opacity=".28"/>
+      <rect x="79" y="79" width="13" height="13" rx="3" fill="white" opacity=".30"/>
+      <rect x="49" y="94" width="13" height="13" rx="3" fill="white" opacity=".22"/>
+      <rect x="64" y="94" width="13" height="13" rx="3" fill="white" opacity=".18"/>
+      <rect x="79" y="94" width="13" height="13" rx="3" fill="white" opacity=".12"/>
 
-      {/* "N" lettermark — geometric sans, centered, white */}
-      <text
-        x="50" y="62"
-        fontFamily="'Inter', -apple-system, sans-serif"
-        fontSize="42"
-        fontWeight="800"
-        textAnchor="middle"
-        fill="#fff"
-        letterSpacing="-0.04em"
-      >
-        N
-      </text>
+      {/* Inner ring */}
+      <rect x="49" y="34" width="13" height="13" rx="3" fill="white" opacity=".50"/>
+      <rect x="64" y="34" width="13" height="13" rx="3" fill="white" opacity=".55"/>
+      <rect x="34" y="49" width="13" height="13" rx="3" fill="white" opacity=".55"/>
+      <rect x="79" y="49" width="13" height="13" rx="3" fill="white" opacity=".50"/>
+      <rect x="34" y="64" width="13" height="13" rx="3" fill="white" opacity=".50"/>
+      <rect x="79" y="64" width="13" height="13" rx="3" fill="white" opacity=".55"/>
+      <rect x="49" y="79" width="13" height="13" rx="3" fill="white" opacity=".55"/>
+      <rect x="64" y="79" width="13" height="13" rx="3" fill="white" opacity=".50"/>
+
+      {/* Core — brightest pixels */}
+      <rect x="49" y="49" width="13" height="13" rx="3" fill="white" opacity=".92"/>
+      <rect x="64" y="49" width="13" height="13" rx="3" fill="white" opacity=".85"/>
+      <rect x="49" y="64" width="13" height="13" rx="3" fill="white" opacity=".88"/>
+      <rect x="64" y="64" width="13" height="13" rx="3" fill="white" opacity=".95"/>
     </svg>
   );
 };

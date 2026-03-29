@@ -48,6 +48,19 @@ export const API_CONFIG = {
   MINIMAX_VOICE_ID: 'female-yujie',
 } as const;
 
+export const SILENCE_DETECTION = {
+  /** RMS threshold below which audio is considered silence (0-1 scale). Must be above mic noise floor (~0.005-0.02) */
+  THRESHOLD: 0.03,
+  /** Duration of continuous silence before auto-stop (ms). Set high for beginner-friendly pauses between words */
+  DURATION: 3000,
+  /** Minimum recording time before silence detection kicks in (ms) */
+  MIN_RECORDING_TIME: 1500,
+  /** AnalyserNode FFT size */
+  FFT_SIZE: 2048,
+  /** Interval for checking audio levels (ms) */
+  CHECK_INTERVAL: 100,
+} as const;
+
 export const UI_CONFIG = {
   /** Error message display duration (5 seconds) */
   ERROR_DISPLAY_DURATION: 5000,

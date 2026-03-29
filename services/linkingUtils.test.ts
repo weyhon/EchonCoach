@@ -1,104 +1,129 @@
-/**
- * Test file for linking detection
- * Run this to verify the new pronunciation-based linking works correctly
- */
+import { describe, it, expect } from 'vitest';
+import {
+  endsWithConsonantSound,
+  startsWithVowelSound,
+  shouldLink,
+  createLinkedSentence,
+  isFunctionWord,
+  isWhQuestion,
+  isYesNoQuestion,
+  getSentenceIntonation,
+  getHDroppedForm,
+} from './linkingUtils';
 
-import { shouldLink, createLinkedSentence, endsWithConsonantSound, startsWithVowelSound } from './linkingUtils';
+describe('endsWithConsonantSound', () => {
+  it('returns true for regular consonant endings', () => {
+    expect(endsWithConsonantSound('pick')).toBe(true);
+    expect(endsWithConsonantSound('turn')).toBe(true);
+    expect(endsWithConsonantSound('tell')).toBe(true);
+  });
 
-console.log("🧪 Testing Pronunciation-Based Linking Detection\n");
-console.log("=" .repeat(60));
+  it('returns true for special pronunciation words (vowel letter, consonant sound)', () => {
+    expect(endsWithConsonantSound('have')).toBe(true);
+    expect(endsWithConsonantSound('the')).toBe(true);
+    expect(endsWithConsonantSound('are')).toBe(true);
+    expect(endsWithConsonantSound('use')).toBe(true);
+  });
 
-// Test 1: Basic consonant-vowel linking
-console.log("\n✅ Test 1: Basic Consonant-Vowel Linking");
-const basicTests = [
-  { word1: 'pick', word2: 'it', expected: true },
-  { word1: 'turn', word2: 'on', expected: true },
-  { word1: 'look', word2: 'at', expected: true },
-  { word1: 'think', word2: 'about', expected: true },
-];
+  it('returns false for vowel-ending words', () => {
+    expect(endsWithConsonantSound('go')).toBe(false);
+    expect(endsWithConsonantSound('see')).toBe(false);
+  });
 
-basicTests.forEach(({ word1, word2, expected }) => {
-  const result = shouldLink(word1, word2);
-  const status = result === expected ? '✓' : '✗';
-  console.log(`  ${status} "${word1} ${word2}" → ${result ? 'LINK' : 'NO LINK'} (expected: ${expected ? 'LINK' : 'NO LINK'})`);
+  it('handles empty input', () => {
+    expect(endsWithConsonantSound('')).toBe(false);
+  });
 });
 
-// Test 2: Words ending with vowel letters but consonant sounds
-console.log("\n✅ Test 2: Consonant Sounds (vowel spelling)");
-const consonantSoundTests = [
-  { word1: 'have', word2: 'a', expected: true },   // /hæv/ + /ə/ → LINK
-  { word1: 'give', word2: 'it', expected: true },  // /gɪv/ + /ɪt/ → LINK
-  { word1: 'the', word2: 'end', expected: true },  // /ðə/ + /ɛnd/ → LINK
-  { word1: 'are', word2: 'you', expected: true },  // /ɑr/ + /ju/ → LINK
-];
+describe('startsWithVowelSound', () => {
+  it('returns true for vowel-starting words', () => {
+    expect(startsWithVowelSound('apple')).toBe(true);
+    expect(startsWithVowelSound('it')).toBe(true);
+    expect(startsWithVowelSound('up')).toBe(true);
+  });
 
-consonantSoundTests.forEach(({ word1, word2, expected }) => {
-  const result = shouldLink(word1, word2);
-  const status = result === expected ? '✓' : '✗';
-  console.log(`  ${status} "${word1} ${word2}" → ${result ? 'LINK' : 'NO LINK'} (expected: ${expected ? 'LINK' : 'NO LINK'})`);
+  it('returns true for h-dropping words in connected speech', () => {
+    expect(startsWithVowelSound('him', true)).toBe(true);
+    expect(startsWithVowelSound('her', true)).toBe(true);
+    expect(startsWithVowelSound('have', true)).toBe(true);
+  });
+
+  it('returns false for h-dropping words at sentence start', () => {
+    expect(startsWithVowelSound('him', false)).toBe(false);
+  });
+
+  it('returns false for consonant-starting words', () => {
+    expect(startsWithVowelSound('cat')).toBe(false);
+  });
 });
 
-// Test 3: H-dropping
-console.log("\n✅ Test 3: H-Dropping (common in American English)");
-const hDropTests = [
-  { word1: 'they', word2: 'have', expected: true },  // they‿'ave
-  { word1: 'tell', word2: 'him', expected: true },   // tell‿'im
-  { word1: 'ask', word2: 'her', expected: true },    // ask‿'er
-  { word1: 'I', word2: 'have', expected: true },     // I‿'ave
-];
+describe('shouldLink', () => {
+  it('links consonant-ending to vowel-starting', () => {
+    expect(shouldLink('pick', 'it')).toBe(true);
+    expect(shouldLink('turn', 'on')).toBe(true);
+  });
 
-hDropTests.forEach(({ word1, word2, expected }) => {
-  const result = shouldLink(word1, word2);
-  const status = result === expected ? '✓' : '✗';
-  console.log(`  ${status} "${word1} ${word2}" → ${result ? 'LINK' : 'NO LINK'} (expected: ${expected ? 'LINK' : 'NO LINK'})`);
+  it('links with h-dropping', () => {
+    expect(shouldLink('tell', 'him')).toBe(true);
+    expect(shouldLink('ask', 'her')).toBe(true);
+  });
+
+  it('does not link consonant to consonant', () => {
+    expect(shouldLink('good', 'day')).toBe(false);
+  });
+
+  it('handles empty inputs', () => {
+    expect(shouldLink('', 'test')).toBe(false);
+    expect(shouldLink('test', '')).toBe(false);
+  });
 });
 
-// Test 4: No linking cases
-console.log("\n✅ Test 4: Cases Where NO Linking Occurs");
-const noLinkTests = [
-  { word1: 'the', word2: 'cat', expected: false },   // consonant + consonant
-  { word1: 'big', word2: 'dog', expected: false },   // consonant + consonant
-  { word1: 'see', word2: 'you', expected: false },   // vowel + consonant (normally)
-];
+describe('createLinkedSentence', () => {
+  it('creates linked sentences', () => {
+    expect(createLinkedSentence('pick it up')).toBe('pick‿it‿up');
+    expect(createLinkedSentence('turn on')).toBe('turn‿on');
+  });
 
-noLinkTests.forEach(({ word1, word2, expected }) => {
-  const result = shouldLink(word1, word2);
-  const status = result === expected ? '✓' : '✗';
-  console.log(`  ${status} "${word1} ${word2}" → ${result ? 'LINK' : 'NO LINK'} (expected: ${expected ? 'LINK' : 'NO LINK'})`);
+  it('does not link where inappropriate', () => {
+    expect(createLinkedSentence('good day')).toBe('good day');
+  });
 });
 
-// Test 5: Full sentences
-console.log("\n✅ Test 5: Complete Sentences");
-const sentences = [
-  {
-    input: "Great! I heard they have a nice playground there.",
-    expected: "Great! I heard they‿have‿a nice playground there."
-  },
-  {
-    input: "Pick it up and turn on the light.",
-    expected: "Pick‿it‿up‿and turn‿on the light."
-  },
-  {
-    input: "I think about it all the time.",
-    expected: "I think‿about‿it‿all the time."
-  }
-];
+describe('isFunctionWord', () => {
+  it('identifies function words', () => {
+    expect(isFunctionWord('the')).toBe(true);
+    expect(isFunctionWord('is')).toBe(true);
+    expect(isFunctionWord('can')).toBe(true);
+  });
 
-sentences.forEach(({ input, expected }) => {
-  const result = createLinkedSentence(input);
-  const status = result === expected ? '✓' : '✗';
-  console.log(`\n  ${status} Input:    "${input}"`);
-  console.log(`     Result:   "${result}"`);
-  console.log(`     Expected: "${expected}"`);
+  it('rejects content words', () => {
+    expect(isFunctionWord('cat')).toBe(false);
+    expect(isFunctionWord('happy')).toBe(false);
+  });
 });
 
-console.log("\n" + "=".repeat(60));
-console.log("🎉 Linking Detection Tests Complete!\n");
+describe('getSentenceIntonation', () => {
+  it('returns falling for statements', () => {
+    expect(getSentenceIntonation('I like cats.')).toBe('↘');
+  });
 
-// Summary of improvements
-console.log("📊 Key Improvements:");
-console.log("  • Fixed 'have a' → now correctly links as 'have‿a'");
-console.log("  • Fixed 'give it' → now correctly links as 'give‿it'");
-console.log("  • Added h-dropping for 'they have' → 'they‿have'");
-console.log("  • Added h-dropping for 'tell him' → 'tell‿him'");
-console.log("  • Pronunciation-based detection (not just spelling)");
+  it('returns falling for wh-questions', () => {
+    expect(getSentenceIntonation('What time is it?')).toBe('↘');
+  });
+
+  it('returns rising for yes/no questions', () => {
+    expect(getSentenceIntonation('Do you like cats?')).toBe('↗');
+    expect(getSentenceIntonation('Is it ready?')).toBe('↗');
+  });
+});
+
+describe('getHDroppedForm', () => {
+  it('drops h for common function words', () => {
+    expect(getHDroppedForm('him')).toBe("'im");
+    expect(getHDroppedForm('her')).toBe("'er");
+  });
+
+  it('keeps non-h-dropping words unchanged', () => {
+    expect(getHDroppedForm('house')).toBe('house');
+  });
+});

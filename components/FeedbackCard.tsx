@@ -7,8 +7,8 @@ import { IPALegend } from './IPALegend';
 import { WordDetailModal } from './WordDetailModal';
 import { SentenceAnnotation } from './SentenceAnnotation';
 
-function youTubeSearchUrl(text: string): string {
-  return `https://www.youtube.com/results?search_query=${encodeURIComponent(text + ' pronunciation')}`;
+function videoSearchUrl(text: string): string {
+  return `https://youglish.com/pronounce/${text.replace(/\s+/g, '+')}/english`;
 }
 
 interface FeedbackCardProps {
@@ -197,7 +197,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
       `}</style>
 
       {/* Ruby annotation row */}
-      <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+      <div className="px-5 py-4 border-b animate-section stagger-1" style={{ borderColor: 'var(--border)' }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-placeholder)', marginBottom: 12 }}>
           PRONUNCIATION GUIDE
         </div>
@@ -209,7 +209,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
 
       {/* Analysis Display */}
       <div
-        className="analysis-box rounded-xl p-5 relative min-h-[150px] overflow-hidden"
+        className="analysis-box rounded-xl p-5 relative min-h-[150px] overflow-hidden animate-section stagger-2"
         style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', margin: '0 16px 16px' }}
         onMouseUp={handleMouseUp}
       >
@@ -355,7 +355,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
 
       {/* Color Legend */}
       {result.wordBreakdown?.length > 0 && (
-        <div className="flex items-center gap-4 text-[10px] font-medium justify-center flex-wrap pb-4" style={{ color: 'var(--text-muted)' }}>
+        <div className="flex items-center gap-4 text-[10px] font-medium justify-center flex-wrap pb-4 animate-section stagger-2" style={{ color: 'var(--text-muted)' }}>
           <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: 'var(--green)' }}></span>Correct</span>
           <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: 'var(--amber)' }}></span>Improve</span>
           <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: 'var(--red)' }}></span>Incorrect</span>
@@ -364,7 +364,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
 
       {/* Analysis Details — Word Breakdown pills */}
       {result.wordBreakdown?.length > 0 && (
-        <div className="px-5 pb-5 space-y-4">
+        <div className="px-5 pb-5 space-y-4 animate-section stagger-3">
           <div className="flex items-center gap-3">
              <div className="h-px flex-1" style={{ background: 'linear-gradient(to right, transparent, var(--border-subtle))' }}></div>
              <h4 className="font-semibold text-[10px] uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Word Breakdown</h4>
@@ -373,7 +373,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
                const color = s >= 80 ? 'var(--green)' : s >= 60 ? 'var(--amber)' : 'var(--red)';
                const bg = s >= 80 ? 'var(--green-bg)' : s >= 60 ? 'var(--amber-bg)' : 'var(--red-bg)';
                return (
-                 <span className="num font-bold" style={{ fontSize: 11, color, background: bg, padding: '2px 8px', borderRadius: 12 }}>
+                 <span className="num font-bold animate-score-pop" style={{ fontSize: 11, color, background: bg, padding: '2px 8px', borderRadius: 12 }}>
                    {s}%
                  </span>
                );
@@ -385,11 +385,13 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
               <button
                 key={i}
                 onClick={() => setDetailWord(wa)}
-                className="flex flex-col items-center gap-0.5 px-2.5 py-2 rounded-lg transition-all"
+                className="flex flex-col items-center gap-0.5 px-2.5 py-2 rounded-lg transition-all animate-pill"
                 style={{
                   background: statusBg(wa.status),
                   color: statusColor(wa.status),
                   minWidth: 40,
+                  animationDelay: `${i * 50}ms`,
+                  opacity: 0,
                 }}
               >
                 <span style={{ fontSize: 12, fontWeight: 600 }}>{wa.word}</span>
@@ -407,7 +409,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
 
       {/* AI feedback annotation (overall comment) */}
       {result.overallComment && result.score > 0 && (
-        <div className="mx-5 mb-5 p-3.5 rounded-xl" style={{ backgroundColor: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.18)' }}>
+        <div className="mx-5 mb-5 p-3.5 rounded-xl animate-section stagger-4" style={{ backgroundColor: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.18)' }}>
           <div className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--amber)' }}>AI Feedback</div>
           <p className="text-[13px] leading-relaxed font-medium" style={{ color: 'var(--text-primary)' }}>
             {result.overallComment}

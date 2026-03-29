@@ -7,30 +7,31 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   isPlaying?: boolean;
 }
 
-export const Button: React.FC<ButtonProps> = ({ 
-  children, 
-  variant = 'primary', 
-  isLoading, 
+export const Button: React.FC<ButtonProps> = ({
+  children,
+  variant = 'primary',
+  isLoading,
   isPlaying,
-  className = '', 
+  className = '',
   disabled,
-  ...props 
+  ...props
 }) => {
   const baseStyle = "relative px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed overflow-hidden";
-  
+
   const variants = {
-    primary: "bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200",
-    secondary: "bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-200",
-    danger: "bg-red-500 text-white hover:bg-red-600 shadow-lg shadow-red-200",
-    outline: "border-2 border-slate-200 text-slate-600 hover:border-indigo-500 hover:text-indigo-600 bg-white",
-    ghost: "bg-transparent text-slate-500 hover:bg-slate-100"
+    primary: "bg-gradient-to-r from-[#ec6d44] to-[#f5277f] text-white hover:opacity-90",
+    secondary: "bg-emerald-600 text-white hover:bg-emerald-500",
+    danger: "bg-red-600 text-white hover:bg-red-500",
+    outline: "border text-white hover:border-[#f5277f] hover:text-[#f5277f] bg-transparent",
+    ghost: "bg-transparent hover:bg-[#222230]"
   };
 
-  const playingClass = isPlaying ? "animate-playing ring-2 ring-indigo-400 ring-offset-2" : "";
+  const playingClass = isPlaying ? "animate-playing ring-2 ring-[#f5277f]/30" : "";
 
   return (
-    <button 
+    <button
       className={`${baseStyle} ${variants[variant]} ${playingClass} ${className}`}
+      style={variant === 'outline' ? { borderColor: '#2a2a3a', color: '#8a8a9a' } : variant === 'ghost' ? { color: '#8a8a9a' } : undefined}
       disabled={isLoading || isPlaying || disabled}
       {...props}
     >

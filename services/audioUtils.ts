@@ -218,7 +218,7 @@ export const speakWithWebSpeech = async (text: string, rate: number = 1): Promis
       stopCurrentAudio();
 
       const synth = window.speechSynthesis;
-      if (!synth) throw new Error("当前浏览器不支持语音合成");
+      if (!synth) throw new Error("Browser does not support speech synthesis");
 
       // Cancel any ongoing speech
       synth.cancel();

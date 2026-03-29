@@ -508,7 +508,7 @@ const App: React.FC = () => {
         <div className="flex-1 px-6 lg:px-8">
           <main className="max-w-[660px] mx-auto space-y-5 pt-7 pb-16">
             {/* Input Section */}
-            <div className="rounded-xl p-5" style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+            <div className="rounded-xl p-5 card-hover" style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
               {/* Label */}
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'var(--text-placeholder)', marginBottom: 10 }}>
                 PRACTICE SENTENCE
@@ -555,21 +555,33 @@ const App: React.FC = () => {
                     </button>
                   );
                 })()}
-                {/* Watch on YouTube */}
-                {text.trim() && (
+                {/* Video reference links */}
+                {text.trim() && (<>
                   <a
-                    href={`https://www.youtube.com/results?search_query=${encodeURIComponent(text.trim() + ' pronunciation')}`}
+                    href={`https://youglish.com/pronounce/${text.trim().replace(/\s+/g, '+')}/english`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
-                    style={{ border: '1.5px solid #ff0000', color: '#cc0000', background: '#fff7f7', textDecoration: 'none' }}
+                    style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)', background: 'var(--surface)', textDecoration: 'none' }}
                   >
-                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 11, background: '#ff0000', borderRadius: 2, flexShrink: 0 }}>
-                      <span style={{ width: 0, height: 0, borderStyle: 'solid', borderWidth: '3.5px 0 3.5px 7px', borderColor: 'transparent transparent transparent #fff' }} />
-                    </span>
-                    YouTube
+                    <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+                    </svg>
+                    YouGlish
                   </a>
-                )}
+                  <a
+                    href={`https://www.playphrase.me/#/search?q=${encodeURIComponent(text.trim())}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
+                    style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)', background: 'var(--surface)', textDecoration: 'none' }}
+                  >
+                    <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+                    </svg>
+                    PlayPhrase
+                  </a>
+                </>)}
                 {/* Record */}
                 {appState !== AppState.RECORDING ? (
                   <button onClick={startRecording} disabled={!text.trim() || appState === AppState.ANALYZING || appState === AppState.GENERATING_TTS}
@@ -602,14 +614,14 @@ const App: React.FC = () => {
 
               {/* Recording state: waveform */}
               {appState === AppState.RECORDING && (
-                <div className="flex items-center gap-3 mt-4 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+                <div className="flex items-center gap-3 mt-4 pt-3 animate-fade-in" style={{ borderTop: '1px solid var(--border)' }}>
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: 'var(--red)' }} />
                     <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Recording...</span>
                   </div>
                   <div className="flex items-center gap-0.5 h-6">
                     {[1,2,3,4,5,6,7].map(n => (
-                      <div key={n} className="rec-bar" style={{ width: 3, background: 'var(--rose)', borderRadius: 2, height: `${12 + (n % 3) * 8}px` }} />
+                      <div key={n} className="rec-bar" style={{ width: 3, background: 'var(--rose)', borderRadius: 2, height: `${12 + (n % 3) * 8}px`, animationDelay: `${n * 0.12}s` }} />
                     ))}
                   </div>
                 </div>
@@ -617,7 +629,7 @@ const App: React.FC = () => {
 
               {/* Analyzing state */}
               {appState === AppState.ANALYZING && (
-                <div className="flex items-center gap-2 mt-4 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+                <div className="flex items-center gap-2 mt-4 pt-3 animate-fade-in" style={{ borderTop: '1px solid var(--border)' }}>
                   <div className="w-3.5 h-3.5 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--rose)', borderTopColor: 'transparent' }} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Analyzing pronunciation...</span>
                 </div>
@@ -731,7 +743,7 @@ const App: React.FC = () => {
         <div className="fixed inset-0 z-50 lg:hidden" onClick={() => setShowMobileHistory(false)}>
           <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} />
           <div
-            className="absolute bottom-0 left-0 right-0 rounded-t-2xl p-6 overflow-y-auto"
+            className="absolute bottom-0 left-0 right-0 rounded-t-2xl p-6 overflow-y-auto animate-float-up"
             style={{ backgroundColor: 'var(--bg-surface)', maxHeight: '80vh' }}
             onClick={(e) => e.stopPropagation()}
           >

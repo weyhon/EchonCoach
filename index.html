@@ -170,6 +170,34 @@
       .stagger-2 { animation-delay: 0.1s; opacity: 0; }
       .stagger-3 { animation-delay: 0.15s; opacity: 0; }
       .stagger-4 { animation-delay: 0.2s; opacity: 0; }
+      .stagger-5 { animation-delay: 0.25s; opacity: 0; }
+      .stagger-6 { animation-delay: 0.3s; opacity: 0; }
+
+      /* Section reveal — staggered children in result card */
+      @keyframes sectionReveal {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-section { animation: sectionReveal 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+      /* Score pop — for badge/number appearance */
+      @keyframes scorePop {
+        0% { opacity: 0; transform: scale(0.6); }
+        70% { transform: scale(1.08); }
+        100% { opacity: 1; transform: scale(1); }
+      }
+      .animate-score-pop { animation: scorePop 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+      /* Word pill entrance — staggered slide up */
+      @keyframes pillSlide {
+        from { opacity: 0; transform: translateY(6px) scale(0.92); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      .animate-pill { animation: pillSlide 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+      /* Subtle hover lift for cards */
+      .card-hover { transition: box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1), transform 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
+      .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04); transform: translateY(-1px); }
 
       /* Glass card */
       .glass {

@@ -5,19 +5,23 @@ interface IconProps {
   size?: number;
 }
 
-// 蜗牛图标 - 慢速播放
+// 乌龟图标 - 慢速播放（filled style，与 SpeakerIcon 统一）
 export const SnailIcon: React.FC<IconProps> = ({ className = '', size = 20 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
-    {/* 蜗牛壳 - 螺旋形 */}
-    <circle cx="14" cy="12" r="5.5" stroke="currentColor" strokeWidth="2.5" fill="none" />
-    <circle cx="14" cy="12" r="3" stroke="currentColor" strokeWidth="2" fill="none" />
-    {/* 蜗牛身体 */}
-    <path d="M8 15 C7 15, 6 14.5, 6 13.5 L6 12 C6 11, 7 10.5, 8 10.5 L9 10.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-    {/* 触角 */}
-    <line x1="6.5" y1="11" x2="6.5" y2="8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    <circle cx="6.5" cy="7.5" r="1" fill="currentColor" />
-    <line x1="8.5" y1="11" x2="8.5" y2="9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    <circle cx="8.5" cy="8.5" r="1" fill="currentColor" />
+    {/* 龟壳 */}
+    <path d="M7 15 C7 9 10 6 14 6 C18 6 21 9 21 15 Z" fill="currentColor" />
+    {/* 龟头 */}
+    <ellipse cx="5" cy="14" rx="2.5" ry="2" fill="currentColor" />
+    {/* 眼睛 */}
+    <circle cx="4.5" cy="13.3" r="0.8" fill="white" />
+    {/* 前腿 */}
+    <rect x="9" y="15" width="2.5" height="3.5" rx="1.25" fill="currentColor" />
+    {/* 后腿 */}
+    <rect x="16" y="15" width="2.5" height="3.5" rx="1.25" fill="currentColor" />
+    {/* 壳纹 */}
+    <line x1="14" y1="6.5" x2="14" y2="15" stroke="white" strokeWidth="1.2" opacity="0.3" />
+    <line x1="10.5" y1="9" x2="10.5" y2="15" stroke="white" strokeWidth="1" opacity="0.25" />
+    <line x1="17.5" y1="9" x2="17.5" y2="15" stroke="white" strokeWidth="1" opacity="0.25" />
   </svg>
 );
 

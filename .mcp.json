@@ -1,11 +1,12 @@
 {
   "mcpServers": {
     "pencil": {
-      "command": "npx",
+      "command": "/Users/mac/.cursor/extensions/highagency.pencildev-0.6.26-universal/out/mcp-server-darwin-arm64",
       "args": [
-        "-y",
-        "@upwaver/mcp-pencil"
-      ]
+        "--app",
+        "cursor"
+      ],
+      "env": {}
     }
   }
 }

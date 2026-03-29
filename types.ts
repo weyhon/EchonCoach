@@ -1,8 +1,17 @@
 
+export interface PhonemeDetail {
+  phoneme: string;
+  score: number;
+  userPhoneme?: string;
+}
+
 export interface WordAnalysis {
   word: string;
   status: 'correct' | 'incorrect' | 'needs_improvement';
   phoneticCorrect: string;
+  phoneticUser?: string;
+  wordScore?: number;
+  phonemes?: PhonemeDetail[];
   stressPattern?: string; // e.g., "oOoo"
   suggestion: string;
 }
