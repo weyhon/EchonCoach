@@ -420,9 +420,18 @@ const App: React.FC = () => {
         stream.getTracks().forEach(track => track.stop());
         setActiveStream(null);
 
-        setAppState(AppState.ANALYZING);
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         setUserAudioBlob(audioBlob);
+
+        // Auto-play user recording immediately so they can hear themselves
+        const playbackUrl = URL.createObjectURL(audioBlob);
+        if (activeBlobUrl) URL.revokeObjectURL(activeBlobUrl);
+        setActiveBlobUrl(playbackUrl);
+        const playbackAudio = new Audio(playbackUrl);
+        playbackAudio.play().catch(() => {});
+
+        // Start analysis in parallel with playback
+        setAppState(AppState.ANALYZING);
         const reader = new FileReader();
         reader.onloadend = async () => {
           const base64 = (reader.result as string).split(',')[1];
@@ -594,6 +603,26 @@ const App: React.FC = () => {
                     style={{ background: '#111827', color: '#fff', border: 'none' }}>
                     <span style={{ width: 10, height: 10, borderRadius: 2, background: '#fff', display: 'inline-block' }} />
                     Stop Recording
+                  </button>
+                )}
+                {/* Replay my recording */}
+                {userAudioBlob && appState !== AppState.RECORDING && (
+                  <button
+                    onClick={() => {
+                      if (activeBlobUrl) URL.revokeObjectURL(activeBlobUrl);
+                      const url = URL.createObjectURL(userAudioBlob);
+                      setActiveBlobUrl(url);
+                      setActiveAudioSource('user_playback');
+                      const audio = new Audio(url);
+                      audio.onended = () => { setActiveAudioSource(null); };
+                      audio.onerror = () => { setActiveAudioSource(null); };
+                      audio.play().catch(() => setActiveAudioSource(null));
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
+                    style={{ border: '1px solid var(--border)', color: activeAudioSource === 'user_playback' ? 'var(--rose)' : 'var(--text-secondary)', background: activeAudioSource === 'user_playback' ? 'var(--rose-50)' : 'var(--surface)' }}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2H3v2a9 9 0 0 0 8 8.94V23h2v-2.06A9 9 0 0 0 21 12v-2h-2z"/></svg>
+                    {activeAudioSource === 'user_playback' ? 'Playing...' : 'My Voice'}
                   </button>
                 )}
                 {/* Speed toggle */}
