@@ -10,73 +10,45 @@ import {
 } from "./phoneticUtils";
 import { generateIntonationMap } from "./intonationUtils";
 
-const getApiKey = (): string => {
-  const key = import.meta.env.VITE_API_KEY;
-  if (!key) {
-    throw new Error(
-      "Missing API key. Add VITE_API_KEY to your .env.local file.\n" +
-      "Get a key at: https://aistudio.google.com"
-    );
+// ── API mode: proxy (production) vs direct (local dev) ──────────────
+// In production (Vercel), calls go through /api/* serverless functions
+// so the API key never reaches the browser.
+// In local dev with VITE_API_KEY set, calls go direct for convenience.
+
+const USE_PROXY = !import.meta.env.VITE_API_KEY;
+
+let ai: InstanceType<typeof GoogleGenAI> | null = null;
+if (!USE_PROXY) {
+  ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
+}
+
+// ── Proxy fetch helper ──────────────────────────────────────────────
+async function proxyPost(endpoint: string, body: Record<string, any>): Promise<any> {
+  const res = await fetch(`/api/${endpoint}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || `API ${endpoint} failed (${res.status})`);
   }
-  return key;
-};
-
-const ai = new GoogleGenAI({ apiKey: getApiKey() });
-
-const TUTOR_SYSTEM_INSTRUCTION = `You are a world-class English Phonetics Coach specializing in American English.
-Your goal is to provide complete prosody analysis for ANY sentence, no matter how long.
-
-STRICT RULES:
-1. 'fullLinkedSentence': Mark ALL natural linking points with '‿' in American English.
-   - Consonant + Vowel: "tell‿us", "take‿it", "check‿out"
-   - Mark EVERY linking point in the sentence.
-
-2. 'intonationMap': MUST have one token for EACH word in the sentence.
-   - Content words (nouns, verbs, adjectives, adverbs, wh-words): '●' (stressed)
-   - Function words (articles, prepositions, pronouns, auxiliaries, conjunctions): '·' (unstressed)
-   - MANDATORY: The VERY LAST token must include intonation: '↗' (rise) or '↘' (fall)
-   - Yes/No questions → last word ends with '↗'
-   - Statements & Wh-questions → last word ends with '↘'
-   - Count: If input has 15 words, output MUST have exactly 15 tokens
-
-3. 'fullLinkedPhonetic': IPA transcription. MANDATORY RULES — follow ALL of them:
-   a) EVERY content word (noun, verb, adjective, adverb) MUST have ˈ before its stressed syllable.
-      Examples: tap→ˈtæp, phone→ˈfoʊn, pay→ˈpeɪ, driver→ˈdraɪvər, work→ˈwɜrk, cash→ˈkæʃ
-   b) Function words (a, the, to, for, in, on, or, and, but, you, I, we, can, do, is, was) → NO ˈ
-   c) Use a SPACE between words.
-   d) At each linking point (where ‿ appears in fullLinkedSentence), replace the space with a syllable dot .
-   e) Do NOT use ˌ (secondary stress). Do NOT use ‿ in fullLinkedPhonetic.
-
-Example for "Do you like it?":
-{
-  "fullLinkedSentence": "Do you like‿it?",
-  "intonationMap": "· · ● ·↗",
-  "fullLinkedPhonetic": "du ju ˈlaɪ.kɪt"
+  return res.json();
 }
 
-Example for "Just tap your phone or pay the driver in cash":
-{
-  "fullLinkedSentence": "Just‿ tap your phone or‿ pay the‿driver‿in cash",
-  "intonationMap": "● · · ● · ● · ● · ●↘",
-  "fullLinkedPhonetic": "ˈdʒʌst ˈtæp jər ˈfoʊn ɔr.ˈpeɪ ðə.ˈdraɪ.vər.ɪn ˈkæʃ"
-}
-
-Example for long sentence "Enter the code displayed in the app":
-{
-  "fullLinkedSentence": "Enter‿the code displayed‿in the‿app",
-  "intonationMap": "● · ● ● · · ●↘",
-  "fullLinkedPhonetic": "ˈɛn.tər ðə ˈkoʊd dɪˈspleɪd.ɪn ði.ˈæp"
-}
-
-CRITICAL: For long sentences, you MUST include ALL words. Do not truncate or omit any words.
-Respond ONLY in valid JSON.`;
+// ── TTS ─────────────────────────────────────────────────────────────
 
 export const generateSpeech = async (text: string, slow: boolean = false, voiceName: string = 'Kore'): Promise<string> => {
+  if (USE_PROXY) {
+    const data = await proxyPost('tts', { text, slow, voiceName });
+    return data.audio || '';
+  }
+
   try {
     const prompt = slow
       ? `Speak slowly and clearly with standard American English pronunciation: ${text}`
       : `Read with standard American English pronunciation, natural stress and intonation: ${text}`;
-    const response = await ai.models.generateContent({
+    const response = await ai!.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: prompt }] }],
       config: {
@@ -94,8 +66,13 @@ export const generateSpeech = async (text: string, slow: boolean = false, voiceN
 };
 
 export const generateTutorAudio = async (text: string, voiceName: string = 'Kore'): Promise<string> => {
+  if (USE_PROXY) {
+    const data = await proxyPost('tts', { text, voiceName, tutor: true });
+    return data.audio || '';
+  }
+
   try {
-    const response = await ai.models.generateContent({
+    const response = await ai!.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: `Pronounce clearly with standard American English stress and intonation: "${text}"` }] }],
       config: {
@@ -111,6 +88,8 @@ export const generateTutorAudio = async (text: string, voiceName: string = 'Kore
     throw error;
   }
 };
+
+// ── Pronunciation Analysis ──────────────────────────────────────────
 
 const PRONUNCIATION_ANALYSIS_INSTRUCTION = `You are an expert English pronunciation evaluator with deep phonetics knowledge.
 
@@ -187,11 +166,15 @@ export const analyzePronunciation = async (
   referenceText: string,
   userAudioBase64: string
 ): Promise<AnalysisResult> => {
+  if (USE_PROXY) {
+    return proxyPost('analyze', { referenceText, audioBase64: userAudioBase64 });
+  }
+
   let lastError: any;
   for (const model of ANALYSIS_MODELS) {
     try {
       console.log(`Trying pronunciation analysis with ${model}...`);
-      const response = await ai.models.generateContent({
+      const response = await ai!.models.generateContent({
         model,
         contents: {
           parts: [
@@ -215,20 +198,65 @@ export const analyzePronunciation = async (
   throw lastError;
 };
 
+// ── Linking / Prosody Analysis ──────────────────────────────────────
+
+const TUTOR_SYSTEM_INSTRUCTION = `You are a world-class English Phonetics Coach specializing in American English.
+Your goal is to provide complete prosody analysis for ANY sentence, no matter how long.
+
+STRICT RULES:
+1. 'fullLinkedSentence': Mark ALL natural linking points with '‿' in American English.
+   - Consonant + Vowel: "tell‿us", "take‿it", "check‿out"
+   - Mark EVERY linking point in the sentence.
+
+2. 'intonationMap': MUST have one token for EACH word in the sentence.
+   - Content words (nouns, verbs, adjectives, adverbs, wh-words): '●' (stressed)
+   - Function words (articles, prepositions, pronouns, auxiliaries, conjunctions): '·' (unstressed)
+   - MANDATORY: The VERY LAST token must include intonation: '↗' (rise) or '↘' (fall)
+   - Yes/No questions → last word ends with '↗'
+   - Statements & Wh-questions → last word ends with '↘'
+   - Count: If input has 15 words, output MUST have exactly 15 tokens
+
+3. 'fullLinkedPhonetic': IPA transcription. MANDATORY RULES — follow ALL of them:
+   a) EVERY content word (noun, verb, adjective, adverb) MUST have ˈ before its stressed syllable.
+      Examples: tap→ˈtæp, phone→ˈfoʊn, pay→ˈpeɪ, driver→ˈdraɪvər, work→ˈwɜrk, cash→ˈkæʃ
+   b) Function words (a, the, to, for, in, on, or, and, but, you, I, we, can, do, is, was) → NO ˈ
+   c) Use a SPACE between words.
+   d) At each linking point (where ‿ appears in fullLinkedSentence), replace the space with a syllable dot .
+   e) Do NOT use ˌ (secondary stress). Do NOT use ‿ in fullLinkedPhonetic.
+
+Example for "Do you like it?":
+{
+  "fullLinkedSentence": "Do you like‿it?",
+  "intonationMap": "· · ● ·↗",
+  "fullLinkedPhonetic": "du ju ˈlaɪ.kɪt"
+}
+
+Example for "Just tap your phone or pay the driver in cash":
+{
+  "fullLinkedSentence": "Just‿ tap your phone or‿ pay the‿driver‿in cash",
+  "intonationMap": "● · · ● · ● · ● · ●↘",
+  "fullLinkedPhonetic": "ˈdʒʌst ˈtæp jər ˈfoʊn ɔr.ˈpeɪ ðə.ˈdraɪ.vər.ɪn ˈkæʃ"
+}
+
+Example for long sentence "Enter the code displayed in the app":
+{
+  "fullLinkedSentence": "Enter‿the code displayed‿in the‿app",
+  "intonationMap": "● · ● ● · · ●↘",
+  "fullLinkedPhonetic": "ˈɛn.tər ðə ˈkoʊd dɪˈspleɪd.ɪn ði.ˈæp"
+}
+
+CRITICAL: For long sentences, you MUST include ALL words. Do not truncate or omit any words.
+Respond ONLY in valid JSON.`;
+
 // Smart fallback rules for American English pronunciation
-// Uses centralized intonation generation from intonationUtils.ts
 const generateSmartFallback = (text: string): any => {
   const words = text.split(/\s+/);
-
-  // Generate intonation map using centralized utility
   const intonationMap = generateIntonationMap(text, words);
 
-  // Generate linked sentence with pronunciation-based linking detection
   let linkedSentence = '';
   for (let i = 0; i < words.length; i++) {
     linkedSentence += words[i];
     if (i < words.length - 1) {
-      // Use pronunciation-based linking detection
       if (shouldLink(words[i], words[i + 1])) {
         linkedSentence += '‿';
       } else {
@@ -237,10 +265,7 @@ const generateSmartFallback = (text: string): any => {
     }
   }
 
-  // Generate proper phonetic transcription with linking marks
   let fallbackPhonetic = generateFallbackPhonetic(linkedSentence);
-
-  // Apply phonetic fixes to remove stress marks and other issues
   fallbackPhonetic = fixCommonPhoneticErrors(text, fallbackPhonetic);
 
   return {
@@ -252,31 +277,24 @@ const generateSmartFallback = (text: string): any => {
 
 // IPA phonetics of common function words — these should NOT receive ˈ
 const FUNCTION_PHONETICS = new Set([
-  'ðə','ðɪ','ə','ɑn','ɔn',                          // articles
-  'ɪn','æt','tu','tə','fɔr','fər','wɪð','frɑm','frəm','ʌv','əv', // prepositions
-  'ænd','ənd','ɔr','ər','bʌt',                       // conjunctions
-  'aɪ','ju','hi','ʃi','wi','ðeɪ','ɪt',               // subject pronouns
-  'mi','hɪm','hɚ','ʌs','ðɛm',                        // object pronouns
-  'maɪ','jɚ','jər','hɪz','ɪts','ɑr','ðɛr','ðer',     // possessives
-  'bi','bɪn','ɪz','wɑz','wɚ','wəz',                  // be forms
-  'hæv','həv','hæz','həz','hæd','həd',                // have forms
-  'du','dʊ','dʌz','dɪd',                              // do forms
-  'kæn','kən','kʊd','wɪl','wəl','wʊd','wəd','ʃʊd','ʃəd', // modals
-  'nɑt','nət','ðæt','ðɪs','ðoʊz','ðiz',              // other function words
+  'ðə','ðɪ','ə','ɑn','ɔn',
+  'ɪn','æt','tu','tə','fɔr','fər','wɪð','frɑm','frəm','ʌv','əv',
+  'ænd','ənd','ɔr','ər','bʌt',
+  'aɪ','ju','hi','ʃi','wi','ðeɪ','ɪt',
+  'mi','hɪm','hɚ','ʌs','ðɛm',
+  'maɪ','jɚ','jər','hɪz','ɪts','ɑr','ðɛr','ðer',
+  'bi','bɪn','ɪz','wɑz','wɚ','wəz',
+  'hæv','həv','hæz','həz','hæd','həd',
+  'du','dʊ','dʌz','dɪd',
+  'kæn','kən','kʊd','wɪl','wəl','wʊd','wəd','ʃʊd','ʃəd',
+  'nɑt','nət','ðæt','ðɪs','ðoʊz','ðiz',
 ]);
 
-/**
- * Add ˈ to content word phonetic segments.
- * Pass 1: align via intonationMap tokens (exact count match).
- * Pass 2 fallback: use FUNCTION_PHONETICS set when alignment fails
- *   (AI sometimes splits linked phonetics differently from linkedSentence).
- */
 const addPrimaryStress = (phonetic: string, linkedSentence: string, intonationMap: string): string => {
   const phoneticSegments = phonetic.split(' ');
   const wordGroups = linkedSentence.trim().split(/\s+/);
   const tokens = intonationMap.trim().split(/\s+/).filter(Boolean);
 
-  // Pass 1: exact alignment
   if (phoneticSegments.length === wordGroups.length) {
     const groupSizes = wordGroups.map(g => g.split('‿').length);
     const totalWords = groupSizes.reduce((a, b) => a + b, 0);
@@ -292,26 +310,31 @@ const addPrimaryStress = (phonetic: string, linkedSentence: string, intonationMa
     }
   }
 
-  // Pass 2 fallback: heuristic via function word list
   return phoneticSegments.map(seg => {
     if (seg.includes('ˈ')) return seg;
-    const base = seg.split('.')[0]; // get first syllable/word of the segment
+    const base = seg.split('.')[0];
     return FUNCTION_PHONETICS.has(base) ? seg : 'ˈ' + seg;
   }).join(' ');
 };
 
 export const getLinkingAnalysisForText = async (text: string): Promise<any> => {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `Perform prosody analysis for: "${text}"`,
-      config: {
-        systemInstruction: TUTOR_SYSTEM_INSTRUCTION,
-        responseMimeType: "application/json",
-      }
-    });
-    const resultText = response.text || "{}";
-    const parsed = JSON.parse(resultText.replace(/```json|```/g, '').trim());
+    let parsed: any;
+
+    if (USE_PROXY) {
+      parsed = await proxyPost('linking', { text });
+    } else {
+      const response = await ai!.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `Perform prosody analysis for: "${text}"`,
+        config: {
+          systemInstruction: TUTOR_SYSTEM_INSTRUCTION,
+          responseMimeType: "application/json",
+        }
+      });
+      const resultText = response.text || "{}";
+      parsed = JSON.parse(resultText.replace(/```json|```/g, '').trim());
+    }
 
     // Validate token count matches word count
     const wordCount = text.trim().split(/\s+/).length;
@@ -325,11 +348,9 @@ export const getLinkingAnalysisForText = async (text: string): Promise<any> => {
       isValid: tokenCount === wordCount && parsed.fullLinkedSentence && parsed.intonationMap
     });
 
-    // Validate the response has required fields and correct token count
     if (!parsed.fullLinkedSentence || !parsed.intonationMap || tokenCount !== wordCount) {
       console.warn("⚠️ AI response incomplete or mismatched, using smart fallback");
       const fallback = generateSmartFallback(text);
-      // Add ˈ to content words in fallback too
       fallback.fullLinkedPhonetic = addPrimaryStress(
         fallback.fullLinkedPhonetic, fallback.fullLinkedSentence, fallback.intonationMap
       );
@@ -337,39 +358,25 @@ export const getLinkingAnalysisForText = async (text: string): Promise<any> => {
       return fallback;
     }
 
-    // CRITICAL: Remove commas from linked sentence (AI sometimes adds them incorrectly)
+    // Clean linked sentence
     let cleanedLinkedSentence = parsed.fullLinkedSentence || text;
-    // Remove all comma variants using same ultra-aggressive approach as fixCommonPhoneticErrors
     cleanedLinkedSentence = cleanedLinkedSentence.replace(/[,，、]/g, '');
     cleanedLinkedSentence = cleanedLinkedSentence.split('').filter((char: string) => {
       const code = char.charCodeAt(0);
       return code !== 44 && code !== 65292 && code !== 12289;
     }).join('');
 
-    // Validate and fix phonetic transcription
     let finalPhonetic = parsed.fullLinkedPhonetic || '';
 
-    // Check if phonetic is complete
     if (!isPhoneticComplete(text, finalPhonetic)) {
       console.warn("⚠️ AI phonetic incomplete, generating fallback");
       finalPhonetic = generateFallbackPhonetic(cleanedLinkedSentence);
     } else {
-      // Fix common AI errors (missing /s/ in "this", etc.)
       finalPhonetic = fixCommonPhoneticErrors(text, finalPhonetic);
-
-      // Ensure linking marks match between text and phonetic
       finalPhonetic = validateLinkedPhonetic(cleanedLinkedSentence, finalPhonetic);
     }
 
-    // ALWAYS add ˈ to content words — runs on ALL paths (AI, fallback, etc.)
     finalPhonetic = addPrimaryStress(finalPhonetic, cleanedLinkedSentence, parsed.intonationMap || '');
-
-    console.log("✅ Using AI result with validated phonetics:", {
-      originalSentence: parsed.fullLinkedSentence,
-      cleanedSentence: cleanedLinkedSentence,
-      originalPhonetic: parsed.fullLinkedPhonetic,
-      fixedPhonetic: finalPhonetic
-    });
 
     return {
       ...parsed,
