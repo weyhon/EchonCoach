@@ -23,21 +23,6 @@ interface FeedbackCardProps {
   onRetry?: () => void;
 }
 
-const ScoreNumber: React.FC<{ score: number }> = ({ score }) => {
-  const safe = Math.max(0, Math.min(100, score));
-  const color = safe >= 80 ? 'var(--green)' : safe >= 60 ? 'var(--amber)' : 'var(--red)';
-  return (
-    <div className="flex flex-col items-center shrink-0">
-      <span className="font-brand num leading-none" style={{ fontSize: 44, fontWeight: 800, letterSpacing: '-0.05em', color }}>
-        {safe > 0 ? safe : '--'}
-      </span>
-      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-placeholder)', marginTop: 3 }}>
-        SCORE
-      </span>
-    </div>
-  );
-};
-
 const statusBg = (s: WordAnalysis['status']) =>
   s === 'correct' ? 'var(--green-bg)' : s === 'incorrect' ? 'var(--red-bg)' : 'var(--amber-bg)';
 const statusColor = (s: WordAnalysis['status']) =>

@@ -1,9 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Button } from './components/Button';
 import { FeedbackCard } from './components/FeedbackCard';
 import { HistoryList } from './components/HistoryList';
-import { SnailIcon, SpeakerIcon, MicrophoneIcon, WaveformIcon } from './components/Icons';
 import { NebulaLogo } from './components/NebulaLogo';
 import { generateSpeech, analyzePronunciation, getLinkingAnalysisForText, generateTutorAudio } from './services/geminiService';
 import { playBase64Audio, speakWithWebSpeech, cleanupAudioResources } from './services/audioUtils';
