@@ -80,6 +80,57 @@ const WORD_PHONETICS: Record<string, string> = {
 };
 
 /**
+ * Simple rule-based English → IPA transliteration for unknown words.
+ * Not perfect, but much better than showing raw English inside IPA.
+ */
+function transliterateToIPA(word: string): string {
+  return word
+    // Multi-char replacements first (order matters)
+    .replace(/tion/g, 'ʃən')
+    .replace(/sion/g, 'ʒən')
+    .replace(/ough/g, 'oʊ')
+    .replace(/augh/g, 'ɔ')
+    .replace(/ight/g, 'aɪt')
+    .replace(/igh/g, 'aɪ')
+    .replace(/ear/g, 'ɪər')
+    .replace(/eer/g, 'ɪər')
+    .replace(/air/g, 'ɛər')
+    .replace(/oor/g, 'ʊər')
+    .replace(/our/g, 'aʊər')
+    .replace(/ow$/g, 'oʊ')
+    .replace(/ow/g, 'aʊ')
+    .replace(/oi/g, 'ɔɪ')
+    .replace(/ou/g, 'aʊ')
+    .replace(/ee/g, 'iː')
+    .replace(/ea/g, 'iː')
+    .replace(/ay/g, 'eɪ')
+    .replace(/ai/g, 'eɪ')
+    .replace(/oa/g, 'oʊ')
+    .replace(/oo/g, 'uː')
+    .replace(/ph/g, 'f')
+    .replace(/ch/g, 'tʃ')
+    .replace(/sh/g, 'ʃ')
+    .replace(/th/g, 'ð')
+    .replace(/ng/g, 'ŋ')
+    .replace(/wh/g, 'w')
+    .replace(/ck/g, 'k')
+    .replace(/ce$/g, 's')
+    .replace(/ge$/g, 'dʒ')
+    // Single vowels
+    .replace(/a/g, 'æ')
+    .replace(/e/g, 'ɛ')
+    .replace(/i/g, 'ɪ')
+    .replace(/o/g, 'ɑ')
+    .replace(/u/g, 'ʌ')
+    .replace(/y$/g, 'i')
+    .replace(/y/g, 'j')
+    // Single consonants
+    .replace(/c/g, 'k')
+    .replace(/x/g, 'ks')
+    .replace(/q/g, 'k');
+}
+
+/**
  * Get phonetic transcription for a word
  * Returns best-effort transcription from dictionary or simplified version
  */
@@ -91,8 +142,9 @@ export function getWordPhonetic(word: string): string {
     return WORD_PHONETICS[cleanWord];
   }
 
-  // For unknown words, return the word itself (AI will need to provide)
-  return cleanWord;
+  // For unknown words, use a simple vowel-based transliteration
+  // so we never show raw English inside IPA notation
+  return transliterateToIPA(cleanWord);
 }
 
 /**
@@ -122,11 +174,23 @@ export function isPhoneticComplete(text: string, phonetic: string): boolean {
   const words = text.split(/[\s‿]+/).filter(w => w.replace(/[?.!,;]/g, '').length > 0);
 
   // Very rough heuristic: phonetic should have at least 60% of word count in segments
-  // IPA typically has fewer "segments" than English words, but not dramatically so
   const phoneticSegments = phonetic.split(/[\s‿]+/).filter(s => s.length > 0);
 
   if (phoneticSegments.length < words.length * 0.6) {
     console.warn(`Phonetic seems incomplete: ${phoneticSegments.length} segments for ${words.length} words`);
+    return false;
+  }
+
+  // Detect if AI left raw English words in the phonetic (e.g. "spicy", "original")
+  // A segment is "raw English" if it contains only ASCII letters and no IPA characters
+  const ipaChars = /[æɑɒɛɪɯɔʊəɐɜɞœøɵɶɨʉɘɵɤɑɒɚɝʌɵʏɤɶɑɒ̞ɐɵɤɑɒɞœɨɞɵɚɪʏɞɤɑɪɛɵɞɜɘɵɐɤ̞ɑɐɪɤɵɘɞɜɵɤɑɒɛɵɐɪɘɶɵɜɤɵɤɑɒɐɪɤɘɵɞɛɵɶɸɰɥʋɹɻɰʁɽɸβðθʃʒʧʤŋɲɴʍʎɫɬɮɣχɦɧɕʑɭɻʈɖɗɓɠʔˈˌ]/;
+  const rawEnglishSegments = phoneticSegments.filter(seg => {
+    const clean = seg.replace(/[ˈˌ.ː]/g, '');
+    return /^[a-z]{3,}$/.test(clean) && !ipaChars.test(clean);
+  });
+
+  if (rawEnglishSegments.length > 0) {
+    console.warn(`Phonetic contains raw English words: ${rawEnglishSegments.join(', ')}`);
     return false;
   }
 

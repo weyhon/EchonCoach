@@ -199,6 +199,7 @@ const App: React.FC = () => {
     if (!textToSpeak.trim()) return;
     if (isPlayingRef.current) return;
     isPlayingRef.current = true;
+    const stateBeforePlay = appState;
     try {
       const cacheKey = `${textToSpeak}_${isSlow ? 'slow' : 'normal'}`;
       const sourceKey = isSlow ? 'input_slow' : 'input_normal';
@@ -231,7 +232,9 @@ const App: React.FC = () => {
         }
         setActiveAudioSource(null);
       } finally {
-        setAppState(AppState.IDLE);
+        // Restore previous state instead of always resetting to IDLE
+        // so analysis results remain visible after playing
+        setAppState(stateBeforePlay === AppState.SHOWING_RESULT ? AppState.SHOWING_RESULT : AppState.IDLE);
       }
     } finally {
       isPlayingRef.current = false;
@@ -512,7 +515,19 @@ const App: React.FC = () => {
 
       <div className="flex pt-[52px]">
         {/* Main Content Area */}
-        <div className="flex-1 px-6 lg:px-8">
+        <div className="flex-1 px-6 lg:px-8 relative">
+          {/* Decorative side elements — nebula ambient orbs */}
+          <div className="hidden lg:block pointer-events-none" aria-hidden="true">
+            <div className="fixed top-[20%] left-[3%] w-48 h-48 rounded-full opacity-[0.035] orb-drift" style={{ background: 'radial-gradient(circle, var(--rose) 0%, transparent 70%)' }} />
+            <div className="fixed top-[55%] left-[5%] w-32 h-32 rounded-full opacity-[0.025] orb-drift-slow" style={{ background: 'radial-gradient(circle, #a78bfa 0%, transparent 70%)' }} />
+            <div className="fixed top-[30%] right-[3%] w-40 h-40 rounded-full opacity-[0.03] orb-drift-slow" style={{ background: 'radial-gradient(circle, #f9a8d4 0%, transparent 70%)' }} />
+            <div className="fixed top-[65%] right-[5%] w-28 h-28 rounded-full opacity-[0.02] orb-drift" style={{ background: 'radial-gradient(circle, #93c5fd 0%, transparent 70%)' }} />
+            {/* Subtle dot accents */}
+            <div className="fixed top-[15%] left-[8%] w-1.5 h-1.5 rounded-full" style={{ background: 'var(--rose)', opacity: 0.12 }} />
+            <div className="fixed top-[40%] left-[4%] w-1 h-1 rounded-full" style={{ background: '#a78bfa', opacity: 0.1 }} />
+            <div className="fixed top-[25%] right-[6%] w-1.5 h-1.5 rounded-full" style={{ background: '#f9a8d4', opacity: 0.1 }} />
+            <div className="fixed top-[70%] right-[4%] w-1 h-1 rounded-full" style={{ background: 'var(--rose)', opacity: 0.08 }} />
+          </div>
           <main className="max-w-[660px] mx-auto space-y-5 pt-7 pb-16">
             {/* Input Section */}
             <div className="rounded-xl p-5 card-hover" style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
@@ -523,7 +538,7 @@ const App: React.FC = () => {
               {/* Textarea */}
               <textarea
                 value={text}
-                onChange={e => setText(e.target.value)}
+                onChange={e => { setText(e.target.value); setResult(null); }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     if (e.metaKey) return;
@@ -549,7 +564,8 @@ const App: React.FC = () => {
                 {(() => {
                   const isBusy = appState === AppState.GENERATING_TTS || activeAudioSource?.startsWith('input_');
                   return (
-                    <button onClick={() => playAndAnalyze(text)}
+                    <button
+                      onClick={() => { result ? handlePlayTTS(text, ttsSpeed === 'slow') : playAndAnalyze(text); }}
                       disabled={!text.trim() || isBusy || appState === AppState.RECORDING || appState === AppState.ANALYZING}
                       className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-60"
                       style={{ background: isBusy ? 'var(--rose-50)' : 'var(--rose)', color: isBusy ? 'var(--rose)' : '#fff', border: isBusy ? '1.5px solid var(--rose)' : 'none' }}>
@@ -705,7 +721,7 @@ const App: React.FC = () => {
         </div>
 
         {/* Right Sidebar - History */}
-        <aside className="hidden lg:flex flex-col w-[256px] shrink-0 h-[calc(100vh-52px)] sticky top-[52px] overflow-y-auto"
+        <aside className="hidden lg:flex flex-col w-[280px] shrink-0 h-[calc(100vh-52px)] sticky top-[52px] overflow-y-auto px-3 py-4"
           style={{ background: 'var(--surface)', borderLeft: '1px solid var(--border)' }}>
           <HistoryList
             history={history}
