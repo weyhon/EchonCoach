@@ -179,7 +179,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
   });
 
   return (
-    <div className={`animate-fade-in-up relative transition-all duration-500 rounded-2xl overflow-hidden ${isUpdating ? 'opacity-50 scale-[0.97] blur-[1px]' : 'opacity-100 scale-100'}`}
+    <section aria-label="Pronunciation Analysis Results" aria-live="polite" className={`animate-fade-in-up relative transition-all duration-500 rounded-2xl overflow-hidden ${isUpdating ? 'opacity-50 scale-[0.97] blur-[1px]' : 'opacity-100 scale-100'}`}
       style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
       <style>{`
         @keyframes symbol-pop {
@@ -443,6 +443,6 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
 
       {/* IPA Legend Modal */}
       <IPALegend show={showIPALegend} onClose={() => setShowIPALegend(false)} />
-    </div>
+    </section>
   );
 };
