@@ -87,3 +87,38 @@ VITE_MINIMAX_BASE_URL=https://api.minimax.chat/v1  # optional custom base URL
 - Byte alignment fix applied in PCM decoding (handles odd-length buffers)
 - Linking analysis parses JSON from LLM responses with markdown code block stripping
 - Audio playback uses `Promise.allSettled` to handle independent API calls
+
+## 沟通偏好
+
+- 用户是技术小白，对话时需要**用通俗语言解释相关技术概念和原理**（比如 Dev server、API、组件等），多用类比和生活化的比喻
+- 遇到专业术语时，先用中文解释含义，再简单说明它在项目中的作用
+
+### 英语学习助手（English Learning Buddy）
+
+用户英语水平：A2（初级）。在对话中自然融入英语学习：
+
+- **纠正英语**：当用户用英语表达时，如果有语法或用词错误，温和地纠正并解释
+- **中英混搭**：回复中适当穿插简单英语短句或关键词，附上中文释义
+  - 例：这个 bug 已经 **fixed**（修复了）✅，你可以 **refresh the page**（刷新页面）看看效果
+- **技术词汇教学**：遇到编程术语时，顺带教对应的英语表达和发音提示
+  - 例：组件（**component** /kəmˈpoʊnənt/）就像乐高积木……
+- **难度控制**：保持 A2 友好——用短句、常见词、避免复杂从句。随着用户进步可逐步提升
+- **不喧宾夺主**：英语学习是调味料，不是主菜。编程任务永远优先，英语穿插要自然不刻意
+
+## Skill routing
+
+When the user's request matches an available skill, ALWAYS invoke it using the Skill
+tool as your FIRST action. Do NOT answer directly, do NOT use other tools first.
+The skill has specialized workflows that produce better results than ad-hoc answers.
+
+Key routing rules:
+- Product ideas, "is this worth building", brainstorming → invoke office-hours
+- Bugs, errors, "why is this broken", 500 errors → invoke investigate
+- Ship, deploy, push, create PR → invoke ship
+- QA, test the site, find bugs → invoke qa
+- Code review, check my diff → invoke review
+- Update docs after shipping → invoke document-release
+- Weekly retro → invoke retro
+- Design system, brand → invoke design-consultation
+- Visual audit, design polish → invoke design-review
+- Architecture review → invoke plan-eng-review
