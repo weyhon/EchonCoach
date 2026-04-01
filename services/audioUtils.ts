@@ -107,71 +107,15 @@ export const decodePCM = (
   return buffer;
 };
 
-// 播放 base64 音频 - 智能检测格式（MP3 或 PCM）
+// 播放 base64 音频 - Gemini TTS 返回 PCM 格式，直接用 Web Audio API 播放
 export const playBase64Audio = async (
   base64Audio: string,
-  mimeType: string = 'audio/mpeg'
+  _mimeType: string = 'audio/pcm'
 ): Promise<void> => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      // CRITICAL: Stop any currently playing audio first to prevent echo
-      stopCurrentAudio();
-
-      // 尝试作为 MP3 播放（MiniMax）
-      const dataUrl = `data:${mimeType};base64,${base64Audio}`;
-      console.log("Playing audio, dataUrl length:", dataUrl.length);
-
-      const audio = new Audio(dataUrl);
-      currentAudio = audio; // Track current audio
-      let playbackStarted = false;
-
-      audio.oncanplay = () => {
-        console.log("Audio can play as MP3");
-        playbackStarted = true;
-      };
-
-      audio.onended = () => {
-        console.log("Audio playback ended");
-        currentAudio = null;
-        resolve();
-      };
-
-      audio.onerror = async (e) => {
-        console.warn("MP3 playback failed, trying PCM format:", e);
-        currentAudio = null;
-
-        // 如果 MP3 播放失败，尝试作为 PCM 播放（Gemini）
-        try {
-          await playPCMAudio(base64Audio);
-          resolve();
-        } catch (pcmError) {
-          console.error("PCM playback also failed:", pcmError);
-          reject(new Error(`Audio playback error: ${audio.error?.message || 'unknown'}`));
-        }
-      };
-
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => console.log("Audio play started"))
-          .catch(async (err) => {
-            console.warn("Audio play failed, trying PCM:", err);
-            currentAudio = null;
-            // 尝试 PCM 播放
-            try {
-              await playPCMAudio(base64Audio);
-              resolve();
-            } catch (pcmError) {
-              reject(err);
-            }
-          });
-      }
-    } catch (error) {
-      console.error("playBase64Audio error:", error);
-      currentAudio = null;
-      reject(error);
-    }
-  });
+  // Gemini TTS returns raw PCM data, not MP3.
+  // Play directly via Web Audio API for fastest, most reliable playback.
+  stopCurrentAudio();
+  return playPCMAudio(base64Audio);
 };
 
 // 播放 PCM 音频 - 用于 Gemini TTS

@@ -19,19 +19,27 @@ export const Button: React.FC<ButtonProps> = ({
   const baseStyle = "relative px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed overflow-hidden";
 
   const variants = {
-    primary: "bg-gradient-to-r from-[#ec6d44] to-[#f5277f] text-white hover:opacity-90",
-    secondary: "bg-emerald-600 text-white hover:bg-emerald-500",
-    danger: "bg-red-600 text-white hover:bg-red-500",
-    outline: "border text-white hover:border-[#f5277f] hover:text-[#f5277f] bg-transparent",
-    ghost: "bg-transparent hover:bg-[#222230]"
+    primary: "text-white hover:opacity-90",
+    secondary: "text-white",
+    danger: "text-white",
+    outline: "border bg-transparent",
+    ghost: "bg-transparent"
   };
 
-  const playingClass = isPlaying ? "animate-playing ring-2 ring-[#f5277f]/30" : "";
+  const variantStyles: Record<string, React.CSSProperties> = {
+    primary: { background: 'var(--rose)' },
+    secondary: { background: 'var(--green)' },
+    danger: { background: 'var(--red)' },
+    outline: { borderColor: 'var(--border)', color: 'var(--text-muted)' },
+    ghost: { color: 'var(--text-muted)' },
+  };
+
+  const playingClass = isPlaying ? "animate-playing ring-2" : "";
 
   return (
     <button
       className={`${baseStyle} ${variants[variant]} ${playingClass} ${className}`}
-      style={variant === 'outline' ? { borderColor: '#2a2a3a', color: '#8a8a9a' } : variant === 'ghost' ? { color: '#8a8a9a' } : undefined}
+      style={{ ...variantStyles[variant], ...(isPlaying ? { boxShadow: '0 0 0 3px var(--pink-dim)' } : {}) }}
       disabled={isLoading || isPlaying || disabled}
       {...props}
     >

@@ -431,7 +431,8 @@ const App: React.FC = () => {
         if (activeBlobUrl) URL.revokeObjectURL(activeBlobUrl);
         setActiveBlobUrl(playbackUrl);
         const playbackAudio = new Audio(playbackUrl);
-        playbackAudio.play().catch(() => {});
+        playbackAudio.onended = () => URL.revokeObjectURL(playbackUrl);
+        playbackAudio.play().catch(() => URL.revokeObjectURL(playbackUrl));
 
         // Start analysis in parallel with playback
         setAppState(AppState.ANALYZING);
@@ -479,13 +480,13 @@ const App: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowIPALegend(true)}
-            className="px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
+            className="px-3 py-2 rounded-md text-xs font-semibold transition-colors min-h-[44px] flex items-center"
             style={{ background: 'var(--surface-muted)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
             IPA Guide
           </button>
           {history.length > 0 && (
             <button onClick={() => setShowMobileHistory(true)}
-              className="lg:hidden px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5"
+              className="lg:hidden px-3 py-2 rounded-md text-xs font-semibold flex items-center gap-1.5 min-h-[44px]"
               style={{ background: 'var(--surface-muted)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
               History
               <span className="w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center text-white" style={{ background: 'var(--rose)' }}>
@@ -519,20 +520,20 @@ const App: React.FC = () => {
           {/* Decorative side elements — nebula ambient orbs */}
           <div className="hidden lg:block pointer-events-none" aria-hidden="true">
             <div className="fixed top-[20%] left-[3%] w-48 h-48 rounded-full opacity-[0.035] orb-drift" style={{ background: 'radial-gradient(circle, var(--rose) 0%, transparent 70%)' }} />
-            <div className="fixed top-[55%] left-[5%] w-32 h-32 rounded-full opacity-[0.025] orb-drift-slow" style={{ background: 'radial-gradient(circle, #a78bfa 0%, transparent 70%)' }} />
-            <div className="fixed top-[30%] right-[3%] w-40 h-40 rounded-full opacity-[0.03] orb-drift-slow" style={{ background: 'radial-gradient(circle, #f9a8d4 0%, transparent 70%)' }} />
-            <div className="fixed top-[65%] right-[5%] w-28 h-28 rounded-full opacity-[0.02] orb-drift" style={{ background: 'radial-gradient(circle, #93c5fd 0%, transparent 70%)' }} />
+            <div className="fixed top-[55%] left-[5%] w-32 h-32 rounded-full opacity-[0.025] orb-drift-slow" style={{ background: 'radial-gradient(circle, var(--orb-violet) 0%, transparent 70%)' }} />
+            <div className="fixed top-[30%] right-[3%] w-40 h-40 rounded-full opacity-[0.03] orb-drift-slow" style={{ background: 'radial-gradient(circle, var(--orb-pink) 0%, transparent 70%)' }} />
+            <div className="fixed top-[65%] right-[5%] w-28 h-28 rounded-full opacity-[0.02] orb-drift" style={{ background: 'radial-gradient(circle, var(--orb-blue) 0%, transparent 70%)' }} />
             {/* Subtle dot accents */}
             <div className="fixed top-[15%] left-[8%] w-1.5 h-1.5 rounded-full" style={{ background: 'var(--rose)', opacity: 0.12 }} />
-            <div className="fixed top-[40%] left-[4%] w-1 h-1 rounded-full" style={{ background: '#a78bfa', opacity: 0.1 }} />
-            <div className="fixed top-[25%] right-[6%] w-1.5 h-1.5 rounded-full" style={{ background: '#f9a8d4', opacity: 0.1 }} />
+            <div className="fixed top-[40%] left-[4%] w-1 h-1 rounded-full" style={{ background: 'var(--orb-violet)', opacity: 0.1 }} />
+            <div className="fixed top-[25%] right-[6%] w-1.5 h-1.5 rounded-full" style={{ background: 'var(--orb-pink)', opacity: 0.1 }} />
             <div className="fixed top-[70%] right-[4%] w-1 h-1 rounded-full" style={{ background: 'var(--rose)', opacity: 0.08 }} />
           </div>
           <main className="max-w-[660px] mx-auto space-y-5 pt-7 pb-16">
             {/* Input Section */}
             <div className="rounded-xl p-5 card-hover" style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
               {/* Label */}
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'var(--text-placeholder)', marginBottom: 10 }}>
+              <div className="label-micro" style={{ color: 'var(--text-placeholder)', marginBottom: 10 }}>
                 PRACTICE SENTENCE
               </div>
               {/* Textarea */}
@@ -547,19 +548,17 @@ const App: React.FC = () => {
                   }
                 }}
                 placeholder="Type or paste a sentence to practice..."
-                className="w-full resize-none outline-none"
+                className="w-full resize-none outline-none input-focus"
                 style={{
                   minHeight: 56, padding: '11px 13px',
-                  background: 'var(--surface-muted)', border: '1.5px solid var(--border)', borderRadius: 8,
+                  background: 'var(--surface-muted)', borderRadius: 8,
                   fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 500, color: 'var(--text-primary)',
                   lineHeight: 1.55,
                 }}
-                onFocus={e => e.target.style.borderColor = 'var(--rose)'}
-                onBlur={e => e.target.style.borderColor = 'var(--border)'}
                 disabled={appState !== AppState.IDLE && appState !== AppState.SHOWING_RESULT}
               />
               {/* Action row */}
-              <div className="flex items-center gap-2 mt-3 flex-wrap">
+              <div className="flex items-center gap-2 mt-3 flex-wrap gap-y-2">
                 {/* Play Reference */}
                 {(() => {
                   const isBusy = appState === AppState.GENERATING_TTS || activeAudioSource?.startsWith('input_');
@@ -578,13 +577,13 @@ const App: React.FC = () => {
                     </button>
                   );
                 })()}
-                {/* Video reference links */}
+                {/* Video reference links — hidden on mobile to avoid overflow */}
                 {text.trim() && (<>
                   <a
                     href={`https://youglish.com/pronounce/${text.trim().replace(/\s+/g, '+')}/english`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
+                    className="hidden sm:flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
                     style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)', background: 'var(--surface)', textDecoration: 'none' }}
                   >
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -596,7 +595,7 @@ const App: React.FC = () => {
                     href={`https://www.playphrase.me/#/search?q=${encodeURIComponent(text.trim())}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
+                    className="hidden sm:flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
                     style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)', background: 'var(--surface)', textDecoration: 'none' }}
                   >
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -616,8 +615,8 @@ const App: React.FC = () => {
                 ) : (
                   <button onClick={() => mediaRecorderRef.current?.stop()}
                     className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold"
-                    style={{ background: '#111827', color: '#fff', border: 'none' }}>
-                    <span style={{ width: 10, height: 10, borderRadius: 2, background: '#fff', display: 'inline-block' }} />
+                    style={{ background: 'var(--text-primary)', color: 'var(--surface)', border: 'none' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--surface)', display: 'inline-block' }} />
                     Stop Recording
                   </button>
                 )}
@@ -643,13 +642,13 @@ const App: React.FC = () => {
                 )}
                 {/* Speed toggle */}
                 <div className="flex ml-auto rounded-md overflow-hidden" style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', padding: 2 }}>
-                  {(['normal', 'slow'] as const).map(speed => (
-                    <button key={speed} onClick={() => setTtsSpeed(speed)}
-                      className="px-3 py-1 text-xs font-semibold rounded capitalize transition-all"
-                      style={ttsSpeed === speed
+                  {([{ key: 'normal', label: '1x' }, { key: 'slow', label: '0.8x' }] as const).map(({ key, label }) => (
+                    <button key={key} onClick={() => setTtsSpeed(key as 'normal' | 'slow')}
+                      className="px-3 py-1 text-xs font-semibold rounded transition-all"
+                      style={ttsSpeed === key
                         ? { background: 'var(--surface)', color: 'var(--text-primary)', boxShadow: '0 1px 2px rgba(0,0,0,0.08)' }
                         : { color: 'var(--text-muted)', background: 'transparent' }}>
-                      {speed.charAt(0).toUpperCase() + speed.slice(1)}
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -681,7 +680,7 @@ const App: React.FC = () => {
 
             {/* Loading State */}
             {appState === AppState.ANALYZING && !result && (
-              <div className="glass rounded-2xl p-12 flex flex-col items-center gap-6 animate-fade-in-up nebula-glow">
+              <div className="glass rounded-2xl p-12 flex flex-col items-center gap-6 animate-fade-in-up nebula-glow" role="status" aria-busy="true" aria-label="Analyzing pronunciation">
                 <div className="relative w-16 h-16">
                   <div className="absolute inset-0 border-[3px] rounded-full" style={{ borderColor: 'var(--border-subtle)' }}></div>
                   <div className="absolute inset-0 border-[3px] rounded-full animate-spin" style={{ borderTopColor: 'var(--pink)', borderRightColor: 'rgba(232,88,122,0.3)', borderBottomColor: 'transparent', borderLeftColor: 'transparent' }}></div>
@@ -716,6 +715,20 @@ const App: React.FC = () => {
                 }}
                 onRetry={() => setAppState(AppState.IDLE)}
               />
+            )}
+
+            {/* New Session button — shown after results */}
+            {result && appState === AppState.SHOWING_RESULT && (
+              <button
+                onClick={() => { setText(''); setResult(null); setUserAudioBlob(null); setAppState(AppState.IDLE); }}
+                className="w-full py-3.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] animate-fade-in flex items-center justify-center gap-2"
+                style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', color: 'var(--text-secondary)' }}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                New Session
+              </button>
             )}
           </main>
         </div>

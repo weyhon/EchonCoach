@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 interface IPALegendProps {
   show: boolean;
@@ -6,27 +6,35 @@ interface IPALegendProps {
 }
 
 export const IPALegend: React.FC<IPALegendProps> = ({ show, onClose }) => {
+  // Close on Escape key
+  useEffect(() => {
+    if (!show) return;
+    const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [show, onClose]);
+
   if (!show) return null;
 
   return (
     <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-      <div role="dialog" aria-label="IPA Symbol Guide" className="glass rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto" style={{ boxShadow: '0 8px 48px rgba(0,0,0,0.1)' }} onClick={e => e.stopPropagation()}>
-        <div className="sticky top-0 px-6 py-5 flex items-center justify-between rounded-t-2xl" style={{ backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' }}>
-          <div>
-            <h2 className="text-lg font-bold font-brand" style={{ color: 'var(--text-primary)' }}>IPA Symbol Guide</h2>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>International Phonetic Alphabet reference</p>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
-            style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+      <div role="dialog" aria-label="IPA Symbol Guide" className="glass rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto relative" style={{ boxShadow: '0 8px 48px rgba(0,0,0,0.1)' }} onClick={e => e.stopPropagation()}>
+        {/* Fixed close button — always visible */}
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="sticky top-3 float-right mr-4 mt-3 z-10 w-8 h-8 rounded-full flex items-center justify-center transition-colors shadow-sm"
+          style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        <div className="px-6 pt-5 pb-2">
+          <h2 className="text-lg font-bold font-brand" style={{ color: 'var(--text-primary)' }}>IPA Symbol Guide</h2>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>International Phonetic Alphabet reference</p>
         </div>
+        <div style={{ borderBottom: '1px solid var(--border-subtle)' }}></div>
 
         <div className="px-6 py-5 space-y-6">
           {/* Linking */}

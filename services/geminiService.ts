@@ -23,17 +23,31 @@ if (!USE_PROXY) {
 }
 
 // ── Proxy fetch helper ──────────────────────────────────────────────
-async function proxyPost(endpoint: string, body: Record<string, any>): Promise<any> {
-  const res = await fetch(`/api/${endpoint}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || `API ${endpoint} failed (${res.status})`);
+async function proxyPost(endpoint: string, body: Record<string, any>, timeoutMs = 25000): Promise<any> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`/api/${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || `API ${endpoint} failed (${res.status})`);
+    }
+    return res.json();
+  } catch (e: any) {
+    if (e.name === 'AbortError') {
+      const err = new Error('Request timed out. Please try again.');
+      (err as any).code = 'REQUEST_TIMEOUT';
+      throw err;
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json();
 }
 
 // ── TTS ─────────────────────────────────────────────────────────────
