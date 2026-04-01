@@ -62,13 +62,13 @@ const SymbolSpan: React.FC<SymbolSpanProps> = ({ token, isLast, firstWord, fullT
   return (
     <div className="flex flex-col items-center justify-start gap-0">
       {toneSymbol && (
-        <span className="font-bold text-[16px] leading-none animate-symbol-pop"
-          style={{ color: toneSymbol === '↗' ? 'var(--amber)' : 'var(--pink)' }}>
+        <span className="font-bold text-[20px] leading-none animate-symbol-pop"
+          style={{ color: toneSymbol === '↗' ? 'var(--amber)' : 'var(--pink)', textShadow: `0 0 6px ${toneSymbol === '↗' ? 'var(--amber-bg)' : 'var(--pink-dim)'}` }}>
           {toneSymbol}
         </span>
       )}
       {stressSymbol && (
-        <span className="font-bold text-[10px]"
+        <span className="font-bold text-[11px]"
           style={{ color: stressSymbol === '●' ? 'var(--pink)' : 'var(--text-muted)' }}>
           {stressSymbol}
         </span>
@@ -191,7 +191,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
 
       {/* Ruby annotation row */}
       <div className="px-5 py-4 border-b animate-section stagger-1" style={{ borderColor: 'var(--border)' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-placeholder)', marginBottom: 12 }}>
+        <div className="label-micro" style={{ color: 'var(--text-placeholder)', marginBottom: 12 }}>
           PRONUNCIATION GUIDE
         </div>
         <SentenceAnnotation
@@ -212,7 +212,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
               <svg className="w-3 h-3 shrink-0" style={{ color: 'var(--pink)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5.586V18.414a1 1 0 01-1.707.707L5.586 15z" />
               </svg>
-              <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: 'var(--pink)' }}>Intonation & Linking</span>
+              <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--pink)' }}>Intonation & Linking</span>
             </div>
             {/* Phonics at top */}
             {result.fullLinkedPhonetic && (
@@ -228,10 +228,8 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
                 </div>
                 <button
                   onClick={() => setShowIPALegend(true)}
-                  className="text-[9px] font-semibold uppercase tracking-wider transition-colors flex items-center gap-1 pointer-events-auto"
+                  className="text-[11px] font-semibold uppercase tracking-wider transition-colors flex items-center gap-1 pointer-events-auto hover-rose"
                   style={{ color: 'var(--text-muted)' }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--pink)'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
                 >
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -327,7 +325,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
              {selectedText ? (
                <button
                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onPlayTutor(selectedText); }}
-                 className="pointer-events-auto text-white px-4 h-8 rounded-full text-[9px] font-semibold uppercase tracking-wider flex items-center gap-1.5 active:scale-95 transition-all animate-bounce-in"
+                 className="pointer-events-auto text-white px-4 h-8 rounded-full text-[11px] font-semibold uppercase tracking-wider flex items-center gap-1.5 active:scale-95 transition-all animate-bounce-in"
                  style={{ backgroundColor: 'var(--pink)', boxShadow: '0 2px 12px var(--pink-dim)' }}
                >
                  {isTutorLoading ? (
@@ -339,8 +337,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
                </button>
              ) : (
                <div className="flex flex-col items-center gap-1 opacity-30 transition-opacity hover:opacity-50">
-                 <p className="text-[9px] font-medium uppercase tracking-widest select-none text-center" style={{ color: 'var(--text-muted)' }}>Click word to hear</p>
-                 <p className="text-[8px] font-medium tracking-wider select-none text-center" style={{ color: 'var(--text-muted)' }}>Select text for phrases</p>
+                 <p className="text-[11px] font-medium select-none text-center" style={{ color: 'var(--text-muted)' }}>Tap a word to hear it &middot; Select text for phrases</p>
                </div>
              )}
           </div>
@@ -358,19 +355,28 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
       {/* Analysis Details — Word Breakdown pills */}
       {result.wordBreakdown?.length > 0 && (
         <div className="px-5 pb-5 space-y-4 animate-section stagger-3">
+          {/* Score + heading row */}
+          {result.score > 0 && (() => {
+            const s = result.score;
+            const color = s >= 80 ? 'var(--green)' : s >= 60 ? 'var(--amber)' : 'var(--red)';
+            const bg = s >= 80 ? 'var(--green-bg)' : s >= 60 ? 'var(--amber-bg)' : 'var(--red-bg)';
+            const label = s >= 90 ? 'Excellent!' : s >= 80 ? 'Great job!' : s >= 60 ? 'Keep practicing' : 'Try again';
+            return (
+              <div className={`flex items-center gap-4 p-3.5 rounded-xl mb-2 animate-score-pop ${s >= 90 ? 'celebrate-pulse' : ''}`} style={{ background: bg }}>
+                <span className="num font-bold font-display" style={{ fontSize: 32, color, lineHeight: 1 }}>
+                  {s}
+                  <span style={{ fontSize: 16 }}>%</span>
+                </span>
+                <div>
+                  <div className="font-semibold text-sm" style={{ color }}>{label}</div>
+                  <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Pronunciation accuracy</div>
+                </div>
+              </div>
+            );
+          })()}
           <div className="flex items-center gap-3">
              <div className="h-px flex-1" style={{ background: 'linear-gradient(to right, transparent, var(--border-subtle))' }}></div>
-             <h4 className="font-semibold text-[10px] uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Word Breakdown</h4>
-             {result.score > 0 && (() => {
-               const s = result.score;
-               const color = s >= 80 ? 'var(--green)' : s >= 60 ? 'var(--amber)' : 'var(--red)';
-               const bg = s >= 80 ? 'var(--green-bg)' : s >= 60 ? 'var(--amber-bg)' : 'var(--red-bg)';
-               return (
-                 <span className="num font-bold animate-score-pop" style={{ fontSize: 11, color, background: bg, padding: '2px 8px', borderRadius: 12 }}>
-                   {s}%
-                 </span>
-               );
-             })()}
+             <h4 className="label-micro" style={{ color: 'var(--text-muted)' }}>Word Breakdown</h4>
              <div className="h-px flex-1" style={{ background: 'linear-gradient(to left, transparent, var(--border-subtle))' }}></div>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-2 flex-wrap" style={{ scrollbarWidth: 'none' }}>
@@ -378,32 +384,40 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
               <button
                 key={i}
                 onClick={() => setDetailWord(wa)}
-                className="flex flex-col items-center gap-0.5 px-2.5 py-2 rounded-lg transition-all animate-pill"
+                className="flex flex-col items-center gap-0.5 px-2.5 py-2 rounded-lg transition-all animate-pill cursor-pointer hover-lift group"
                 style={{
                   background: statusBg(wa.status),
                   color: statusColor(wa.status),
                   minWidth: 40,
                   animationDelay: `${i * 50}ms`,
                   opacity: 0,
+                  border: '1px solid transparent',
                 }}
+                title="Click for details"
               >
-                <span style={{ fontSize: 12, fontWeight: 600 }}>{wa.word}</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{wa.word}</span>
                 {wa.phoneticCorrect && (
-                  <span className="font-mono" style={{ fontSize: 9, opacity: 0.7 }}>{wa.phoneticCorrect}</span>
+                  <span className="font-mono transition-opacity group-hover:opacity-100" style={{ fontSize: 12, opacity: 0.7 }}>{wa.phoneticCorrect}</span>
                 )}
+                <span className="w-1 h-1 rounded-full opacity-0 group-hover:opacity-60 transition-opacity" style={{ background: statusColor(wa.status) }} />
               </button>
             ))}
           </div>
           {result.wordBreakdown.length > 5 && (
-            <p className="text-center text-[9px] mt-1" style={{ color: 'var(--text-muted)', opacity: 0.5 }}>← scroll →</p>
+            <p className="text-center text-[11px] mt-1" style={{ color: 'var(--text-muted)', opacity: 0.5 }}>← scroll →</p>
           )}
         </div>
       )}
 
       {/* AI feedback annotation (overall comment) */}
       {result.overallComment && result.score > 0 && (
-        <div className="mx-5 mb-5 p-3.5 rounded-xl animate-section stagger-4" style={{ backgroundColor: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.18)' }}>
-          <div className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--amber)' }}>AI Feedback</div>
+        <div className={`mx-5 mb-5 p-3.5 rounded-xl animate-section stagger-4 ${result.score >= 90 ? 'celebrate-pulse' : ''}`}
+          style={result.score >= 90
+            ? { backgroundColor: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.18)' }
+            : { backgroundColor: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.18)' }}>
+          <div className="label-micro mb-1" style={{ color: result.score >= 90 ? 'var(--green)' : 'var(--amber)' }}>
+            {result.score >= 90 ? 'Excellent!' : 'AI Feedback'}
+          </div>
           <p className="text-[13px] leading-relaxed font-medium" style={{ color: 'var(--text-primary)' }}>
             {result.overallComment}
           </p>

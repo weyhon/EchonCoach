@@ -68,10 +68,10 @@ export const SentenceAnnotation: React.FC<Props> = ({ text, wordBreakdown }) => 
             {/* Annotation row */}
             <div className="flex items-center justify-center gap-0.5 h-5">
               {w.isStressed && (
-                <span className="font-bold leading-none" style={{ fontSize: 10, color: 'var(--rose)' }}>●</span>
+                <span className="font-bold leading-none" style={{ fontSize: 11, color: 'var(--rose)' }}>●</span>
               )}
               {w.ipa && (
-                <span className="font-mono leading-none" style={{ fontSize: 9, color: w.status ? wordColor(w.status) : 'var(--text-muted)', opacity: 0.85 }}>
+                <span className="font-mono leading-none" style={{ fontSize: 11, color: w.status ? wordColor(w.status) : 'var(--text-muted)', opacity: 0.85 }}>
                   {w.ipa}
                 </span>
               )}
@@ -83,13 +83,14 @@ export const SentenceAnnotation: React.FC<Props> = ({ text, wordBreakdown }) => 
             </div>
             {/* Word text */}
             <span
-              className="leading-none"
+              className="leading-none font-display"
               style={{
-                fontSize: 17,
-                fontWeight: w.isStressed ? 700 : 500,
-                color: wordBreakdown ? wordColor(w.status) : 'var(--text-secondary)',
+                fontSize: 22,
+                fontWeight: w.isStressed ? 700 : 400,
+                color: wordBreakdown ? wordColor(w.status) : 'var(--text-primary)',
                 borderBottom: w.isStressed ? '2px solid var(--rose)' : undefined,
-                paddingBottom: w.isStressed ? 1 : 0,
+                paddingBottom: w.isStressed ? 2 : 0,
+                letterSpacing: '-0.01em',
               }}
             >
               {w.word}
@@ -98,9 +99,9 @@ export const SentenceAnnotation: React.FC<Props> = ({ text, wordBreakdown }) => 
 
           {/* Linking arc between this word and next */}
           {w.linksToNext && (
-            <div className="flex flex-col items-center self-end" style={{ width: 14, marginBottom: 2 }}>
+            <div className="flex flex-col items-center self-end" style={{ width: 16, marginBottom: 2 }}>
               <div style={{ height: 20 }} /> {/* spacer to align with annotation row */}
-              <span className="leading-none" style={{ fontSize: 20, color: 'var(--rose)', lineHeight: 1, marginBottom: 1 }}>‿</span>
+              <span className="leading-none font-bold" style={{ fontSize: 24, color: 'var(--rose)', lineHeight: 1, marginBottom: 1, textShadow: '0 0 8px var(--pink-dim)' }}>‿</span>
             </div>
           )}
 

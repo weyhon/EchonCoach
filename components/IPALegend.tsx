@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 interface IPALegendProps {
   show: boolean;
@@ -6,6 +6,14 @@ interface IPALegendProps {
 }
 
 export const IPALegend: React.FC<IPALegendProps> = ({ show, onClose }) => {
+  // Close on Escape key
+  useEffect(() => {
+    if (!show) return;
+    const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [show, onClose]);
+
   if (!show) return null;
 
   return (

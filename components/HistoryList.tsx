@@ -78,19 +78,13 @@ export const HistoryList: React.FC<HistoryListProps> = ({
     <div className="space-y-4 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span style={{
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          color: 'var(--text-placeholder)',
-        }}>
+        <span className="label-micro" style={{ color: 'var(--text-placeholder)' }}>
           History
         </span>
         <button
           onClick={onClear}
           style={{
-            fontSize: 10,
+            fontSize: 'var(--text-xs)',
             fontWeight: 700,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
@@ -100,8 +94,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
             cursor: 'pointer',
             padding: 0,
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--red)')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-placeholder)')}
+          className="hover-red"
         >
           Clear
         </button>
@@ -117,14 +110,11 @@ export const HistoryList: React.FC<HistoryListProps> = ({
           placeholder="Search..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-9 pr-4 py-2.5 rounded-lg text-[12px] font-medium focus:outline-none transition-colors"
+          className="w-full pl-9 pr-4 py-2.5 rounded-lg text-[12px] font-medium focus:outline-none transition-colors input-focus"
           style={{
             background: 'var(--surface-muted)',
-            border: '1.5px solid var(--border)',
             color: 'var(--text-primary)',
           }}
-          onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--border-focus)')}
-          onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
         />
       </div>
 

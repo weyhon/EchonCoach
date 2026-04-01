@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { WordAnalysis } from '../types';
 import { PHONEME_VIDEOS } from '../data/phonemeVideos';
 
@@ -44,6 +44,13 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
 
   const handleCoachPlay = () => onPlayCoach(item.word);
   const handleYouPlay = () => onPlayUser();
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto p-4"
@@ -227,20 +234,20 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
                     onClick={() => handlePlayPhoneme(`Pronounce clearly: /${item.phoneticCorrect}/`, 'fallback-correct')}
                     className="flex flex-col items-center gap-1.5 group transition-all active:scale-95"
                   >
-                    <span className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Correct</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Correct</span>
                     <span className="font-mono text-lg font-semibold px-4 py-2 rounded-xl inline-flex items-center gap-2 transition-all"
                       style={{ backgroundColor: 'var(--surface-muted)', color: 'var(--green)', border: '1px solid var(--border)' }}>
                       /{item.phoneticCorrect}/
                     </span>
                   </button>
                   <div className="flex flex-col items-center gap-1">
-                    <span className="text-[8px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>vs</span>
+                    <span className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>vs</span>
                   </div>
                   <button
                     onClick={() => handlePlayPhoneme(`Pronounce clearly: /${item.phoneticUser}/`, 'fallback-user')}
                     className="flex flex-col items-center gap-1.5 group transition-all active:scale-95"
                   >
-                    <span className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>You said</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>You said</span>
                     <span className="font-mono text-lg font-semibold px-4 py-2 rounded-xl inline-flex items-center gap-2 transition-all"
                       style={{ backgroundColor: 'var(--surface-muted)', color: 'var(--red)', border: '1px solid var(--border)' }}>
                       /{item.phoneticUser}/
