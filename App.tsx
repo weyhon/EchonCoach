@@ -431,7 +431,8 @@ const App: React.FC = () => {
         if (activeBlobUrl) URL.revokeObjectURL(activeBlobUrl);
         setActiveBlobUrl(playbackUrl);
         const playbackAudio = new Audio(playbackUrl);
-        playbackAudio.play().catch(() => {});
+        playbackAudio.onended = () => URL.revokeObjectURL(playbackUrl);
+        playbackAudio.play().catch(() => URL.revokeObjectURL(playbackUrl));
 
         // Start analysis in parallel with playback
         setAppState(AppState.ANALYZING);
@@ -559,7 +560,7 @@ const App: React.FC = () => {
                 disabled={appState !== AppState.IDLE && appState !== AppState.SHOWING_RESULT}
               />
               {/* Action row */}
-              <div className="flex items-center gap-2 mt-3 flex-wrap">
+              <div className="flex items-center gap-2 mt-3 flex-wrap gap-y-2">
                 {/* Play Reference */}
                 {(() => {
                   const isBusy = appState === AppState.GENERATING_TTS || activeAudioSource?.startsWith('input_');
@@ -578,13 +579,13 @@ const App: React.FC = () => {
                     </button>
                   );
                 })()}
-                {/* Video reference links */}
+                {/* Video reference links — hidden on mobile to avoid overflow */}
                 {text.trim() && (<>
                   <a
                     href={`https://youglish.com/pronounce/${text.trim().replace(/\s+/g, '+')}/english`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
+                    className="hidden sm:flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
                     style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)', background: 'var(--surface)', textDecoration: 'none' }}
                   >
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -596,7 +597,7 @@ const App: React.FC = () => {
                     href={`https://www.playphrase.me/#/search?q=${encodeURIComponent(text.trim())}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
+                    className="hidden sm:flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
                     style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)', background: 'var(--surface)', textDecoration: 'none' }}
                   >
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -31,3 +31,6 @@ skills-lock.json
 *.njsproj
 *.sln
 *.sw?
+.vercel
+.env*.local
+.gstack/

@@ -46,10 +46,11 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
   const handleYouPlay = () => onPlayUser();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+    <div className="fixed inset-0 z-50 overflow-y-auto p-4"
       style={{ background: 'rgba(0,0,0,0.15)', backdropFilter: 'blur(8px)' }}
       onClick={onClose}>
-      <div role="dialog" aria-label="Word detail" className="rounded-2xl overflow-hidden w-full max-w-md max-h-[85vh] flex flex-col animate-modal-in"
+      <div className="min-h-full flex items-center justify-center">
+      <div role="dialog" aria-label="Word detail" className="rounded-2xl overflow-hidden w-full max-w-md max-h-[90vh] flex flex-col animate-modal-in my-4"
         style={{ background: 'var(--surface)', boxShadow: '0 8px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)' }}
         onClick={e => e.stopPropagation()}>
 
@@ -186,7 +187,7 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
                       {openPhonemeVideo === ph.phoneme && PHONEME_VIDEOS[ph.phoneme] && (
                         <div className="mt-2 rounded-xl overflow-hidden" style={{ aspectRatio: '16/9', border: '1px solid var(--border)' }}>
                           <iframe
-                            src={`https://www.youtube.com/embed/${PHONEME_VIDEOS[ph.phoneme]}?rel=0&modestbranding=1&autoplay=1`}
+                            src={`https://www.youtube.com/embed/${PHONEME_VIDEOS[ph.phoneme]}?rel=0&modestbranding=1&autoplay=1&cc_load_policy=0&cc_lang_pref=en&hl=en`}
                             allow="autoplay; encrypted-media"
                             allowFullScreen
                             className="w-full h-full"
@@ -253,6 +254,7 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
           {/* Bottom padding */}
           <div className="h-5"></div>
         </div>
+      </div>
       </div>
     </div>
   );

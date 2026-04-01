@@ -278,12 +278,18 @@ export function getSentenceIntonation(text: string): '↗' | '↘' {
     return '↘'; // Wh-question uses falling intonation
   }
 
+  // Choice questions (A or B?) use falling intonation on the last option
+  // e.g. "Would you like sweet or normal?" → ↘
+  const lowerText = text.toLowerCase();
+  if (/ or /.test(lowerText) && hasQuestionMark) {
+    return '↘';
+  }
+
   if (isYesNoQuestion(text)) {
     return '↗'; // Yes/no question uses rising intonation
   }
 
   // Default for questions: check if it looks like yes/no
-  // If it ends with question mark but doesn't start with wh-word, likely yes/no
   return '↗';
 }
 

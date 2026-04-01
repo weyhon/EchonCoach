@@ -6,8 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Nebula</title>
     <link rel="icon" type="image/svg+xml" href="/nebula-favicon.svg" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
       :root {
         /* ── Color tokens ─────────────────────────────────────────── */
@@ -194,6 +193,18 @@
         to { opacity: 1; transform: translateY(0) scale(1); }
       }
       .animate-pill { animation: pillSlide 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+      /* Ambient orb drift — slow, subtle float for side decorations */
+      @keyframes orbDrift {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-12px); }
+      }
+      @keyframes orbDriftSlow {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-8px); }
+      }
+      .orb-drift { animation: orbDrift 8s ease-in-out infinite; }
+      .orb-drift-slow { animation: orbDriftSlow 12s ease-in-out infinite; }
 
       /* Subtle hover lift for cards */
       .card-hover { transition: box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1), transform 0.25s cubic-bezier(0.22, 1, 0.36, 1); }

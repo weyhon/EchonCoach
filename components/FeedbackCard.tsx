@@ -166,9 +166,17 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
 
   const rawTokens = (result.intonationMap || "").trim().split(/\s+/).filter(Boolean);
 
-  const mapTokens = rawTokens.length === words.length
+  const baseTokens = rawTokens.length === words.length
     ? rawTokens
     : generateIntonationTokens(sentenceText, words);
+
+  // Override the last token's intonation arrow with locally computed value
+  // so AI cache inconsistencies don't cause mismatch with the pronunciation guide above
+  const correctArrow = getSentenceIntonation(result.speechScript || sentenceText);
+  const mapTokens = baseTokens.map((token, i) => {
+    if (i !== baseTokens.length - 1) return token;
+    return token.replace(/[↗↘]/, '') + correctArrow;
+  });
 
   return (
     <div className={`animate-fade-in-up relative transition-all duration-500 rounded-2xl overflow-hidden ${isUpdating ? 'opacity-50 scale-[0.97] blur-[1px]' : 'opacity-100 scale-100'}`}
