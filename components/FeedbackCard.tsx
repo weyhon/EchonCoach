@@ -197,6 +197,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
         <SentenceAnnotation
           text={result.speechScript || ''}
           wordBreakdown={result.wordBreakdown}
+          onWordClick={(word) => onPlayTutor(word)}
         />
       </div>
 
@@ -384,22 +385,23 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
               <button
                 key={i}
                 onClick={() => setDetailWord(wa)}
-                className="flex flex-col items-center gap-0.5 px-2.5 py-2 rounded-lg transition-all animate-pill cursor-pointer hover-lift group"
+                className="flex flex-col items-center gap-1 px-3.5 py-2.5 rounded-xl transition-all animate-pill cursor-pointer hover-lift group"
                 style={{
                   background: statusBg(wa.status),
                   color: statusColor(wa.status),
-                  minWidth: 40,
+                  minWidth: 48,
                   animationDelay: `${i * 50}ms`,
                   opacity: 0,
-                  border: '1px solid transparent',
+                  border: `1.5px solid ${wa.status === 'correct' ? 'rgba(34,197,94,0.2)' : wa.status === 'incorrect' ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)'}`,
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                 }}
                 title="Click for details"
               >
-                <span style={{ fontSize: 13, fontWeight: 600 }}>{wa.word}</span>
+                <span className="font-display" style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.01em' }}>{wa.word}</span>
                 {wa.phoneticCorrect && (
-                  <span className="font-mono transition-opacity group-hover:opacity-100" style={{ fontSize: 12, opacity: 0.7 }}>{wa.phoneticCorrect}</span>
+                  <span className="font-mono transition-opacity group-hover:opacity-100" style={{ fontSize: 11, opacity: 0.65 }}>{wa.phoneticCorrect}</span>
                 )}
-                <span className="w-1 h-1 rounded-full opacity-0 group-hover:opacity-60 transition-opacity" style={{ background: statusColor(wa.status) }} />
+                <span className="w-1.5 h-0.5 rounded-full opacity-0 group-hover:opacity-50 transition-opacity" style={{ background: statusColor(wa.status) }} />
               </button>
             ))}
           </div>

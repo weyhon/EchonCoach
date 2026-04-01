@@ -54,9 +54,10 @@ const wordColor = (status?: WordAnalysis['status']): string => {
 interface Props {
   text: string;
   wordBreakdown?: WordAnalysis[];
+  onWordClick?: (word: string) => void;
 }
 
-export const SentenceAnnotation: React.FC<Props> = ({ text, wordBreakdown }) => {
+export const SentenceAnnotation: React.FC<Props> = ({ text, wordBreakdown, onWordClick }) => {
   const words = buildAnnotationWords(text, wordBreakdown);
 
   return (
@@ -83,7 +84,7 @@ export const SentenceAnnotation: React.FC<Props> = ({ text, wordBreakdown }) => 
             </div>
             {/* Word text */}
             <span
-              className="leading-none font-display"
+              className={`leading-none font-display${onWordClick ? ' cursor-pointer hover:opacity-70 transition-opacity' : ''}`}
               style={{
                 fontSize: 22,
                 fontWeight: w.isStressed ? 700 : 400,
@@ -92,6 +93,8 @@ export const SentenceAnnotation: React.FC<Props> = ({ text, wordBreakdown }) => 
                 paddingBottom: w.isStressed ? 2 : 0,
                 letterSpacing: '-0.01em',
               }}
+              onClick={onWordClick ? () => onWordClick(w.word.replace(/[?.!,;:'"()[\]{}]/g, '')) : undefined}
+              title={onWordClick ? 'Click to hear pronunciation' : undefined}
             >
               {w.word}
             </span>
