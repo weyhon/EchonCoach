@@ -176,7 +176,9 @@ export function isPhoneticComplete(text: string, phonetic: string): boolean {
   // Very rough heuristic: phonetic should have at least 60% of word count in segments
   const phoneticSegments = phonetic.split(/[\s‿]+/).filter(s => s.length > 0);
 
-  if (phoneticSegments.length < words.length * 0.6) {
+  // AI often groups linked words (e.g. "is it" → single phonetic unit)
+  // so a lower threshold (40%) avoids false negatives on short sentences
+  if (phoneticSegments.length < words.length * 0.4) {
     console.warn(`Phonetic seems incomplete: ${phoneticSegments.length} segments for ${words.length} words`);
     return false;
   }
