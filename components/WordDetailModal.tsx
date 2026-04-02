@@ -20,6 +20,54 @@ const VideoIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
   </svg>
 );
 
+/**
+ * Highlight the parts of `b` that differ from `a`.
+ * Returns JSX spans: shared chars are plain, extra/different chars get a highlight.
+ */
+function diffPhonetics(a: string, b: string, highlightColor: string): React.ReactNode {
+  // Use a simple LCS-based diff to find matching vs differing characters
+  const aChars = [...a];
+  const bChars = [...b];
+
+  // Build LCS table
+  const m = aChars.length, n = bChars.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = aChars[i - 1] === bChars[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
+
+  // Backtrack to find which chars in b are in the LCS (shared) vs not (different)
+  const bMatched = new Set<number>();
+  let i = m, j = n;
+  while (i > 0 && j > 0) {
+    if (aChars[i - 1] === bChars[j - 1]) { bMatched.add(j - 1); i--; j--; }
+    else if (dp[i - 1][j] > dp[i][j - 1]) i--;
+    else j--;
+  }
+
+  // Build spans: group consecutive matched/unmatched chars
+  const spans: React.ReactNode[] = [];
+  let run = '';
+  let runIsHighlight = false;
+  bChars.forEach((ch, idx) => {
+    const isDiff = !bMatched.has(idx);
+    if (isDiff !== runIsHighlight && run) {
+      spans.push(runIsHighlight
+        ? <mark key={idx} style={{ background: highlightColor, borderRadius: 3, padding: '0 1px' }}>{run}</mark>
+        : <span key={idx}>{run}</span>);
+      run = '';
+    }
+    runIsHighlight = isDiff;
+    run += ch;
+  });
+  if (run) {
+    spans.push(runIsHighlight
+      ? <mark key="end" style={{ background: highlightColor, borderRadius: 3, padding: '0 1px' }}>{run}</mark>
+      : <span key="end">{run}</span>);
+  }
+  return <>{spans}</>;
+}
+
 export const WordDetailModal: React.FC<WordDetailModalProps> = ({
   item, allWords, onSelectWord, onClose, onPlayCoach, onPlayUser, onPlayPhoneme, isCoachPlaying, hasUserRecording
 }) => {
@@ -231,26 +279,36 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
                 <p className="text-[10px] font-semibold uppercase tracking-widest mb-3 text-center" style={{ color: 'var(--text-muted)' }}>Compare Sounds</p>
                 <div className="flex items-center justify-center gap-4">
                   <button
-                    onClick={() => handlePlayPhoneme(`Pronounce clearly: /${item.phoneticCorrect}/`, 'fallback-correct')}
+                    onClick={() => handlePlayPhoneme(
+                      `${item.word}`,
+                      'fallback-correct'
+                    )}
                     className="flex flex-col items-center gap-1.5 group transition-all active:scale-95"
                   >
                     <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Correct</span>
-                    <span className="font-mono text-lg font-semibold px-4 py-2 rounded-xl inline-flex items-center gap-2 transition-all"
-                      style={{ backgroundColor: 'var(--surface-muted)', color: 'var(--green)', border: '1px solid var(--border)' }}>
-                      /{item.phoneticCorrect}/
+                    <span className="font-mono font-semibold px-5 py-2.5 rounded-xl inline-flex items-center gap-2 transition-all"
+                      style={{ fontSize: 22, backgroundColor: 'var(--surface-muted)', color: 'var(--green)', border: '1px solid var(--border)' }}>
+                      /{diffPhonetics(item.phoneticUser!, item.phoneticCorrect!, 'rgba(34,197,94,0.15)')}/
                     </span>
                   </button>
                   <div className="flex flex-col items-center gap-1">
                     <span className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>vs</span>
                   </div>
                   <button
-                    onClick={() => handlePlayPhoneme(`Pronounce clearly: /${item.phoneticUser}/`, 'fallback-user')}
+                    onClick={() => {
+                      // Build a descriptive prompt so the TTS deliberately reproduces the learner's error
+                      const errorHint = item.suggestion
+                        ? ` The learner's mistake: ${item.suggestion}`
+                        : '';
+                      const prompt = `You are demonstrating a common pronunciation mistake. Say the word "${item.word}" but DELIBERATELY mispronounce it as /${item.phoneticUser}/ instead of the correct /${item.phoneticCorrect}/.${errorHint} Exaggerate the error slightly so the difference is obvious. Only say the single word, nothing else.`;
+                      handlePlayPhoneme(prompt, 'fallback-user');
+                    }}
                     className="flex flex-col items-center gap-1.5 group transition-all active:scale-95"
                   >
                     <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>You said</span>
-                    <span className="font-mono text-lg font-semibold px-4 py-2 rounded-xl inline-flex items-center gap-2 transition-all"
-                      style={{ backgroundColor: 'var(--surface-muted)', color: 'var(--red)', border: '1px solid var(--border)' }}>
-                      /{item.phoneticUser}/
+                    <span className="font-mono font-semibold px-5 py-2.5 rounded-xl inline-flex items-center gap-2 transition-all"
+                      style={{ fontSize: 22, backgroundColor: 'var(--surface-muted)', color: 'var(--red)', border: '1px solid var(--border)' }}>
+                      /{diffPhonetics(item.phoneticCorrect!, item.phoneticUser!, 'rgba(239,68,68,0.15)')}/
                     </span>
                   </button>
                 </div>
