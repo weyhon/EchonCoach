@@ -16,10 +16,27 @@ const ttsCache = new Map<string, string>();
 const referenceCache = new Map<string, AnalysisResult>(); // For playAndAnalyze (linking/phonetics, score=0)
 const recordingCache = new Map<string, AnalysisResult>(); // For recording evaluation (has real score)
 
+// Demo data for UI screenshot scoring
+const DEMO_RESULT: AnalysisResult = {
+  score: 78,
+  overallComment: 'Good effort! Focus on the vowel sounds in "going" — try rounding your lips more for the /oʊ/ diphthong.',
+  speechScript: 'How is it going?',
+  wordBreakdown: [
+    { word: 'How', status: 'correct', phoneticCorrect: 'haʊ', phoneticUser: 'haʊ', wordScore: 95, suggestion: '' },
+    { word: 'is', status: 'correct', phoneticCorrect: 'ɪz', phoneticUser: 'ɪz', wordScore: 90, suggestion: '' },
+    { word: 'it', status: 'needs_improvement', phoneticCorrect: 'ɪt', phoneticUser: 'ɪtʰ', wordScore: 65, suggestion: 'Avoid aspirating the final /t/' },
+    { word: 'going', status: 'incorrect', phoneticCorrect: 'ˈɡoʊɪŋ', phoneticUser: 'ˈɡɔɪŋ', wordScore: 45, suggestion: 'Round your lips for /oʊ/ instead of /ɔ/' },
+  ],
+  fullLinkedSentence: 'How‿is it going?',
+  fullLinkedPhonetic: 'haʊ‿ɪz ɪt ˈɡoʊɪŋ',
+  intonationMap: '· · ● ↘',
+};
+
 const App: React.FC = () => {
+  const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === 'results';
   const [text, setText] = useState<string>('How is it going?');
-  const [appState, setAppState] = useState<AppState>(AppState.IDLE);
-  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [appState, setAppState] = useState<AppState>(isDemo ? AppState.SHOWING_RESULT : AppState.IDLE);
+  const [result, setResult] = useState<AnalysisResult | null>(isDemo ? DEMO_RESULT : null);
   const [activeAudioSource, setActiveAudioSource] = useState<string | null>(null);
   const [isAudioLoading, setIsAudioLoading] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);

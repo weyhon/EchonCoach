@@ -84,22 +84,27 @@ async function takeScreenshot() {
     });
     const page = await browser.newPage();
 
-    // Desktop viewport
+    // Desktop viewport — Practice view
     await page.setViewport({ width: 1280, height: 800 });
     await page.goto('http://localhost:4174', { waitUntil: 'networkidle0', timeout: 30_000 });
+    await new Promise(r => setTimeout(r, 2000));
 
-    // Wait a moment for fonts and animations
+    const practiceScreenshotPath = join(SCREENSHOTS_DIR, 'latest-practice.png');
+    await page.screenshot({ path: practiceScreenshotPath, fullPage: false });
+
+    // Desktop viewport — Results view (demo mode)
+    await page.goto('http://localhost:4174?demo=results', { waitUntil: 'networkidle0', timeout: 30_000 });
     await new Promise(r => setTimeout(r, 2000));
 
     const screenshotPath = join(SCREENSHOTS_DIR, 'latest.png');
-    await page.screenshot({ path: screenshotPath, fullPage: false });
+    await page.screenshot({ path: screenshotPath, fullPage: true });
 
-    // Also take a mobile screenshot
+    // Mobile — Results view
     await page.setViewport({ width: 390, height: 844 });
     await page.reload({ waitUntil: 'networkidle0' });
     await new Promise(r => setTimeout(r, 1500));
     const mobileScreenshotPath = join(SCREENSHOTS_DIR, 'latest-mobile.png');
-    await page.screenshot({ path: mobileScreenshotPath, fullPage: false });
+    await page.screenshot({ path: mobileScreenshotPath, fullPage: true });
 
     await browser.close();
     console.log('  ✅ Screenshots saved');
