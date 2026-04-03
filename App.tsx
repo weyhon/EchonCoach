@@ -481,13 +481,13 @@ const App: React.FC = () => {
         <div className="flex items-center gap-2">
           <button onClick={() => setShowIPALegend(true)}
             className="px-3 py-2 rounded-md text-xs font-semibold transition-colors min-h-[44px] flex items-center"
-            style={{ background: 'var(--surface-muted)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+            style={{ background: 'var(--surface-muted)', color: 'var(--text-muted)' }}>
             IPA Guide
           </button>
           {history.length > 0 && (
             <button onClick={() => setShowMobileHistory(true)}
               className="lg:hidden px-3 py-2 rounded-md text-xs font-semibold flex items-center gap-1.5 min-h-[44px]"
-              style={{ background: 'var(--surface-muted)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+              style={{ background: 'var(--surface-muted)', color: 'var(--text-muted)' }}>
               History
               <span className="w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center text-white" style={{ background: 'var(--rose)' }}>
                 {Math.min(history.length, 9)}
@@ -521,8 +521,11 @@ const App: React.FC = () => {
             {/* Input Section */}
             <div className="rounded-xl p-5 card-hover" style={{ background: 'var(--surface)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
               {/* Label */}
-              <div className="label-micro" style={{ color: 'var(--text-placeholder)', marginBottom: 10 }}>
-                PRACTICE SENTENCE
+              <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
+                <div className="label-micro" style={{ color: 'var(--text-placeholder)' }}>
+                  PRACTICE SENTENCE
+                </div>
+                <span className="pixel-badge pixel-badge-a" style={{ fontSize: 8, padding: '1px 6px', opacity: 0.7 }}>LVL 1</span>
               </div>
               {/* Textarea */}
               <textarea
@@ -572,7 +575,7 @@ const App: React.FC = () => {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hidden sm:flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
-                    style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)', background: 'var(--surface)', textDecoration: 'none' }}
+                    style={{ color: 'var(--text-secondary)', background: 'var(--surface-muted)', textDecoration: 'none' }}
                   >
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
@@ -584,7 +587,7 @@ const App: React.FC = () => {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hidden sm:flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
-                    style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)', background: 'var(--surface)', textDecoration: 'none' }}
+                    style={{ color: 'var(--text-secondary)', background: 'var(--surface-muted)', textDecoration: 'none' }}
                   >
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
@@ -596,7 +599,7 @@ const App: React.FC = () => {
                 {appState !== AppState.RECORDING ? (
                   <button onClick={startRecording} disabled={!text.trim() || appState === AppState.ANALYZING || appState === AppState.GENERATING_TTS}
                     className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
-                    style={{ background: 'var(--surface-muted)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+                    style={{ background: 'var(--surface-muted)', color: 'var(--text-secondary)' }}>
                     <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2H3v2a9 9 0 0 0 8 8.94V23h2v-2.06A9 9 0 0 0 21 12v-2h-2z"/></svg>
                     Record
                   </button>
@@ -622,14 +625,14 @@ const App: React.FC = () => {
                       audio.play().catch(() => setActiveAudioSource(null));
                     }}
                     className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
-                    style={{ border: '1px solid var(--border)', color: activeAudioSource === 'user_playback' ? 'var(--rose)' : 'var(--text-secondary)', background: activeAudioSource === 'user_playback' ? 'var(--rose-50)' : 'var(--surface)' }}
+                    style={{ color: activeAudioSource === 'user_playback' ? 'var(--rose)' : 'var(--text-secondary)', background: activeAudioSource === 'user_playback' ? 'var(--rose-50)' : 'var(--surface-muted)' }}
                   >
                     <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2H3v2a9 9 0 0 0 8 8.94V23h2v-2.06A9 9 0 0 0 21 12v-2h-2z"/></svg>
                     {activeAudioSource === 'user_playback' ? 'Playing...' : 'My Voice'}
                   </button>
                 )}
                 {/* Speed toggle */}
-                <div className="flex ml-auto rounded-md overflow-hidden" style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', padding: 2 }}>
+                <div className="flex ml-auto rounded-md overflow-hidden" style={{ background: 'var(--surface-muted)', padding: 2 }}>
                   {([{ key: 'normal', label: '1x' }, { key: 'slow', label: '0.8x' }] as const).map(({ key, label }) => (
                     <button key={key} onClick={() => setTtsSpeed(key as 'normal' | 'slow')}
                       className="px-3 py-1 text-xs font-semibold rounded transition-all"
