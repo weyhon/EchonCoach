@@ -476,7 +476,7 @@ const App: React.FC = () => {
         style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
         <div className="flex items-center gap-2.5">
           <NebulaLogo size={28} />
-          <span className="font-brand font-extrabold tracking-tight" style={{ fontSize: 16, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>Nebula</span>
+          <span style={{ fontFamily: "'Newsreader', Georgia, serif", fontSize: 17, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>Nebula</span>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowIPALegend(true)}
