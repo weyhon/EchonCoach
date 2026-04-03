@@ -201,13 +201,37 @@ function logToTsv(description, buildPass, combined, duration) {
   writeFileSync(RESULTS_TSV_PATH, readFileSync(RESULTS_TSV_PATH, 'utf-8') + row + '\n');
 }
 
+// ── Multi-run median (reduces LLM variance) ──
+
+const JUDGE_RUNS = parseInt(process.env.JUDGE_RUNS || '3', 10);
+
+function median(arr) {
+  const sorted = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
+function medianJudge(results) {
+  // Take median of each dimension and total
+  const dims = ['color', 'typography', 'depth', 'interaction', 'pixel'];
+  const merged = {};
+  for (const d of dims) {
+    const scores = results.map(r => r[d]?.score ?? 0);
+    merged[d] = { score: median(scores), issues: results[Math.floor(results.length / 2)][d]?.issues || [] };
+  }
+  merged.total = dims.reduce((s, d) => s + merged[d].score, 0);
+  merged.grade = merged.total >= 90 ? 'S' : merged.total >= 80 ? 'A' : merged.total >= 70 ? 'B' : merged.total >= 60 ? 'C' : 'D';
+  merged.top_suggestion = results[Math.floor(results.length / 2)].top_suggestion;
+  return merged;
+}
+
 // ── Main ──
 
 async function main() {
   const startTime = Date.now();
 
   console.log('🎨 UI Design Judge');
-  console.log('──────────────────');
+  console.log(`──────────────────  (${JUDGE_RUNS} runs, median)`);
 
   // Load inputs
   console.log('📄 Loading design rules...');
@@ -216,9 +240,19 @@ async function main() {
   console.log('📸 Loading screenshot...');
   const screenshotBase64 = loadScreenshot();
 
-  // Judge
-  console.log('🤖 Sending to Gemini for scoring...');
-  const judgeResult = await judgeWithGemini(screenshotBase64, designRules);
+  // Judge — run multiple times in parallel
+  console.log(`🤖 Sending ${JUDGE_RUNS} requests to Gemini...`);
+  const allResults = await Promise.all(
+    Array.from({ length: JUDGE_RUNS }, () => judgeWithGemini(screenshotBase64, designRules))
+  );
+
+  // Show individual run scores
+  allResults.forEach((r, i) => {
+    console.log(`  Run ${i + 1}: C=${r.color?.score} T=${r.typography?.score} D=${r.depth?.score} I=${r.interaction?.score} P=${r.pixel?.score} → ${r.total}`);
+  });
+
+  // Median
+  const judgeResult = medianJudge(allResults);
 
   // Combine
   const combined = combineScores(judgeResult);
@@ -228,6 +262,7 @@ async function main() {
   const fullResult = {
     timestamp: new Date().toISOString(),
     judge: judgeResult,
+    runs: allResults,
     combined,
     duration_ms: duration,
   };
@@ -238,7 +273,7 @@ async function main() {
   logToTsv(description, true, combined, duration);
 
   // Display results
-  console.log('\n📊 Results:');
+  console.log('\n📊 Results (median):');
   console.log('──────────────────');
   console.log(`  Color:       ${judgeResult.color?.score}/20`);
   console.log(`  Typography:  ${judgeResult.typography?.score}/20`);
