@@ -645,14 +645,20 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* Pixel accent strip */}
+              {/* Pixel accent strip + hint */}
               {appState === AppState.IDLE && !result && (
-                <div className="pixel-strip mt-4">
-                  {[...Array(24)].map((_, i) => (
-                    <div key={i} className="pixel-block" style={{
-                      background: i % 5 === 0 ? 'var(--rose)' : i % 3 === 0 ? 'var(--rose-50, #ffd9de)' : 'var(--surface-muted)',
-                    }} />
-                  ))}
+                <div className="mt-4 flex flex-col items-center gap-2">
+                  <div className="pixel-strip">
+                    {[...Array(32)].map((_, i) => (
+                      <div key={i} className="pixel-block" style={{
+                        width: 6, height: 6,
+                        background: i % 7 === 0 ? 'var(--rose)' : i % 4 === 0 ? 'var(--rose-50, #ffd9de)' : i % 5 === 0 ? '#FFD700' : 'var(--surface-muted)',
+                      }} />
+                    ))}
+                  </div>
+                  <span style={{ fontFamily: 'monospace', fontSize: 9, fontWeight: 700, color: 'var(--text-placeholder)', letterSpacing: '1px' }}>
+                    ▶ PRESS PLAY TO START ▶
+                  </span>
                 </div>
               )}
 
