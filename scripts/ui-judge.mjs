@@ -74,6 +74,16 @@ async function judgeWithGemini(screenshotBase64, designRules) {
 ## Design Rules
 ${designRules}
 
+## Pixel Elements — What to Look For
+This app uses a "Cozy Retro-Modern" design with pixel art accents. Look for these specific pixel elements:
+- Pixel badges: small rectangular labels with monospace text (e.g., "LVL 1", "S", "A", "B" grade badges) using bold colors
+- Pixel progress bar: thin horizontal bars resembling game HP bars with stepped/blocky fills
+- Pixel strip: rows of tiny colored squares as decorative accents
+- Pixel loading: stepped animations, blinking dots, or grid patterns
+- Monospace hint text: small uppercase text like "PRESS PLAY TO START" or "ANALYZING"
+- These elements are SMALL (≤10% of screen area) — they are "seasoning, not the main dish"
+Score pixel 15-20 if these small pixel accents are present and tasteful. Score 0 ONLY if NO pixel elements exist at all.
+
 ## Instructions
 1. Analyze the screenshot carefully
 2. Score each of the 5 dimensions (0-20 each)
