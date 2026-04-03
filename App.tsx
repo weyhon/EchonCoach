@@ -473,7 +473,7 @@ const App: React.FC = () => {
     <div className="min-h-screen pb-16 antialiased">
       {/* Fixed Top Header */}
       <header className="fixed top-0 w-full z-50 flex items-center justify-between px-5 h-[52px]"
-        style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)' }}>
+        style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
         <div className="flex items-center gap-2.5">
           <NebulaLogo size={28} />
           <span className="font-brand font-extrabold tracking-tight" style={{ fontSize: 16, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>Nebula</span>
@@ -645,9 +645,20 @@ const App: React.FC = () => {
                 </div>
               </div>
 
+              {/* Pixel accent strip */}
+              {appState === AppState.IDLE && !result && (
+                <div className="pixel-strip mt-4">
+                  {[...Array(24)].map((_, i) => (
+                    <div key={i} className="pixel-block" style={{
+                      background: i % 5 === 0 ? 'var(--rose)' : i % 3 === 0 ? 'var(--rose-50, #ffd9de)' : 'var(--surface-muted)',
+                    }} />
+                  ))}
+                </div>
+              )}
+
               {/* Recording state: waveform */}
               {appState === AppState.RECORDING && (
-                <div className="flex items-center gap-3 mt-4 pt-3 animate-fade-in" style={{ borderTop: '1px solid var(--border)' }}>
+                <div className="flex items-center gap-3 mt-4 pt-3 animate-fade-in" style={{ background: 'var(--surface-muted)', borderRadius: 8, padding: '10px 12px' }}>
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: 'var(--red)' }} />
                     <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Recording...</span>
@@ -662,7 +673,7 @@ const App: React.FC = () => {
 
               {/* Analyzing state */}
               {appState === AppState.ANALYZING && (
-                <div className="flex items-center gap-2 mt-4 pt-3 animate-fade-in" style={{ borderTop: '1px solid var(--border)' }}>
+                <div className="flex items-center gap-2 mt-4 pt-3 animate-fade-in" style={{ background: 'var(--surface-muted)', borderRadius: 8, padding: '10px 12px' }}>
                   <div className="w-3.5 h-3.5 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--rose)', borderTopColor: 'transparent' }} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Analyzing pronunciation...</span>
                 </div>
