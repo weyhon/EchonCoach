@@ -560,7 +560,7 @@ const App: React.FC = () => {
                       className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-60"
                       style={{ background: isBusy ? 'var(--rose-50)' : 'var(--rose)', color: isBusy ? 'var(--rose)' : '#fff', border: isBusy ? '1.5px solid var(--rose)' : 'none' }}>
                       {isBusy ? (
-                        <div className="w-3.5 h-3.5 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--rose)', borderTopColor: 'transparent' }} />
+                        <span className="pixel-spinner-sm"><span className="dot" /><span className="dot" /><span className="dot" /></span>
                       ) : (
                         <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                       )}
@@ -656,40 +656,53 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              {/* Recording state: waveform */}
+              {/* Recording state: pixel waveform */}
               {appState === AppState.RECORDING && (
-                <div className="flex items-center gap-3 mt-4 pt-3 animate-fade-in" style={{ background: 'var(--surface-muted)', borderRadius: 8, padding: '10px 12px' }}>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: 'var(--red)' }} />
-                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Recording...</span>
-                  </div>
-                  <div className="flex items-center gap-0.5 h-6">
-                    {[1,2,3,4,5,6,7].map(n => (
-                      <div key={n} className="rec-bar" style={{ width: 3, background: 'var(--rose)', borderRadius: 2, height: `${12 + (n % 3) * 8}px`, animationDelay: `${n * 0.12}s` }} />
+                <div className="flex items-center gap-3 mt-4 animate-fade-in" style={{ background: 'var(--surface-muted)', borderRadius: 10, padding: '10px 14px' }}>
+                  <span className="pixel-badge pixel-badge-a" style={{ fontSize: 8, padding: '2px 6px', animation: 'pixel-blink 1s steps(1) infinite' }}>REC</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', fontFamily: 'monospace', letterSpacing: '0.5px' }}>Recording...</span>
+                  <div className="pixel-wave ml-auto">
+                    {[0,1,2,3,4,5,6,7,8].map(n => (
+                      <div key={n} className="pixel-wave-bar" style={{ background: 'var(--rose)', animationDelay: `${n * 100}ms` }} />
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Analyzing state */}
+              {/* Analyzing state: pixel style */}
               {appState === AppState.ANALYZING && (
-                <div className="flex items-center gap-2 mt-4 pt-3 animate-fade-in" style={{ background: 'var(--surface-muted)', borderRadius: 8, padding: '10px 12px' }}>
-                  <div className="w-3.5 h-3.5 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--rose)', borderTopColor: 'transparent' }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Analyzing pronunciation...</span>
+                <div className="mt-4 animate-fade-in" style={{ background: 'var(--surface-muted)', borderRadius: 10, padding: '10px 14px' }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="pixel-spinner">
+                      <span className="dot active" /><span className="dot" />
+                      <span className="dot" /><span className="dot active" />
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', fontFamily: 'monospace', letterSpacing: '0.5px' }}>Analyzing...</span>
+                  </div>
+                  <div className="pixel-loading-bar">
+                    <div className="pixel-loading-fill" />
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Loading State */}
+            {/* Loading State: pixel grid animation */}
             {appState === AppState.ANALYZING && !result && (
-              <div className="glass rounded-2xl p-12 flex flex-col items-center gap-6 animate-fade-in-up nebula-glow" role="status" aria-busy="true" aria-label="Analyzing pronunciation">
-                <div className="relative w-16 h-16">
-                  <div className="absolute inset-0 border-[3px] rounded-full" style={{ borderColor: 'var(--border-subtle)' }}></div>
-                  <div className="absolute inset-0 border-[3px] rounded-full animate-spin" style={{ borderTopColor: 'var(--pink)', borderRightColor: 'rgba(232,88,122,0.3)', borderBottomColor: 'transparent', borderLeftColor: 'transparent' }}></div>
+              <div className="rounded-2xl p-10 flex flex-col items-center gap-5 animate-fade-in-up" style={{ background: 'var(--surface)', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }} role="status" aria-busy="true" aria-label="Analyzing pronunciation">
+                <div className="pixel-analyze-icon">
+                  {[...Array(25)].map((_, i) => {
+                    const row = Math.floor(i / 5);
+                    const col = i % 5;
+                    const isLit = (row + col) % 2 === 0 || row === 2 || col === 2;
+                    return <div key={i} className={`cell ${isLit ? 'lit' : ''}`} style={isLit ? { animationDelay: `${i * 80}ms` } : undefined} />;
+                  })}
                 </div>
-                <div className="text-center space-y-2">
-                  <p className="font-semibold text-base" style={{ color: 'var(--text-primary)' }}>Analyzing your pronunciation</p>
-                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Comparing phonemes, rhythm, and intonation...</p>
+                <div className="text-center space-y-1.5">
+                  <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'monospace', letterSpacing: '0.5px' }}>ANALYZING</p>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>phonemes ● rhythm ● intonation</p>
+                </div>
+                <div className="pixel-loading-bar" style={{ maxWidth: 200 }}>
+                  <div className="pixel-loading-fill" />
                 </div>
               </div>
             )}
