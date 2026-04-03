@@ -362,15 +362,22 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
             const color = s >= 80 ? 'var(--green)' : s >= 60 ? 'var(--amber)' : 'var(--red)';
             const bg = s >= 80 ? 'var(--green-bg)' : s >= 60 ? 'var(--amber-bg)' : 'var(--red-bg)';
             const label = s >= 90 ? 'Excellent!' : s >= 80 ? 'Great job!' : s >= 60 ? 'Keep practicing' : 'Try again';
+            const grade = s >= 90 ? 'S' : s >= 80 ? 'A' : s >= 70 ? 'B' : s >= 60 ? 'C' : 'D';
+            const gradeCls = s >= 90 ? 'pixel-badge-s' : s >= 80 ? 'pixel-badge-a' : s >= 70 ? 'pixel-badge-b' : s >= 60 ? 'pixel-badge-c' : 'pixel-badge-d';
             return (
               <div className={`flex items-center gap-4 p-3.5 rounded-xl mb-2 animate-score-pop ${s >= 90 ? 'celebrate-pulse' : ''}`} style={{ background: bg }}>
                 <span className="num font-bold font-display" style={{ fontSize: 32, color, lineHeight: 1 }}>
                   {s}
                   <span style={{ fontSize: 16 }}>%</span>
                 </span>
-                <div>
-                  <div className="font-semibold text-sm" style={{ color }}>{label}</div>
-                  <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Pronunciation accuracy</div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm" style={{ color }}>{label}</span>
+                    <span className={`pixel-badge ${gradeCls}`}>{grade}</span>
+                  </div>
+                  <div className="pixel-bar mt-1.5" style={{ width: '100%' }}>
+                    <div className="pixel-bar-fill" style={{ width: `${s}%` }} />
+                  </div>
                 </div>
               </div>
             );

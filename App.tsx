@@ -519,7 +519,7 @@ const App: React.FC = () => {
         <div className="flex-1 px-6 lg:px-8 relative">
           <main className="max-w-[660px] mx-auto space-y-5 pt-7 pb-16">
             {/* Input Section */}
-            <div className="rounded-xl p-5 card-hover" style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+            <div className="rounded-xl p-5 card-hover" style={{ background: 'var(--surface)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
               {/* Label */}
               <div className="label-micro" style={{ color: 'var(--text-placeholder)', marginBottom: 10 }}>
                 PRACTICE SENTENCE
@@ -710,7 +710,7 @@ const App: React.FC = () => {
               <button
                 onClick={() => { setText(''); setResult(null); setUserAudioBlob(null); setAppState(AppState.IDLE); }}
                 className="w-full py-3.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] animate-fade-in flex items-center justify-center gap-2"
-                style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', color: 'var(--text-secondary)' }}
+                style={{ background: 'var(--surface)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', color: 'var(--text-secondary)' }}
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

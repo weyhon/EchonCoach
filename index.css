@@ -1,1 +1,74 @@
 @import "tailwindcss";
+
+/* ── Global hover/active states for interactive elements ── */
+
+button:not(:disabled):hover {
+  filter: brightness(0.96);
+  transform: translateY(-0.5px);
+}
+button:not(:disabled):active {
+  transform: scale(0.97);
+  transition: transform 100ms ease-out;
+}
+
+/* Smooth transitions for all buttons */
+button {
+  transition: all 200ms ease-out;
+}
+
+/* Links styled as buttons */
+a[class*="rounded-lg"]:hover {
+  filter: brightness(0.96);
+  transform: translateY(-0.5px);
+  transition: all 200ms ease-out;
+}
+
+/* ── Pixel achievement badge ── */
+
+.pixel-badge {
+  font-family: monospace;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  image-rendering: pixelated;
+  border-radius: 2px;
+}
+
+.pixel-badge-s { background: #FFD700; color: #2D2D2D; }
+.pixel-badge-a { background: #E8587A; color: #fff; }
+.pixel-badge-b { background: #006b30; color: #fff; }
+.pixel-badge-c { background: #574144; color: #fff; }
+.pixel-badge-d { background: #ba1a1a; color: #fff; }
+
+/* ── Pixel progress bar (game HP style) ── */
+
+.pixel-bar {
+  height: 8px;
+  background: var(--surface-muted, #f4f3f1);
+  border-radius: 1px;
+  overflow: hidden;
+  image-rendering: pixelated;
+}
+
+.pixel-bar-fill {
+  height: 100%;
+  background: linear-gradient(180deg, #E8587A 40%, #aa284d 60%);
+  transition: width 600ms steps(20);
+  border-radius: 1px;
+}
+
+/* ── Pixel decorative star (CSS-only 8-bit star) ── */
+
+.pixel-star {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  position: relative;
+}
+.pixel-star::before {
+  content: '★';
+  font-size: 14px;
+  color: #FFD700;
+  image-rendering: pixelated;
+}
