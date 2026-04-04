@@ -59,6 +59,8 @@ const App: React.FC = () => {
   const [showMobileHistory, setShowMobileHistory] = useState(false);
   const [showIPALegend, setShowIPALegend] = useState(false);
   const [ttsSpeed, setTtsSpeed] = useState<'normal' | 'slow'>('normal');
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const VOICES = [
     { id: 'Kore', label: 'Kore', desc: 'Firm' },
@@ -135,6 +137,15 @@ const App: React.FC = () => {
     return () => {
       stopSilenceDetection();
     };
+  }, []);
+
+  // Online/offline detection
+  useEffect(() => {
+    const goOnline = () => setIsOffline(false);
+    const goOffline = () => setIsOffline(true);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); };
   }, []);
 
   // Clear TTS cache and persist preference when voice changes
@@ -531,6 +542,20 @@ const App: React.FC = () => {
         </div>
       </header>
 
+      {/* Offline Banner */}
+      {isOffline && (
+        <div className="fixed top-16 left-0 right-0 z-40 flex justify-center animate-fade-in">
+          <div className="px-4 py-2 rounded-b-lg text-xs font-semibold flex items-center gap-2"
+            style={{ background: 'var(--amber-bg)', color: 'var(--amber)' }}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728M5.636 18.364a9 9 0 010-12.728" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 12h.01" />
+            </svg>
+            You're offline — some features won't work
+          </div>
+        </div>
+      )}
+
       {/* Error Toast */}
       {error && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
@@ -825,12 +850,7 @@ const App: React.FC = () => {
                 }
               }
             }}
-            onClear={() => {
-              if (confirm("Clear all practice history?")) {
-                setHistory([]);
-                safeRemoveItem(CACHE_CONFIG.HISTORY_KEY);
-              }
-            }}
+            onClear={() => setShowClearConfirm(true)}
           />
         </aside>
       </div>
@@ -876,13 +896,29 @@ const App: React.FC = () => {
                 const item = history.find(h => h.text.trim().toLowerCase() === t.trim().toLowerCase());
                 if (item?.result) setResult(item.result);
               }}
-              onClear={() => {
-                if (confirm("Clear all practice history?")) {
-                  setHistory([]);
-                  safeRemoveItem(CACHE_CONFIG.HISTORY_KEY);
-                }
-              }}
+              onClear={() => setShowClearConfirm(true)}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Clear History Confirm Dialog */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowClearConfirm(false)}>
+          <div className="rounded-2xl p-6 w-full max-w-xs animate-fade-in-up"
+            style={{ background: 'var(--surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
+            onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Clear all history?</p>
+            <p className="text-xs mb-5" style={{ color: 'var(--text-muted)' }}>This can't be undone.</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setShowClearConfirm(false)}
+                className="px-4 py-2 rounded-lg text-xs font-semibold"
+                style={{ background: 'var(--surface-muted)', color: 'var(--text-secondary)' }}>Cancel</button>
+              <button onClick={() => { setHistory([]); safeRemoveItem(CACHE_CONFIG.HISTORY_KEY); setShowClearConfirm(false); }}
+                className="px-4 py-2 rounded-lg text-xs font-semibold"
+                style={{ background: 'var(--red)', color: '#fff' }}>Clear</button>
+            </div>
           </div>
         </div>
       )}

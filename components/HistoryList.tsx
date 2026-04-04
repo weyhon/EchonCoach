@@ -129,7 +129,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
           return (
             <div
               key={item.id}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors min-h-[48px]"
               style={{ background: isActive ? 'var(--rose-50)' : 'transparent' }}
               onMouseEnter={(e) => {
                 handleMouseEnter(e, item.id);

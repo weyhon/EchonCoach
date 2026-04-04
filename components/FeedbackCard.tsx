@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import { AnalysisResult, WordAnalysis } from '../types';
 import { isYesNoQuestion, getSentenceIntonation } from '../services/linkingUtils';
 import { generateIntonationTokens } from '../services/intonationUtils';
@@ -77,7 +77,7 @@ const SymbolSpan: React.FC<SymbolSpanProps> = ({ token, isLast, firstWord, fullT
   );
 };
 
-export const FeedbackCard: React.FC<FeedbackCardProps> = ({
+export const FeedbackCard: React.FC<FeedbackCardProps> = memo(({
   result, isUpdating, activeAudioSource, onPlayWord, onPlayTutor, playingWord, onPlayUserRecording, hasUserRecording, onRetry
 }) => {
   const [selectedText, setSelectedText] = useState<string | null>(null);
@@ -452,4 +452,4 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
       <IPALegend show={showIPALegend} onClose={() => setShowIPALegend(false)} />
     </section>
   );
-};
+});

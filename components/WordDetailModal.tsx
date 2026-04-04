@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { WordAnalysis } from '../types';
 import { PHONEME_VIDEOS } from '../data/phonemeVideos';
 
@@ -93,6 +93,21 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
   const handleCoachPlay = () => onPlayCoach(item.word);
   const handleYouPlay = () => onPlayUser();
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  // Focus management: capture previous focus, auto-focus dialog, restore on close
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement as HTMLElement;
+    // Small delay to ensure the dialog is rendered
+    requestAnimationFrame(() => {
+      dialogRef.current?.focus();
+    });
+    return () => {
+      previousFocusRef.current?.focus();
+    };
+  }, []);
+
   // Close on Escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -105,7 +120,8 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
       style={{ background: 'rgba(0,0,0,0.15)', backdropFilter: 'blur(8px)' }}
       onClick={onClose}>
       <div className="min-h-full flex items-center justify-center">
-      <div role="dialog" aria-label="Word detail" className="rounded-2xl overflow-hidden w-full max-w-md max-h-[90vh] flex flex-col animate-modal-in my-4"
+      <div ref={dialogRef} role="dialog" aria-label="Word detail" aria-modal="true" tabIndex={-1}
+        className="rounded-2xl overflow-hidden w-full max-w-md max-h-[90vh] flex flex-col animate-modal-in my-4 focus:outline-none"
         style={{ background: 'var(--surface)', boxShadow: '0 8px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)' }}
         onClick={e => e.stopPropagation()}>
 
