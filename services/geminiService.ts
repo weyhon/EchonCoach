@@ -121,111 +121,95 @@ export const generateTutorAudio = async (text: string, voiceName: string = 'Kore
 
 // ── Pronunciation Analysis ──────────────────────────────────────────
 
-const PRONUNCIATION_ANALYSIS_INSTRUCTION = `You are an expert English pronunciation evaluator with deep phonetics knowledge.
+// Slim prompt: scoring only — linking/prosody is merged from cache separately
+const PRONUNCIATION_SCORING_INSTRUCTION = `You are an expert English pronunciation evaluator.
 
-Your task: Listen carefully to the audio and compare EVERY word to the reference sentence. You MUST identify what the learner actually said, even when close to correct.
+Listen to the audio and score EVERY word against the reference sentence.
 
-## MANDATORY FIELDS — never omit these
+## MANDATORY: For EVERY word in wordBreakdown
+- "phoneticUser": REQUIRED — IPA of what the learner actually produced. Copy phoneticCorrect if perfect.
+- "phonemes": REQUIRED when wordScore < 90. Each entry MUST have "userPhoneme" when score < 85.
 
-For EVERY word in wordBreakdown:
-- "phoneticUser": REQUIRED — write what the learner actually produced in IPA.
-  - If perfect: copy phoneticCorrect exactly.
-  - If different: write the actual sounds heard (e.g. "wɛri" instead of "vɛri").
-- "phonemes": REQUIRED for every word with wordScore < 90.
-  - Each phoneme entry MUST include "userPhoneme" when score < 85, even if close.
+## Scoring (0-100)
+- 90-100: all phonemes correct, natural rhythm
+- 75-89: 1-2 minor substitutions, correct stress
+- 60-74: noticeable errors, some stress issues
+- 40-59: frequent errors affecting clarity
+- 0-39: most phonemes wrong
 
-## Scoring Rubric (0-100)
+## Focus: /æ/ɛ/, /ɪ/iː/, /θ/ð/→/s/z/, /r/l/, /v/w/, dropped final consonants, stress placement
 
-### 90-100: Excellent — all phonemes correct, natural rhythm, proper linking
-### 75-89: Good — 1-2 minor substitutions, correct stress, slight accent
-### 60-74: Fair — noticeable errors, some stress issues, choppy rhythm
-### 40-59: Needs Work — frequent errors affecting clarity, wrong stress
-### 0-39: Significant — most phonemes wrong, very hard to understand
+## Status: "correct" | "needs_improvement" | "incorrect"
 
-## Focus Areas
-
-1. **Vowels**: /æ/ vs /ɛ/, /ɪ/ vs /iː/, /ʊ/ vs /uː/, /ɑː/ vs /ʌ/, /ɜːr/ vs /ɔ/
-2. **Consonants**: /θ/ /ð/ (often → /s/ /z/ or /t/ /d/), /r/ vs /l/, /v/ vs /w/ or /b/
-3. **Final consonants**: dropped /t/ /d/ /s/ /z/ at word endings
-4. **Stress**: primary stress on content words, weak forms for function words
-5. **Intonation & linking**: rising yes/no questions, falling statements
-6. **Common L2 errors**: adding vowels between consonant clusters, shortening long vowels
-
-## Word Status
-
-- "correct": sounds accurate, stress right — phoneticUser still REQUIRED
-- "needs_improvement": understandable but noticeable issues
-- "incorrect": phoneme substitution that obscures the word
-
-## Output Format (strict JSON — no markdown, no extra text)
-
+## JSON Output (no markdown):
 {
   "score": <0-100>,
-  "overallComment": "<1-2 sentences: most impactful improvement the learner can make>",
-  "speechScript": "<exact reference text>",
+  "overallComment": "<1 sentence: most impactful tip>",
+  "speechScript": "<exact reference>",
   "wordBreakdown": [
     {
       "word": "<word>",
-      "status": "correct" | "needs_improvement" | "incorrect",
-      "phoneticCorrect": "<correct IPA, no stress marks>",
-      "phoneticUser": "<REQUIRED: what learner actually produced in IPA>",
+      "status": "<status>",
+      "phoneticCorrect": "<correct IPA>",
+      "phoneticUser": "<REQUIRED: learner IPA>",
       "wordScore": <0-100>,
-      "phonemes": [
-        {
-          "phoneme": "<correct phoneme>",
-          "score": <0-100>,
-          "userPhoneme": "<REQUIRED when score < 85: what learner produced>"
-        }
-      ],
-      "suggestion": "<physical tip: tongue position, lip shape, airflow — empty string if correct>"
+      "phonemes": [{ "phoneme": "<correct>", "score": <0-100>, "userPhoneme": "<learner>" }],
+      "suggestion": "<tip or empty>"
     }
+  ]
+}
+
+CRITICAL: Be honest. phoneticUser is NEVER optional. Silent/unintelligible = score 0.`;
+
+// Full prompt: includes linking/prosody fields (used when no cache available)
+const PRONUNCIATION_FULL_INSTRUCTION = `${PRONUNCIATION_SCORING_INSTRUCTION.replace(
+  '## JSON Output (no markdown):',
+  '## JSON Output (no markdown) — include linking fields:'
+).replace(
+  `    }
+  ]
+}`,
+  `    }
   ],
   "fullLinkedSentence": "<reference with ‿ linking>",
   "fullLinkedPhonetic": "<IPA with ˈ on content words, . at linking points>",
   "intonationMap": "<space-separated ● · tokens, last token has ↗ or ↘>"
-}
+}`
+)}`;
 
-CRITICAL:
-- Be honest, not flattering. Do not inflate scores.
-- phoneticUser is NEVER optional. Always fill it in.
-- If audio is silent or unintelligible, return score 0.`;
-
-const ANALYSIS_MODELS = ["gemini-3.1-pro-preview", "gemini-3-flash-preview"] as const;
+// Flash model only — pronunciation scoring doesn't need pro-level reasoning
+const ANALYSIS_MODEL = "gemini-3-flash-preview";
 
 export const analyzePronunciation = async (
   referenceText: string,
-  userAudioBase64: string
+  userAudioBase64: string,
+  /** When true, omit linking/prosody fields from prompt for faster response */
+  slim = false,
 ): Promise<AnalysisResult> => {
+  const t0 = performance.now();
   if (USE_PROXY) {
-    return proxyPost('analyze', { referenceText, audioBase64: userAudioBase64 });
+    const result = await proxyPost('analyze', { referenceText, audioBase64: userAudioBase64, slim });
+    console.log(`[perf] analyzePronunciation: ${((performance.now() - t0) / 1000).toFixed(1)}s (proxy, slim=${slim})`);
+    return result;
   }
 
-  let lastError: any;
-  for (const model of ANALYSIS_MODELS) {
-    try {
-      console.log(`Trying pronunciation analysis with ${model}...`);
-      const response = await ai!.models.generateContent({
-        model,
-        contents: {
-          parts: [
-            { inlineData: { mimeType: "audio/webm", data: userAudioBase64 } },
-            { text: `Reference sentence: "${referenceText}"\n\nListen to my recording and evaluate my pronunciation of this sentence. Score each word individually and provide overall feedback.` }
-          ]
-        },
-        config: {
-          systemInstruction: PRONUNCIATION_ANALYSIS_INSTRUCTION,
-          responseMimeType: "application/json",
-        }
-      });
-      const text = response.text || "{}";
-      console.log(`Analysis succeeded with ${model}`);
-      return JSON.parse(text.replace(/```json|```/g, '').trim());
-    } catch (error) {
-      console.error(`${model} failed:`, error);
-      lastError = error;
+  const instruction = slim ? PRONUNCIATION_SCORING_INSTRUCTION : PRONUNCIATION_FULL_INSTRUCTION;
+  const response = await ai!.models.generateContent({
+    model: ANALYSIS_MODEL,
+    contents: {
+      parts: [
+        { inlineData: { mimeType: "audio/webm", data: userAudioBase64 } },
+        { text: `Reference sentence: "${referenceText}"\n\nEvaluate my pronunciation. Score each word.` }
+      ]
+    },
+    config: {
+      systemInstruction: instruction,
+      responseMimeType: "application/json",
     }
-  }
-  throw lastError;
+  });
+  const text = response.text || "{}";
+  console.log(`[perf] analyzePronunciation: ${((performance.now() - t0) / 1000).toFixed(1)}s (direct, slim=${slim})`);
+  return JSON.parse(text.replace(/```json|```/g, '').trim());
 };
 
 // ── Linking / Prosody Analysis ──────────────────────────────────────

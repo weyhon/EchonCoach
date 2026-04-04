@@ -481,22 +481,46 @@ const App: React.FC = () => {
 
         // Start analysis in parallel with playback
         setAppState(AppState.ANALYZING);
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const base64 = (reader.result as string).split(',')[1];
-          try {
-            const res = await analyzePronunciation(text, base64);
-            setResult(res);
-            setAppState(AppState.SHOWING_RESULT);
-            lruSet(recordingCache, text, res, MAX_RESULT_CACHE);
-            saveToHistory(text, res);
-          } catch (err: any) {
-            console.error("Recording evaluation failure", err);
-            showError(err?.message || "Analysis failed. Please try again.");
-            setAppState(AppState.IDLE);
+        try {
+          // Fast base64 conversion via arrayBuffer (no FileReader callback overhead)
+          const buffer = await audioBlob.arrayBuffer();
+          const bytes = new Uint8Array(buffer);
+          let binary = '';
+          for (let i = 0; i < bytes.length; i += 8192) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
           }
-        };
-        reader.readAsDataURL(audioBlob);
+          const base64 = btoa(binary);
+
+          // Use slim mode when linking data is already cached (skip redundant token generation)
+          const hasLinkingCache = referenceCache.has(text);
+          const res = await analyzePronunciation(text, base64, hasLinkingCache);
+
+          // Merge linking/prosody data from reference cache if slim response
+          if (hasLinkingCache && !res.fullLinkedSentence) {
+            const cached = referenceCache.get(text)!;
+            res.fullLinkedSentence = cached.fullLinkedSentence;
+            res.fullLinkedPhonetic = cached.fullLinkedPhonetic;
+            res.intonationMap = cached.intonationMap;
+          }
+
+          setResult(res);
+          setAppState(AppState.SHOWING_RESULT);
+          lruSet(recordingCache, text, res, MAX_RESULT_CACHE);
+          saveToHistory(text, res);
+
+          // If no linking data yet, fetch it in background and update
+          if (!res.fullLinkedSentence) {
+            getLinkingAnalysisForText(text).then(linking => {
+              const enriched = { ...res, ...linking };
+              setResult(enriched);
+              lruSet(recordingCache, text, enriched, MAX_RESULT_CACHE);
+            }).catch(() => {});
+          }
+        } catch (err: any) {
+          console.error("Recording evaluation failure", err);
+          showError(err?.message || "Analysis failed. Please try again.");
+          setAppState(AppState.IDLE);
+        }
       };
       mediaRecorder.start();
       setAppState(AppState.RECORDING);
