@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Modality } from "@google/genai";
 import { AnalysisResult } from "../types";
+import { API_CONFIG } from "../config/constants";
 import { shouldLink } from "./linkingUtils";
 import {
   isPhoneticComplete,
@@ -22,32 +23,47 @@ if (!USE_PROXY) {
   ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
 }
 
-// ── Proxy fetch helper ──────────────────────────────────────────────
+// ── Proxy fetch helper with retry ──────────────────────────────────
 async function proxyPost(endpoint: string, body: Record<string, any>, timeoutMs = 25000): Promise<any> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(`/api/${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(err.error || `API ${endpoint} failed (${res.status})`);
+  let lastError: any;
+  for (let attempt = 0; attempt < API_CONFIG.RETRY_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(`/api/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        const status = res.status;
+        // Don't retry on 4xx client errors (bad request, auth, rate limit)
+        if (status >= 400 && status < 500) {
+          throw new Error(err.error || `API ${endpoint} failed (${status})`);
+        }
+        // 5xx server errors — retry
+        throw new Error(err.error || `API ${endpoint} server error (${status})`);
+      }
+      return res.json();
+    } catch (e: any) {
+      lastError = e;
+      if (e.name === 'AbortError') {
+        lastError = new Error('Request timed out. Please try again.');
+        (lastError as any).code = 'REQUEST_TIMEOUT';
+      }
+      // Don't retry on client errors or if last attempt
+      if ((e.message && /4\d{2}/.test(e.message)) || attempt === API_CONFIG.RETRY_ATTEMPTS - 1) {
+        break;
+      }
+      // Wait before retry with exponential backoff
+      await new Promise(r => setTimeout(r, API_CONFIG.RETRY_DELAY * (attempt + 1)));
+    } finally {
+      clearTimeout(timer);
     }
-    return res.json();
-  } catch (e: any) {
-    if (e.name === 'AbortError') {
-      const err = new Error('Request timed out. Please try again.');
-      (err as any).code = 'REQUEST_TIMEOUT';
-      throw err;
-    }
-    throw e;
-  } finally {
-    clearTimeout(timer);
   }
+  throw lastError;
 }
 
 // ── TTS ─────────────────────────────────────────────────────────────

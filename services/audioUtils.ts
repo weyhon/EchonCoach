@@ -69,14 +69,9 @@ const stopCurrentAudio = () => {
     }
   }
 
-  if (currentAudioContext) {
-    try {
-      currentAudioContext.close();
-      currentAudioContext = null;
-    } catch (e) {
-      console.warn("Error closing audio context:", e);
-    }
-  }
+  // Don't close AudioContext here — just clear the reference.
+  // The global singleton context is reused and only closed on app unmount.
+  currentAudioContext = null;
 };
 
 export const decodePCM = (
@@ -137,10 +132,9 @@ export const playPCMAudio = async (base64Audio: string): Promise<void> => {
       source.connect(audioContext.destination);
 
       source.onended = () => {
-        console.log("PCM playback ended");
         currentAudioSource = null;
         currentAudioContext = null;
-        audioContext.close();
+        // Don't close the global AudioContext — it's reused across playbacks
         resolve();
       };
 

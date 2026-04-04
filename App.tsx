@@ -12,6 +12,18 @@ import { AnalysisResult, AppState, HistoryItem } from './types';
 import { CACHE_CONFIG, UI_CONFIG, SILENCE_DETECTION } from './config/constants';
 import { safeGetJSON, safeSetJSON, safeRemoveItem } from './services/storageUtils';
 
+// LRU-style cache: evict oldest entries when over limit to prevent unbounded memory growth
+const MAX_TTS_CACHE = 20;  // ~20 * 50KB = ~1MB max
+const MAX_RESULT_CACHE = 50;
+
+function lruSet<K, V>(map: Map<K, V>, key: K, value: V, limit: number) {
+  if (map.size >= limit) {
+    const oldest = map.keys().next().value;
+    if (oldest !== undefined) map.delete(oldest);
+  }
+  map.set(key, value);
+}
+
 const ttsCache = new Map<string, string>();
 const referenceCache = new Map<string, AnalysisResult>(); // For playAndAnalyze (linking/phonetics, score=0)
 const recordingCache = new Map<string, AnalysisResult>(); // For recording evaluation (has real score)
@@ -54,7 +66,9 @@ const App: React.FC = () => {
     { id: 'Charon', label: 'Charon', desc: 'Informative' },
     { id: 'Aoede', label: 'Aoede', desc: 'Breezy' },
   ] as const;
-  const [selectedVoice, setSelectedVoice] = useState('Kore');
+  const [selectedVoice, setSelectedVoice] = useState(() => {
+    try { return localStorage.getItem('echocoach_voice') || 'Kore'; } catch { return 'Kore'; }
+  });
 
   const showError = (message: string) => {
     setError(message);
@@ -65,8 +79,8 @@ const App: React.FC = () => {
     const parsed = safeGetJSON<HistoryItem[]>(CACHE_CONFIG.HISTORY_KEY, []);
     // Populate caches from history
     parsed.forEach(h => {
-      if (h.result && h.result.score > 0) recordingCache.set(h.text, h.result);
-      else if (h.result) referenceCache.set(h.text, h.result);
+      if (h.result && h.result.score > 0) lruSet(recordingCache, h.text, h.result, MAX_RESULT_CACHE);
+      else if (h.result) lruSet(referenceCache, h.text, h.result, MAX_RESULT_CACHE);
     });
     return parsed;
   });
@@ -86,7 +100,7 @@ const App: React.FC = () => {
 
       // Safely save to localStorage (handles quota exceeded, disabled storage, etc.)
       if (!safeSetJSON(CACHE_CONFIG.HISTORY_KEY, updated)) {
-        console.warn('Failed to save history to localStorage, keeping in memory only');
+        showError('Storage full — history kept in memory only. Clear old entries to save.');
       }
 
       return updated;
@@ -123,9 +137,10 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Clear TTS cache when voice changes — cached audio is voice-specific
+  // Clear TTS cache and persist preference when voice changes
   useEffect(() => {
     ttsCache.clear();
+    try { localStorage.setItem('echocoach_voice', selectedVoice); } catch {}
   }, [selectedVoice]);
 
   // Keyboard shortcuts: Enter=Listen, Space=Play, S=Slow, R=Record/Stop
@@ -201,7 +216,7 @@ const App: React.FC = () => {
       setActiveAudioSource('tutor_loading');
       try {
         const base64 = await generateTutorAudio(selectedText, selectedVoice);
-        ttsCache.set(cacheKey, base64);
+        lruSet(ttsCache, cacheKey, base64, MAX_TTS_CACHE);
         await playAudio(base64, 'tutor');
       } catch (e) {
         console.error("Tutor playback error", e);
@@ -230,7 +245,7 @@ const App: React.FC = () => {
       setActiveAudioSource(sourceKey);
       try {
         const base64 = await generateSpeech(textToSpeak, isSlow, selectedVoice);
-        ttsCache.set(cacheKey, base64);
+        lruSet(ttsCache, cacheKey, base64, MAX_TTS_CACHE);
         await playAudio(base64, sourceKey);
       } catch (e: any) {
         console.error("TTS playback error", e);
@@ -292,7 +307,7 @@ const App: React.FC = () => {
       intonationMap
     };
     setResult(localRes);
-    referenceCache.set(textToSpeak, localRes);
+    lruSet(referenceCache, textToSpeak, localRes, MAX_RESULT_CACHE);
     saveToHistory(textToSpeak, localRes);
     setAppState(AppState.SHOWING_RESULT);
 
@@ -314,12 +329,12 @@ const App: React.FC = () => {
           intonationMap: linking.intonationMap
         };
         setResult(enrichedRes);
-        referenceCache.set(textToSpeak, enrichedRes);
+        lruSet(referenceCache, textToSpeak, enrichedRes, MAX_RESULT_CACHE);
       }
 
       if (ttsResult.status === 'fulfilled') {
         const base64 = ttsResult.value;
-        ttsCache.set(`${textToSpeak}_normal`, base64);
+        lruSet(ttsCache, `${textToSpeak}_normal`, base64, MAX_TTS_CACHE);
         setIsAudioLoading(false);
         await playAudio(base64, 'input_normal');
       } else {
@@ -427,6 +442,8 @@ const App: React.FC = () => {
 
   const startRecording = async () => {
     try {
+      // Dismiss mobile keyboard to avoid UI shift during recording
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
       const ctx = await ensureAudioContext();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setActiveStream(stream);
@@ -460,7 +477,7 @@ const App: React.FC = () => {
             const res = await analyzePronunciation(text, base64);
             setResult(res);
             setAppState(AppState.SHOWING_RESULT);
-            recordingCache.set(text, res);
+            lruSet(recordingCache, text, res, MAX_RESULT_CACHE);
             saveToHistory(text, res);
           } catch (err: any) {
             console.error("Recording evaluation failure", err);
@@ -574,6 +591,8 @@ const App: React.FC = () => {
                     <button
                       onClick={() => { result ? handlePlayTTS(text, ttsSpeed === 'slow') : playAndAnalyze(text); }}
                       disabled={!text.trim() || isBusy || appState === AppState.RECORDING || appState === AppState.ANALYZING}
+                      aria-label={appState === AppState.GENERATING_TTS ? 'Loading audio' : 'Play reference pronunciation'}
+                      title="Play reference (Space)"
                       className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-60"
                       style={{ background: isBusy ? 'var(--rose-50)' : 'var(--rose)', color: isBusy ? 'var(--rose)' : '#fff', border: isBusy ? '1.5px solid var(--rose)' : 'none' }}>
                       {isBusy ? (
@@ -615,6 +634,8 @@ const App: React.FC = () => {
                 {/* Record */}
                 {appState !== AppState.RECORDING ? (
                   <button onClick={startRecording} disabled={!text.trim() || appState === AppState.ANALYZING || appState === AppState.GENERATING_TTS}
+                    aria-label="Record your pronunciation"
+                    title="Record (R)"
                     className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
                     style={{ background: 'var(--surface-muted)', color: 'var(--text-secondary)' }}>
                     <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2H3v2a9 9 0 0 0 8 8.94V23h2v-2.06A9 9 0 0 0 21 12v-2h-2z"/></svg>
@@ -622,6 +643,8 @@ const App: React.FC = () => {
                   </button>
                 ) : (
                   <button onClick={() => mediaRecorderRef.current?.stop()}
+                    aria-label="Stop recording"
+                    title="Stop recording (R)"
                     className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold"
                     style={{ background: 'var(--text-primary)', color: 'var(--surface)', border: 'none' }}>
                     <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--surface)', display: 'inline-block' }} />
@@ -641,6 +664,7 @@ const App: React.FC = () => {
                       audio.onerror = () => { setActiveAudioSource(null); };
                       audio.play().catch(() => setActiveAudioSource(null));
                     }}
+                    aria-label="Replay your recording"
                     className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
                     style={{ color: activeAudioSource === 'user_playback' ? 'var(--rose)' : 'var(--text-secondary)', background: activeAudioSource === 'user_playback' ? 'var(--rose-50)' : 'var(--surface-muted)' }}
                   >
@@ -789,7 +813,7 @@ const App: React.FC = () => {
                     const linking = await getLinkingAnalysisForText(t);
                     const fixedResult = { ...item.result, fullLinkedSentence: linking.fullLinkedSentence, fullLinkedPhonetic: linking.fullLinkedPhonetic, intonationMap: linking.intonationMap };
                     setResult(fixedResult);
-                    referenceCache.set(t, fixedResult);
+                    lruSet(referenceCache, t, fixedResult, MAX_RESULT_CACHE);
                     const newHistory = history.map(h => h.text.trim().toLowerCase() === t.trim().toLowerCase() ? { ...h, result: fixedResult } : h);
                     setHistory(newHistory);
                     safeSetJSON(CACHE_CONFIG.HISTORY_KEY, newHistory);

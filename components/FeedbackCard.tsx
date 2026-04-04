@@ -209,16 +209,16 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
       >
           <div className="flex flex-col items-center w-full z-10 pb-10">
             {/* Section label */}
-            <div className="self-stretch mb-3 px-3 py-1.5 rounded-lg flex items-center gap-2" style={{ backgroundColor: 'rgba(232,88,122,0.07)' }}>
-              <svg className="w-3 h-3 shrink-0" style={{ color: 'var(--pink)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="self-stretch mb-3 px-3 py-1.5 rounded-lg flex items-center gap-2" style={{ backgroundColor: 'var(--surface-muted)' }}>
+              <svg className="w-3 h-3 shrink-0" style={{ color: 'var(--text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5.586V18.414a1 1 0 01-1.707.707L5.586 15z" />
               </svg>
-              <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--pink)' }}>Intonation & Linking</span>
+              <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Intonation & Linking</span>
             </div>
             {/* Phonics at top */}
             {result.fullLinkedPhonetic && (
               <div className="mb-3 flex flex-col items-center gap-1.5">
-                <div className="px-4 py-1.5 rounded-full" style={{ backgroundColor: 'var(--pink-dim)' }}>
+                <div className="px-4 py-1.5 rounded-full" style={{ backgroundColor: 'var(--surface-muted)' }}>
                   <p className="text-[12px] md:text-[14px] font-medium tracking-[0.06em] font-mono select-none pointer-events-none text-center leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                     /{result.fullLinkedPhonetic.split('ˈ').map((part, i) =>
                       i === 0
@@ -376,7 +376,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
                     <span className={`pixel-badge ${gradeCls}`}>{grade}</span>
                   </div>
                   <div className="pixel-bar mt-1.5" style={{ width: '100%' }}>
-                    <div className="pixel-bar-fill" style={{ width: `${s}%` }} />
+                    <div className="pixel-bar-fill" style={{ width: `${s}%`, background: color }} />
                   </div>
                 </div>
               </div>
