@@ -458,7 +458,10 @@ const App: React.FC = () => {
       const ctx = await ensureAudioContext();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setActiveStream(stream);
-      const mediaRecorder = new MediaRecorder(stream);
+      // Lower bitrate (32kbps) — sufficient for speech analysis, ~75% smaller upload
+      const recorderOptions: MediaRecorderOptions = { audioBitsPerSecond: 32000 };
+      try { recorderOptions.mimeType = 'audio/webm;codecs=opus'; } catch {}
+      const mediaRecorder = new MediaRecorder(stream, recorderOptions);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
       mediaRecorder.ondataavailable = (e) => audioChunksRef.current.push(e.data);
