@@ -36,10 +36,19 @@ npm run preview
 - History persisted to `localStorage` (`echocoach_history_v3`) with 50-item limit
 
 ### Audio Pipeline
-1. **Recording**: MediaRecorder API captures audio as webm blob
-2. **TTS**: MiniMax API (`speech-2.8-turbo` model) returns hex-encoded audio
+1. **Recording**: MediaRecorder API captures audio as webm blob (32kbps Opus)
+2. **TTS**: Gemini TTS returns PCM audio
 3. **Playback**: Base64 MP3 played via HTML5 Audio API
-4. **Fallback chain**: MiniMax TTS → Web Speech API (browser native)
+4. **Fallback chain**: Gemini TTS → Web Speech API (browser native)
+
+### Pronunciation Scoring (dual-engine)
+- **Primary: Azure Speech** — dedicated acoustic model, phoneme-level IPA scoring, ~1-2s
+  - webm→WAV conversion via OfflineAudioContext (16kHz mono)
+  - REST API with token proxy (api/speech-token.ts)
+  - Falls back to Gemini if Azure key not configured
+- **Secondary: Gemini Flash** — generates coaching tips (overallComment, suggestion) asynchronously
+  - Only used for natural language feedback, not scoring
+  - Runs in background after Azure scores are shown
 
 ### AI Integration (MiniMax)
 All AI features use MiniMax API with multi-base-URL fallback:
@@ -71,6 +80,14 @@ Create `.env.local` file:
 VITE_MINIMAX_API_KEY=your_key_here
 VITE_MINIMAX_GROUP_ID=your_group_id
 VITE_MINIMAX_BASE_URL=https://api.minimax.chat/v1  # optional custom base URL
+
+# Azure Speech (optional — enables fast pronunciation scoring via dedicated ASR)
+VITE_AZURE_SPEECH_KEY=your_azure_speech_key
+VITE_AZURE_SPEECH_REGION=eastasia   # pick region closest to your users
+
+# For Vercel deployment, set server-side vars (used by api/speech-token.ts):
+# AZURE_SPEECH_KEY=your_azure_speech_key
+# AZURE_SPEECH_REGION=eastasia
 ```
 
 ## File Organization

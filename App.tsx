@@ -5,6 +5,7 @@ import { HistoryList } from './components/HistoryList';
 import { NebulaLogo } from './components/NebulaLogo';
 import { generateSpeech, analyzePronunciation, getLinkingAnalysisForText, generateTutorAudio } from './services/geminiService';
 import { playBase64Audio, speakWithWebSpeech, cleanupAudioResources } from './services/audioUtils';
+import { azurePronunciationScore, isAzureSpeechAvailable } from './services/azureSpeechService';
 import { shouldLink } from './services/linkingUtils';
 import { generateIntonationMap } from './services/intonationUtils';
 import { IPALegend } from './components/IPALegend';
@@ -485,21 +486,63 @@ const App: React.FC = () => {
         // Start analysis in parallel with playback
         setAppState(AppState.ANALYZING);
         try {
-          // Fast base64 conversion via arrayBuffer (no FileReader callback overhead)
-          const buffer = await audioBlob.arrayBuffer();
-          const bytes = new Uint8Array(buffer);
-          let binary = '';
-          for (let i = 0; i < bytes.length; i += 8192) {
-            binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+          let res: AnalysisResult;
+
+          if (isAzureSpeechAvailable()) {
+            // ── Azure path: dedicated acoustic model (~1-2s) ──
+            res = await azurePronunciationScore(text, audioBlob);
+
+            // Enrich with Gemini coaching tips asynchronously (non-blocking)
+            const enrichWithGemini = async () => {
+              try {
+                const buffer = await audioBlob.arrayBuffer();
+                const bytes = new Uint8Array(buffer);
+                let binary = '';
+                for (let i = 0; i < bytes.length; i += 8192) {
+                  binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+                }
+                const base64 = btoa(binary);
+                const geminiRes = await analyzePronunciation(text, base64, true);
+                // Only take coaching fields from Gemini, keep Azure's accurate scores
+                if (geminiRes.overallComment) {
+                  res.overallComment = geminiRes.overallComment;
+                  // Merge per-word suggestions from Gemini where Azure had none
+                  geminiRes.wordBreakdown?.forEach(gw => {
+                    const match = res.wordBreakdown.find(w => w.word.toLowerCase() === gw.word.toLowerCase());
+                    if (match && !match.suggestion && gw.suggestion) {
+                      match.suggestion = gw.suggestion;
+                    }
+                  });
+                  setResult({ ...res });
+                  lruSet(recordingCache, text, res, MAX_RESULT_CACHE);
+                }
+              } catch { /* Gemini enrichment is optional */ }
+            };
+            enrichWithGemini();
+
+          } else {
+            // ── Gemini fallback: LLM-based analysis ──
+            const buffer = await audioBlob.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i += 8192) {
+              binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+            }
+            const base64 = btoa(binary);
+            const hasLinkingCache = referenceCache.has(text);
+            res = await analyzePronunciation(text, base64, hasLinkingCache);
+
+            // Merge linking data from cache if slim
+            if (hasLinkingCache && !res.fullLinkedSentence) {
+              const cached = referenceCache.get(text)!;
+              res.fullLinkedSentence = cached.fullLinkedSentence;
+              res.fullLinkedPhonetic = cached.fullLinkedPhonetic;
+              res.intonationMap = cached.intonationMap;
+            }
           }
-          const base64 = btoa(binary);
 
-          // Use slim mode when linking data is already cached (skip redundant token generation)
-          const hasLinkingCache = referenceCache.has(text);
-          const res = await analyzePronunciation(text, base64, hasLinkingCache);
-
-          // Merge linking/prosody data from reference cache if slim response
-          if (hasLinkingCache && !res.fullLinkedSentence) {
+          // Merge linking/prosody from reference cache
+          if (!res.fullLinkedSentence && referenceCache.has(text)) {
             const cached = referenceCache.get(text)!;
             res.fullLinkedSentence = cached.fullLinkedSentence;
             res.fullLinkedPhonetic = cached.fullLinkedPhonetic;
@@ -511,7 +554,7 @@ const App: React.FC = () => {
           lruSet(recordingCache, text, res, MAX_RESULT_CACHE);
           saveToHistory(text, res);
 
-          // If no linking data yet, fetch it in background and update
+          // If no linking data yet, fetch in background
           if (!res.fullLinkedSentence) {
             getLinkingAnalysisForText(text).then(linking => {
               const enriched = { ...res, ...linking };
