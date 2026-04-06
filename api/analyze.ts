@@ -70,7 +70,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!referenceText || !audioBase64) return res.status(400).json({ error: 'Missing referenceText or audioBase64' });
 
     const instruction = slim ? PRONUNCIATION_SCORING_INSTRUCTION : PRONUNCIATION_FULL_INSTRUCTION;
-    const t0 = Date.now();
     const response = await ai.models.generateContent({
       model: ANALYSIS_MODEL,
       contents: {
@@ -86,7 +85,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
     const text = response.text || '{}';
     const result = JSON.parse(text.replace(/```json|```/g, '').trim());
-    console.log(`[perf] analyze: ${Date.now() - t0}ms (slim=${!!slim})`);
     return res.status(200).json(result);
   } catch (error: any) {
     console.error('Analysis Error:', error);

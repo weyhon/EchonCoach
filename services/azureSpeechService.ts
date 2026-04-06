@@ -35,7 +35,7 @@ async function getAuthToken(): Promise<{ token: string; region: string }> {
     return cachedToken;
   }
 
-  const res = await fetch('/api/speech-token');
+  const res = await fetch('/api/speech-token', { method: 'POST' });
   if (!res.ok) throw new Error('Failed to get speech token');
   const data = await res.json();
   cachedToken = { ...data, expires: Date.now() + 8 * 60 * 1000 }; // cache 8 min (token lasts 10)
@@ -271,7 +271,9 @@ function generateOverallComment(score: number, words: WordAnalysis[]): string {
 
 // ── Feature detection ───────────────────────────────────────────────
 
-/** Check if Azure Speech is configured (either direct key or proxy available) */
+/** Check if Azure Speech is configured (either direct key or explicitly enabled proxy) */
 export function isAzureSpeechAvailable(): boolean {
-  return !!AZURE_KEY || USE_TOKEN_PROXY;
+  if (AZURE_KEY) return true;
+  // Only use token proxy if explicitly enabled — the server may not have AZURE_SPEECH_KEY
+  return !!import.meta.env.VITE_AZURE_ENABLED;
 }

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, memo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AnalysisResult, WordAnalysis } from '../types';
 import { IPALegend } from './IPALegend';
 import { WordDetailModal } from './WordDetailModal';
@@ -23,7 +23,7 @@ const statusBg = (s: WordAnalysis['status']) =>
 const statusColor = (s: WordAnalysis['status']) =>
   s === 'correct' ? 'var(--green)' : s === 'incorrect' ? 'var(--red)' : 'var(--amber)';
 
-export const FeedbackCard: React.FC<FeedbackCardProps> = memo(({
+export const FeedbackCard: React.FC<FeedbackCardProps> = ({
   result, isUpdating, activeAudioSource, onPlayWord, onPlayTutor, playingWord, onPlayUserRecording, hasUserRecording, onRetry
 }) => {
   const [selectedText, setSelectedText] = useState<string | null>(null);
@@ -331,4 +331,4 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = memo(({
       <IPALegend show={showIPALegend} onClose={() => setShowIPALegend(false)} />
     </section>
   );
-});
+};

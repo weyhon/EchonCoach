@@ -17,6 +17,15 @@ import { safeGetJSON, safeSetJSON, safeRemoveItem } from './services/storageUtil
 const MAX_TTS_CACHE = 20;  // ~20 * 50KB = ~1MB max
 const MAX_RESULT_CACHE = 50;
 
+function lruGet<K, V>(map: Map<K, V>, key: K): V | undefined {
+  const value = map.get(key);
+  if (value !== undefined) {
+    map.delete(key);
+    map.set(key, value);
+  }
+  return value;
+}
+
 function lruSet<K, V>(map: Map<K, V>, key: K, value: V, limit: number) {
   if (map.size >= limit) {
     const oldest = map.keys().next().value;
@@ -117,6 +126,7 @@ const App: React.FC = () => {
   const silenceTimerRef = useRef<number | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mediaSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const enrichAbortRef = useRef<AbortController | null>(null);
 
   // Cleanup audio resources when stream/blob changes
   useEffect(() => {
@@ -224,7 +234,7 @@ const App: React.FC = () => {
     }, 15000);
     try {
       const cacheKey = `tutor_${selectedText}`;
-      const cached = ttsCache.get(cacheKey);
+      const cached = lruGet(ttsCache, cacheKey);
       if (cached && cached.length > UI_CONFIG.MIN_BASE64_LENGTH) {
         await playAudio(cached, 'tutor');
         return;
@@ -253,7 +263,7 @@ const App: React.FC = () => {
     try {
       const cacheKey = `${textToSpeak}_${isSlow ? 'slow' : 'normal'}`;
       const sourceKey = isSlow ? 'input_slow' : 'input_normal';
-      const cached = ttsCache.get(cacheKey);
+      const cached = lruGet(ttsCache, cacheKey);
       if (cached && cached.length > UI_CONFIG.MIN_BASE64_LENGTH) {
         await playAudio(cached, sourceKey);
         return;
@@ -295,10 +305,10 @@ const App: React.FC = () => {
     if (!textToSpeak.trim()) return;
 
     // Check reference cache first (linking/phonetics analysis)
-    const cachedRef = referenceCache.get(textToSpeak);
+    const cachedRef = lruGet(referenceCache, textToSpeak);
     if (cachedRef) {
       // If user has a recording result, merge linking data with it
-      const cachedRecording = recordingCache.get(textToSpeak);
+      const cachedRecording = lruGet(recordingCache, textToSpeak);
       setResult(cachedRecording || cachedRef);
       setAppState(AppState.SHOWING_RESULT);
       await handlePlayTTS(textToSpeak, false);
@@ -460,6 +470,8 @@ const App: React.FC = () => {
 
   const startRecording = async () => {
     try {
+      // Cancel any pending Gemini enrichment from a previous recording
+      enrichAbortRef.current?.abort();
       // Dismiss mobile keyboard to avoid UI shift during recording
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
       const ctx = await ensureAudioContext();
@@ -496,11 +508,36 @@ const App: React.FC = () => {
 
           if (isAzureSpeechAvailable()) {
             // ── Azure path: dedicated acoustic model (~1-2s) ──
-            res = await azurePronunciationScore(text, audioBlob);
+            try {
+              res = await azurePronunciationScore(text, audioBlob);
+            } catch (azureErr) {
+              // Azure failed — fall back to Gemini
+              console.warn('Azure scoring failed, falling back to Gemini:', azureErr);
+              const buffer = await audioBlob.arrayBuffer();
+              const bytes = new Uint8Array(buffer);
+              let binary = '';
+              for (let i = 0; i < bytes.length; i += 8192) {
+                binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+              }
+              const base64 = btoa(binary);
+              const hasLinkingCache = referenceCache.has(text);
+              res = await analyzePronunciation(text, base64, hasLinkingCache);
+              if (hasLinkingCache && !res.fullLinkedSentence) {
+                const cached = lruGet(referenceCache, text)!;
+                res.fullLinkedSentence = cached.fullLinkedSentence;
+                res.fullLinkedPhonetic = cached.fullLinkedPhonetic;
+                res.intonationMap = cached.intonationMap;
+              }
+            }
 
             // Enrich with Gemini coaching tips asynchronously (non-blocking)
+            const capturedText = text; // capture before async to avoid stale closure
+            const capturedRes = res; // snapshot for enrichment
+            const controller = new AbortController();
+            enrichAbortRef.current = controller;
             const enrichWithGemini = async () => {
               try {
+                if (controller.signal.aborted) return;
                 const buffer = await audioBlob.arrayBuffer();
                 const bytes = new Uint8Array(buffer);
                 let binary = '';
@@ -508,19 +545,20 @@ const App: React.FC = () => {
                   binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
                 }
                 const base64 = btoa(binary);
-                const geminiRes = await analyzePronunciation(text, base64, true);
+                const geminiRes = await analyzePronunciation(capturedText, base64, true);
+                if (controller.signal.aborted) return;
                 // Only take coaching fields from Gemini, keep Azure's accurate scores
                 if (geminiRes.overallComment) {
-                  res.overallComment = geminiRes.overallComment;
+                  const enriched = { ...capturedRes, overallComment: geminiRes.overallComment, wordBreakdown: [...capturedRes.wordBreakdown] };
                   // Merge per-word suggestions from Gemini where Azure had none
                   geminiRes.wordBreakdown?.forEach(gw => {
-                    const match = res.wordBreakdown.find(w => w.word.toLowerCase() === gw.word.toLowerCase());
+                    const match = enriched.wordBreakdown.find(w => w.word.toLowerCase() === gw.word.toLowerCase());
                     if (match && !match.suggestion && gw.suggestion) {
                       match.suggestion = gw.suggestion;
                     }
                   });
-                  setResult({ ...res });
-                  lruSet(recordingCache, text, res, MAX_RESULT_CACHE);
+                  setResult(enriched);
+                  lruSet(recordingCache, capturedText, enriched, MAX_RESULT_CACHE);
                 }
               } catch { /* Gemini enrichment is optional */ }
             };
@@ -540,7 +578,7 @@ const App: React.FC = () => {
 
             // Merge linking data from cache if slim
             if (hasLinkingCache && !res.fullLinkedSentence) {
-              const cached = referenceCache.get(text)!;
+              const cached = lruGet(referenceCache, text)!;
               res.fullLinkedSentence = cached.fullLinkedSentence;
               res.fullLinkedPhonetic = cached.fullLinkedPhonetic;
               res.intonationMap = cached.intonationMap;
@@ -549,7 +587,7 @@ const App: React.FC = () => {
 
           // Merge linking/prosody from reference cache
           if (!res.fullLinkedSentence && referenceCache.has(text)) {
-            const cached = referenceCache.get(text)!;
+            const cached = lruGet(referenceCache, text)!;
             res.fullLinkedSentence = cached.fullLinkedSentence;
             res.fullLinkedPhonetic = cached.fullLinkedPhonetic;
             res.intonationMap = cached.intonationMap;

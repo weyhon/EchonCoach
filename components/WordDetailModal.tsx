@@ -186,11 +186,13 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
 
   const handleCoachPlay = () => onPlayCoach(item.word);
   const [youPlaying, setYouPlaying] = useState(false);
+  const youTimerRef = useRef<number | null>(null);
   const handleYouPlay = () => {
     const mispronounced = buildMispronunciation(item);
+    if (youTimerRef.current) clearTimeout(youTimerRef.current);
     setYouPlaying(true);
     onPlayPhoneme(mispronounced);
-    setTimeout(() => setYouPlaying(false), 3000);
+    youTimerRef.current = window.setTimeout(() => setYouPlaying(false), 5000);
   };
 
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -214,6 +216,11 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, [onClose]);
+
+  // Cleanup youPlay timer on unmount
+  useEffect(() => {
+    return () => { if (youTimerRef.current) clearTimeout(youTimerRef.current); };
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto p-4"

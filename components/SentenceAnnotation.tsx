@@ -96,6 +96,9 @@ export const SentenceAnnotation: React.FC<Props> = ({
   const pitchValues = showPitchCurve ? getPitchValues(text) : [];
   const containerRef = useRef<HTMLDivElement>(null);
   const wordRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Reset refs array to match current word count
+  wordRefs.current.length = words.length;
   const [segments, setSegments] = useState<{
     curvePath: string;
     fillBelow: string;
