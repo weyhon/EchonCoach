@@ -217,6 +217,11 @@ const App: React.FC = () => {
     if (!selectedText.trim()) return;
     if (isPlayingRef.current) return;
     isPlayingRef.current = true;
+    // Safety timeout: clear "Playing..." after 15s max in case of stuck state
+    const safetyTimer = setTimeout(() => {
+      setActiveAudioSource(null);
+      isPlayingRef.current = false;
+    }, 15000);
     try {
       const cacheKey = `tutor_${selectedText}`;
       const cached = ttsCache.get(cacheKey);
@@ -235,6 +240,7 @@ const App: React.FC = () => {
         setActiveAudioSource(null);
       }
     } finally {
+      clearTimeout(safetyTimer);
       isPlayingRef.current = false;
     }
   };

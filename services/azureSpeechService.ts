@@ -42,13 +42,36 @@ async function getAuthToken(): Promise<{ token: string; region: string }> {
   return data;
 }
 
+// Common phoneme substitutions for Chinese English learners (fallback when Azure
+// doesn't return NBestPhonemes). Maps target phoneme → likely mispronunciation.
+const COMMON_SUBSTITUTIONS: Record<string, string> = {
+  'ʃ': 's',     // sure → "soor"
+  'ʒ': 'dʒ',    // measure → "medjure"
+  'θ': 's',     // think → "sink"
+  'ð': 'd',     // the → "de"
+  'ɹ': 'l',     // red → "led"
+  'v': 'w',     // very → "wery"
+  'æ': 'e',     // cat → "ket"
+  'ɪ': 'i',     // bit → "beat"
+  'ʊ': 'u',     // book → "buke"
+  'ɝ': 'ɜ',     // bird (rhotic → non-rhotic)
+  'ŋ': 'n',     // sing → "sin"
+};
+
 // ── Azure Pronunciation Assessment API ──────────────────────────────
 
+// Azure response puts scores directly on objects (not nested under PronunciationAssessment)
 interface AzurePronResult {
   RecognitionStatus: string;
   DisplayText?: string;
   NBest?: Array<{
-    PronunciationAssessment: {
+    // Scores are directly on NBest item
+    AccuracyScore: number;
+    FluencyScore: number;
+    CompletenessScore: number;
+    PronScore: number;
+    // Some API versions nest under PronunciationAssessment
+    PronunciationAssessment?: {
       AccuracyScore: number;
       FluencyScore: number;
       CompletenessScore: number;
@@ -56,13 +79,16 @@ interface AzurePronResult {
     };
     Words: Array<{
       Word: string;
-      PronunciationAssessment: {
+      AccuracyScore: number;
+      ErrorType: string;
+      PronunciationAssessment?: {
         AccuracyScore: number;
-        ErrorType: string; // None, Omission, Insertion, Mispronunciation
+        ErrorType: string;
       };
-      Phonemes: Array<{
-        Phoneme: string; // IPA when PhonemeAlphabet=IPA
-        PronunciationAssessment: {
+      Phonemes?: Array<{
+        Phoneme: string;
+        AccuracyScore?: number;
+        PronunciationAssessment?: {
           AccuracyScore: number;
           NBestPhonemes?: Array<{ Phoneme: string; Score: number }>;
         };
@@ -89,6 +115,7 @@ export async function azurePronunciationScore(
     Dimension: 'Comprehensive',
     EnableMiscue: true,
     PhonemeAlphabet: 'IPA',
+    NBestPhonemeCount: 3, // Return top-3 alternative phonemes so we know what user actually said
   }));
 
   // 3. Get auth
@@ -138,11 +165,13 @@ function mapAzureToAnalysisResult(azure: AzurePronResult, referenceText: string)
   }
 
   const best = azure.NBest[0];
-  const score = Math.round(best.PronunciationAssessment.PronScore);
+  // Scores may be directly on best or nested under PronunciationAssessment
+  const pronScore = best.PronScore ?? best.PronunciationAssessment?.PronScore ?? 0;
+  const score = Math.round(pronScore);
 
-  const wordBreakdown: WordAnalysis[] = best.Words.map(w => {
-    const wordScore = Math.round(w.PronunciationAssessment.AccuracyScore);
-    const errorType = w.PronunciationAssessment.ErrorType;
+  const wordBreakdown: WordAnalysis[] = (best.Words || []).map(w => {
+    const wordScore = Math.round(w.AccuracyScore ?? w.PronunciationAssessment?.AccuracyScore ?? 0);
+    const errorType = w.ErrorType ?? w.PronunciationAssessment?.ErrorType ?? 'None';
 
     // Map error type to status
     const status: WordAnalysis['status'] =
@@ -151,23 +180,37 @@ function mapAzureToAnalysisResult(azure: AzurePronResult, referenceText: string)
       : 'needs_improvement';
 
     // Build IPA strings from phonemes
-    const correctIPA = w.Phonemes.map(p => p.Phoneme).join('');
-    const userIPA = w.Phonemes.map(p => {
-      const nBest = p.PronunciationAssessment.NBestPhonemes;
-      // If score is low and there's an alternative phoneme, use that
-      if (p.PronunciationAssessment.AccuracyScore < 70 && nBest && nBest.length > 1) {
-        return nBest[0].Phoneme; // top candidate is what user most likely produced
+    const phonemes = w.Phonemes || [];
+    const correctIPA = phonemes.map(p => p.Phoneme).join('');
+    const userIPA = phonemes.map(p => {
+      const nBest = (p as any).NBestPhonemes ?? p.PronunciationAssessment?.NBestPhonemes;
+      const pScore = p.AccuracyScore ?? p.PronunciationAssessment?.AccuracyScore ?? 0;
+      // If score is low, find what user actually said
+      if (pScore < 70) {
+        // Skip the target phoneme — find the first *different* alternative
+        const alt = nBest?.find((nb: { Phoneme: string }) => nb.Phoneme !== p.Phoneme);
+        if (alt) return alt.Phoneme;
+        // Fallback: common substitution for this phoneme
+        const sub = COMMON_SUBSTITUTIONS[p.Phoneme];
+        if (sub) return sub;
       }
       return p.Phoneme; // matched the target
     }).join('');
 
     // Phoneme details
-    const phonemes: PhonemeDetail[] = w.Phonemes.map(p => {
-      const phScore = Math.round(p.PronunciationAssessment.AccuracyScore);
-      const nBest = p.PronunciationAssessment.NBestPhonemes;
-      const userPhoneme = phScore < 85 && nBest && nBest.length > 1
-        ? nBest[0].Phoneme
-        : undefined;
+    const phonemeDetails: PhonemeDetail[] = phonemes.map(p => {
+      const phScore = Math.round(p.AccuracyScore ?? p.PronunciationAssessment?.AccuracyScore ?? 0);
+      const nBest = (p as any).NBestPhonemes ?? p.PronunciationAssessment?.NBestPhonemes;
+      let userPhoneme: string | undefined;
+      if (phScore < 85) {
+        // Skip the target phoneme — find the first *different* alternative
+        const alt = nBest?.find((nb: { Phoneme: string }) => nb.Phoneme !== p.Phoneme);
+        if (alt) {
+          userPhoneme = alt.Phoneme;
+        } else if (phScore < 70) {
+          userPhoneme = COMMON_SUBSTITUTIONS[p.Phoneme];
+        }
+      }
 
       return {
         phoneme: p.Phoneme,
@@ -177,7 +220,7 @@ function mapAzureToAnalysisResult(azure: AzurePronResult, referenceText: string)
     });
 
     // Generate suggestion based on error type and low-scoring phonemes
-    const suggestion = generateSuggestion(w.Word, errorType, phonemes);
+    const suggestion = generateSuggestion(w.Word, errorType, phonemeDetails);
 
     return {
       word: w.Word,
@@ -185,7 +228,7 @@ function mapAzureToAnalysisResult(azure: AzurePronResult, referenceText: string)
       phoneticCorrect: correctIPA,
       phoneticUser: userIPA !== correctIPA ? userIPA : correctIPA,
       wordScore,
-      phonemes: phonemes.some(p => p.score < 90) ? phonemes : undefined,
+      phonemes: phonemeDetails.some(p => p.score < 90) ? phonemeDetails : undefined,
       suggestion,
     };
   });

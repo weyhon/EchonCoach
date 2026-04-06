@@ -35,11 +35,11 @@ a[class*="rounded-lg"]:hover {
   border-radius: 2px;
 }
 
-.pixel-badge-s { background: #FFD700; color: #2D2D2D; }
-.pixel-badge-a { background: #E8587A; color: #fff; }
-.pixel-badge-b { background: #006b30; color: #fff; }
-.pixel-badge-c { background: #574144; color: #fff; }
-.pixel-badge-d { background: #ba1a1a; color: #fff; }
+.pixel-badge-s { background: var(--amber); color: #2D2D2D; }
+.pixel-badge-a { background: var(--rose); color: #fff; }
+.pixel-badge-b { background: var(--green); color: #fff; }
+.pixel-badge-c { background: var(--text-muted); color: #fff; }
+.pixel-badge-d { background: var(--red); color: #fff; }
 
 /* ── Pixel progress bar (game HP style) ── */
 
@@ -53,7 +53,7 @@ a[class*="rounded-lg"]:hover {
 
 .pixel-bar-fill {
   height: 100%;
-  background: linear-gradient(180deg, #E8587A 40%, #aa284d 60%);
+  background: linear-gradient(180deg, var(--rose) 40%, color-mix(in srgb, var(--rose) 70%, black) 60%);
   transition: width 600ms steps(20);
   border-radius: 1px;
 }
