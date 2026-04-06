@@ -58,7 +58,7 @@ const IPA_TO_SPELL: [string, string][] = [
  * Strategy: take the correct IPA, swap low-scoring phonemes with common errors,
  * then convert to English respelling so TTS reads it differently.
  */
-function buildMispronunciation(item: WordAnalysis): string {
+export function buildMispronunciation(item: WordAnalysis): string {
   if (!item.phoneticCorrect || !item.phonemes?.length) return item.word;
 
   // Find which phonemes scored poorly
@@ -101,7 +101,7 @@ function buildMispronunciation(item: WordAnalysis): string {
 }
 
 /** Convert a single IPA phoneme to a TTS-speakable syllable */
-function phonemeToSpeakable(ipa: string): string {
+export function phonemeToSpeakable(ipa: string): string {
   for (const [ipaStr, spelling] of IPA_TO_SPELL) {
     if (ipa === ipaStr) return spelling;
   }

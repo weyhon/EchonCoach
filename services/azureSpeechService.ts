@@ -44,7 +44,7 @@ async function getAuthToken(): Promise<{ token: string; region: string }> {
 
 // Common phoneme substitutions for Chinese English learners (fallback when Azure
 // doesn't return NBestPhonemes). Maps target phoneme → likely mispronunciation.
-const COMMON_SUBSTITUTIONS: Record<string, string> = {
+export const COMMON_SUBSTITUTIONS: Record<string, string> = {
   'ʃ': 's',     // sure → "soor"
   'ʒ': 'dʒ',    // measure → "medjure"
   'θ': 's',     // think → "sink"
@@ -61,7 +61,7 @@ const COMMON_SUBSTITUTIONS: Record<string, string> = {
 // ── Azure Pronunciation Assessment API ──────────────────────────────
 
 // Azure response puts scores directly on objects (not nested under PronunciationAssessment)
-interface AzurePronResult {
+export interface AzurePronResult {
   RecognitionStatus: string;
   DisplayText?: string;
   NBest?: Array<{
@@ -154,7 +154,7 @@ export async function azurePronunciationScore(
 
 // ── Response mapper ─────────────────────────────────────────────────
 
-function mapAzureToAnalysisResult(azure: AzurePronResult, referenceText: string): AnalysisResult {
+export function mapAzureToAnalysisResult(azure: AzurePronResult, referenceText: string): AnalysisResult {
   if (azure.RecognitionStatus !== 'Success' || !azure.NBest?.length) {
     return {
       score: 0,
@@ -242,7 +242,7 @@ function mapAzureToAnalysisResult(azure: AzurePronResult, referenceText: string)
   };
 }
 
-function generateSuggestion(word: string, errorType: string, phonemes: PhonemeDetail[]): string {
+export function generateSuggestion(word: string, errorType: string, phonemes: PhonemeDetail[]): string {
   if (errorType === 'Omission') return `You skipped "${word}" — try saying the full sentence.`;
   if (errorType === 'Insertion') return '';
 
@@ -253,7 +253,7 @@ function generateSuggestion(word: string, errorType: string, phonemes: PhonemeDe
   return `Focus on the /${worstPhoneme.phoneme}/ sound in "${word}".`;
 }
 
-function generateOverallComment(score: number, words: WordAnalysis[]): string {
+export function generateOverallComment(score: number, words: WordAnalysis[]): string {
   const incorrect = words.filter(w => w.status === 'incorrect');
   const needsWork = words.filter(w => w.status === 'needs_improvement');
 

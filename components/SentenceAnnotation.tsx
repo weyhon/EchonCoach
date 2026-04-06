@@ -49,7 +49,7 @@ interface Props {
   showPitchCurve?: boolean;
 }
 
-function getPitchValues(text: string): number[] {
+export function getPitchValues(text: string): number[] {
   const words = text.trim().split(/\s+/);
   if (words.length === 0) return [];
   const isYesNo = isYesNoQuestion(text);

@@ -12,27 +12,11 @@ import { IPALegend } from './components/IPALegend';
 import { AnalysisResult, AppState, HistoryItem } from './types';
 import { CACHE_CONFIG, UI_CONFIG, SILENCE_DETECTION } from './config/constants';
 import { safeGetJSON, safeSetJSON, safeRemoveItem } from './services/storageUtils';
+import { lruGet, lruSet } from './utils/lru';
 
 // LRU-style cache: evict oldest entries when over limit to prevent unbounded memory growth
 const MAX_TTS_CACHE = 20;  // ~20 * 50KB = ~1MB max
 const MAX_RESULT_CACHE = 50;
-
-function lruGet<K, V>(map: Map<K, V>, key: K): V | undefined {
-  const value = map.get(key);
-  if (value !== undefined) {
-    map.delete(key);
-    map.set(key, value);
-  }
-  return value;
-}
-
-function lruSet<K, V>(map: Map<K, V>, key: K, value: V, limit: number) {
-  if (map.size >= limit) {
-    const oldest = map.keys().next().value;
-    if (oldest !== undefined) map.delete(oldest);
-  }
-  map.set(key, value);
-}
 
 const ttsCache = new Map<string, string>();
 const referenceCache = new Map<string, AnalysisResult>(); // For playAndAnalyze (linking/phonetics, score=0)
