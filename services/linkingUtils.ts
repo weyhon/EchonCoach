@@ -156,6 +156,9 @@ const FUNCTION_WORDS = new Set([
  * Determines if a word ends with a consonant SOUND
  * Considers pronunciation, not just spelling
  */
+// Words ending in 'e' that genuinely end in a vowel SOUND (not silent-e)
+const VOWEL_E_WORDS = new Set(['be', 'he', 'me', 'she', 'we', 'bye', 'dye', 'eye', 'rye']);
+
 export function endsWithConsonantSound(word: string): boolean {
   if (!word) return false;
 
@@ -164,6 +167,15 @@ export function endsWithConsonantSound(word: string): boolean {
   // Check if word is in our special pronunciation dictionary
   if (CONSONANT_ENDING_WORDS[cleaned]) {
     return true;
+  }
+
+  // Silent-e pattern: "office", "dance", "make", "come", "home", etc.
+  // The letter before the final 'e' is the actual ending sound.
+  if (cleaned.length >= 3 && cleaned.endsWith('e') && !VOWEL_E_WORDS.has(cleaned)) {
+    const penultimate = cleaned[cleaned.length - 2];
+    if (/[bcdfghjklmnpqrstvwxz]/.test(penultimate)) {
+      return true;
+    }
   }
 
   // For regular words, check the last letter
