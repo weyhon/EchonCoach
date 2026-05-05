@@ -54,18 +54,45 @@ export function getPitchValues(text: string): number[] {
   if (words.length === 0) return [];
   const isYesNo = isYesNoQuestion(text);
   const isWh = isWhQuestion(text);
+
+  // Find nuclear stress position (last content word before final) — gets the peak
+  const contentIdxs = words
+    .map((w, i) => ({ i, isContent: !isFunctionWord(w.toLowerCase().replace(/[?.!,;:'"()[\]{}]/g, '')) }))
+    .filter(x => x.isContent)
+    .map(x => x.i);
+  const nuclearIdx = contentIdxs.length >= 2 ? contentIdxs[contentIdxs.length - 2] : contentIdxs[contentIdxs.length - 1];
+
   return words.map((word, i) => {
     const cleaned = word.toLowerCase().replace(/[?.!,;:'"()[\]{}]/g, '');
     const isFunc = isFunctionWord(cleaned);
     const isLast = i === words.length - 1;
     const isFirst = i === 0;
     const pos = words.length > 1 ? i / (words.length - 1) : 0.5;
-    let p = isFunc ? 0.35 : 0.65;
-    if (isFirst && !isFunc) p = 0.75;
-    if (isFirst && isWh) p = 0.85;
-    if (isYesNo) { if (isLast) p = 0.9; else p -= pos * 0.15; }
-    else if (isWh) { if (!isFirst) p -= pos * 0.3; if (isLast) p = Math.min(p, 0.2); }
-    else { p -= pos * 0.2; if (isLast) p = Math.min(p, 0.15); }
+
+    // Wider baseline spread: function words sit low, content words sit high
+    let p = isFunc ? 0.25 : 0.72;
+
+    // Nuclear stress boost — make the main stressed word clearly peak
+    if (i === nuclearIdx && !isFunc) p = 0.9;
+
+    // First-word boost for prominence
+    if (isFirst && !isFunc) p = Math.max(p, 0.78);
+    if (isFirst && isWh) p = 0.95;
+
+    if (isYesNo) {
+      // Yes/no question: dramatic rise to the very last word
+      if (isLast) p = 0.95;
+      else p -= pos * 0.1;
+    } else if (isWh) {
+      // Wh-question: start high, fall sharply to the end
+      if (!isFirst) p -= pos * 0.5;
+      if (isLast) p = 0.08;
+    } else {
+      // Statement: gentle descent, then sharp drop on the final word
+      p -= pos * 0.15;
+      if (isLast) p = 0.06;
+    }
+
     return Math.max(0.05, Math.min(0.95, p));
   });
 }
@@ -73,7 +100,8 @@ export function getPitchValues(text: string): number[] {
 function smoothCurvePath(points: { x: number; y: number }[]): string {
   if (points.length < 2) return '';
   if (points.length === 2) return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
-  const t = 0.3;
+  // Lower tension = sharper peaks/valleys (more musical, less flattened)
+  const t = 0.18;
   let d = `M ${points[0].x} ${points[0].y}`;
   for (let i = 0; i < points.length - 1; i++) {
     const p0 = points[Math.max(0, i - 1)];
@@ -85,8 +113,8 @@ function smoothCurvePath(points: { x: number; y: number }[]): string {
   return d;
 }
 
-// Pitch displacement range
-const PITCH_RANGE = 18;
+// Pitch displacement range — larger to make rise/fall clearly visible
+const PITCH_RANGE = 26;
 
 export const SentenceAnnotation: React.FC<Props> = ({
   text, wordBreakdown, onWordClick, karaokeIndex = -1, isKaraokePlaying = false,
@@ -123,11 +151,11 @@ export const SentenceAnnotation: React.FC<Props> = ({
       });
     });
 
-    // Split by visual lines
+    // Split by visual lines — threshold must exceed max intra-line pitch delta (~23px)
     const lines: typeof allData[] = [];
     let cur: typeof allData = [];
     allData.forEach((pt, i) => {
-      if (i > 0 && Math.abs(pt.wordTop - allData[i - 1].wordTop) > 25) {
+      if (i > 0 && Math.abs(pt.wordTop - allData[i - 1].wordTop) > 30) {
         if (cur.length > 0) lines.push(cur);
         cur = [];
       }
@@ -135,8 +163,8 @@ export const SentenceAnnotation: React.FC<Props> = ({
     });
     if (cur.length > 0) lines.push(cur);
 
-    // Curve sits right on top of IPA annotations
-    const CURVE_GAP = -6;
+    // Curve floats just above words — close but not touching
+    const CURVE_GAP = 4;
     const newSegs = lines.map(pts => {
       // Curve points: above each word, mirroring pitch displacement
       const curvePoints = pts.map(p => ({
@@ -221,9 +249,9 @@ export const SentenceAnnotation: React.FC<Props> = ({
               {seg.curvePath && (
                 <path d={seg.curvePath} fill="none" stroke="url(#pitch-line-grad)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               )}
-              {/* Subtle dot markers on the curve */}
+              {/* Tiny dot markers on the curve */}
               {seg.dots.map((pt, di) => (
-                <circle key={di} cx={pt.x} cy={pt.y} r="2.5" fill="var(--rose)" fillOpacity="0.35" />
+                <circle key={di} cx={pt.x} cy={pt.y} r="2" fill="var(--rose)" fillOpacity="0.3" />
               ))}
             </g>
           ))}
@@ -233,7 +261,7 @@ export const SentenceAnnotation: React.FC<Props> = ({
       {/* === Words with pitch displacement === */}
       <div
         className="flex items-end flex-wrap justify-center relative z-[1]"
-        style={{ gap: showPitchCurve ? '20px 0' : '12px 0' }}
+        style={{ gap: showPitchCurve ? '34px 0' : '12px 0' }}
       >
         {words.map((w, i) => {
           const isKaraokeCurrent = isKaraokePlaying && karaokeIndex === i;
@@ -255,26 +283,28 @@ export const SentenceAnnotation: React.FC<Props> = ({
                 className={`flex flex-col items-center shrink-0 transition-all duration-200 ${isKaraokeCurrent ? 'scale-[1.06] z-10' : ''}`}
                 style={{ transform: showPitchCurve ? `translateY(${yOffset}px)` : undefined }}
               >
-                {/* IPA + stress + intonation */}
-                <div className="flex items-center justify-center gap-0.5 h-5">
-                  {w.isStressed && !isKaraokePlaying && (
-                    <span className="font-bold leading-none" style={{ fontSize: 9, color: 'var(--rose)' }}>●</span>
-                  )}
-                  {w.ipa && (
-                    <span className="font-mono leading-none" style={{
-                      fontSize: 11,
-                      color: isKaraokeCurrent ? 'var(--rose)' : isKaraokePast ? 'var(--text-placeholder)' : w.status ? wordColor(w.status) : 'var(--text-muted)',
-                      opacity: isKaraokeFuture ? 0.3 : 0.8,
-                    }}>
-                      {w.ipa}
-                    </span>
-                  )}
-                  {w.intonation && !isKaraokePlaying && (
-                    <span className="font-bold leading-none" style={{ fontSize: 11, color: w.intonation === '↗' ? 'var(--amber)' : 'var(--text-muted)', marginLeft: 1 }}>
-                      {w.intonation}
-                    </span>
-                  )}
-                </div>
+                {/* IPA + stress + intonation — hidden when pitch curve is active (curve replaces them visually) */}
+                {!showPitchCurve && (
+                  <div className="flex items-center justify-center gap-0.5 h-5">
+                    {w.isStressed && !isKaraokePlaying && (
+                      <span className="font-bold leading-none" style={{ fontSize: 9, color: 'var(--rose)' }}>●</span>
+                    )}
+                    {w.ipa && (
+                      <span className="font-mono leading-none" style={{
+                        fontSize: 11,
+                        color: isKaraokeCurrent ? 'var(--rose)' : isKaraokePast ? 'var(--text-placeholder)' : w.status ? wordColor(w.status) : 'var(--text-muted)',
+                        opacity: isKaraokeFuture ? 0.3 : 0.8,
+                      }}>
+                        {w.ipa}
+                      </span>
+                    )}
+                    {w.intonation && !isKaraokePlaying && (
+                      <span className="font-bold leading-none" style={{ fontSize: 11, color: w.intonation === '↗' ? 'var(--amber)' : 'var(--text-muted)', marginLeft: 1 }}>
+                        {w.intonation}
+                      </span>
+                    )}
+                  </div>
+                )}
                 {/* Word */}
                 <span
                   role={onWordClick ? 'button' : undefined}
@@ -285,8 +315,8 @@ export const SentenceAnnotation: React.FC<Props> = ({
                     fontSize: 22,
                     fontWeight: w.isStressed ? 700 : 400,
                     color,
-                    borderBottom: w.isStressed && !isKaraokePlaying ? '2px solid var(--rose)' : undefined,
-                    paddingBottom: w.isStressed && !isKaraokePlaying ? 2 : 0,
+                    borderBottom: w.isStressed && !isKaraokePlaying && !showPitchCurve ? '2px solid var(--rose)' : undefined,
+                    paddingBottom: w.isStressed && !isKaraokePlaying && !showPitchCurve ? 2 : 0,
                     letterSpacing: '-0.01em',
                   }}
                   onClick={onWordClick ? () => onWordClick(w.word.replace(/[?.!,;:'"()[\]{}]/g, '')) : undefined}

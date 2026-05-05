@@ -315,7 +315,7 @@ const App: React.FC = () => {
       speechScript: textToSpeak,
       wordBreakdown: [],
       fullLinkedSentence: linkedSentence,
-      fullLinkedPhonetic: words.map(w => w.replace(/[?.!,;]/g, '').toLowerCase()).join(' '),
+      fullLinkedPhonetic: '',
       intonationMap
     };
     setResult(localRes);

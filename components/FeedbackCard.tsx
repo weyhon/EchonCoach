@@ -4,7 +4,6 @@ import { AnalysisResult, WordAnalysis } from '../types';
 import { IPALegend } from './IPALegend';
 import { WordDetailModal } from './WordDetailModal';
 import { SentenceAnnotation } from './SentenceAnnotation';
-import { PitchContour } from './PitchContour';
 
 interface FeedbackCardProps {
   result: AnalysisResult;
