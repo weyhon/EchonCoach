@@ -76,7 +76,8 @@ const App: React.FC = () => {
     // Populate caches from history
     parsed.forEach(h => {
       if (h.result && h.result.score > 0) lruSet(recordingCache, h.text, h.result, MAX_RESULT_CACHE);
-      else if (h.result) lruSet(referenceCache, h.text, h.result, MAX_RESULT_CACHE);
+      // Only rehydrate reference cache for entries with valid IPA (skip stale/incomplete)
+      else if (h.result && h.result.fullLinkedPhonetic) lruSet(referenceCache, h.text, h.result, MAX_RESULT_CACHE);
     });
     return parsed;
   });
@@ -288,9 +289,10 @@ const App: React.FC = () => {
   const playAndAnalyze = async (textToSpeak: string) => {
     if (!textToSpeak.trim()) return;
 
-    // Check reference cache first (linking/phonetics analysis)
+    // Check reference cache first (linking/phonetics analysis).
+    // Skip stale cache entries with empty IPA — they came from incomplete prior runs.
     const cachedRef = lruGet(referenceCache, textToSpeak);
-    if (cachedRef) {
+    if (cachedRef && cachedRef.fullLinkedPhonetic) {
       // If user has a recording result, merge linking data with it
       const cachedRecording = lruGet(recordingCache, textToSpeak);
       setResult(cachedRecording || cachedRef);
@@ -319,9 +321,9 @@ const App: React.FC = () => {
       intonationMap
     };
     setResult(localRes);
-    lruSet(referenceCache, textToSpeak, localRes, MAX_RESULT_CACHE);
-    saveToHistory(textToSpeak, localRes);
     setAppState(AppState.SHOWING_RESULT);
+    // Note: don't cache or save-to-history yet — wait for linking to enrich the result,
+    // otherwise an incomplete (empty IPA) entry poisons the cache.
 
     // 2) Fire TTS + remote linking in parallel (audio plays when ready)
     setIsAudioLoading(true);
@@ -342,6 +344,11 @@ const App: React.FC = () => {
         };
         setResult(enrichedRes);
         lruSet(referenceCache, textToSpeak, enrichedRes, MAX_RESULT_CACHE);
+        saveToHistory(textToSpeak, enrichedRes);
+      } else {
+        // Linking failed — still save the local result so the entry shows in history,
+        // but it won't be cached (so next attempt will retry the API).
+        saveToHistory(textToSpeak, localRes);
       }
 
       if (ttsResult.status === 'fulfilled') {
