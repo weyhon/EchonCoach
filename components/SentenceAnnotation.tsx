@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { WordAnalysis } from '../types';
 import { shouldLink, isFunctionWord } from '../services/linkingUtils';
 import { generateIntonationTokens as getTokens } from '../services/intonationUtils';
@@ -121,7 +121,11 @@ export const SentenceAnnotation: React.FC<Props> = ({
   showPitchCurve = false,
 }) => {
   const words = buildAnnotationWords(text, wordBreakdown);
-  const pitchValues = showPitchCurve ? getPitchValues(text) : [];
+  // Memoized so updateCurve's deps stay stable — otherwise: infinite render loop.
+  const pitchValues = useMemo(
+    () => (showPitchCurve ? getPitchValues(text) : []),
+    [showPitchCurve, text]
+  );
   const containerRef = useRef<HTMLDivElement>(null);
   const wordRefs = useRef<(HTMLDivElement | null)[]>([]);
 
