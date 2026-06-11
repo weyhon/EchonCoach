@@ -2,7 +2,7 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 import { AnalysisResult } from "../types";
 import { API_CONFIG } from "../config/constants";
-import { shouldLink } from "./linkingUtils";
+import { shouldLink, enrichLinkedSentence } from "./linkingUtils";
 import {
   isPhoneticComplete,
   fixCommonPhoneticErrors,
@@ -76,8 +76,8 @@ export const generateSpeech = async (text: string, slow: boolean = false, voiceN
 
   try {
     const prompt = slow
-      ? `Speak slowly and clearly with standard American English pronunciation: ${text}`
-      : `Read with standard American English pronunciation, natural stress and intonation: ${text}`;
+      ? `Speak slowly and clearly in standard American English, with deliberate pauses at commas and periods so each clause is easy to follow: ${text}`
+      : `Read in natural standard American English with: proper flap-T (water→wader, better→bedder, "due to"→"due-duh"), rhotic r, natural word linking, AND conversational prosody — brief breath pause at commas, longer pause at periods, NOT a flat monotone: ${text}`;
     const response = await ai!.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: prompt }] }],
@@ -104,7 +104,7 @@ export const generateTutorAudio = async (text: string, voiceName: string = 'Kore
   try {
     const response = await ai!.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: `Pronounce clearly with standard American English stress and intonation: "${text}"` }] }],
+      contents: [{ parts: [{ text: `Pronounce clearly in standard American English with natural flap-T (e.g., "water" sounds like "wader", "due to" sounds like "due-duh"): "${text}"` }] }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
@@ -217,9 +217,25 @@ export const analyzePronunciation = async (
 const TUTOR_SYSTEM_INSTRUCTION = `You are a world-class English Phonetics Coach specializing in American English.
 Your goal is to provide complete prosody analysis for ANY sentence, no matter how long.
 
+AMERICAN ENGLISH PRONUNCIATION (apply throughout fullLinkedPhonetic):
+- Flap-T: When /t/ sits between two vowel sounds AND the following vowel is unstressed,
+  transcribe as /ɾ/ instead of /t/. Applies whether or not there's a ‿ linking mark.
+  • Within word: water→ˈwɔɾər, better→ˈbɛɾər, city→ˈsɪɾi, getting→ˈɡɛɾɪŋ, party→ˈpɑrɾi
+  • Across words: "due to"→duː ɾə, "get up"→ɡɛɾ ʌp, "what is"→wʌɾ ɪz, "a lot of"→ə ˈlɑɾ əv
+- Rhotic /r/: always show r in r-colored vowels (work→ˈwɜrk, driver→ˈdraɪvər, more→mɔr).
+- American vowels: /oʊ/ for go/home (NOT British /əʊ/), /æ/ for cat/dance, /ɑ/ for lot/hot.
+- Weak forms: unstressed function words use their reduced SPOKEN form — to→tə, a→ə, an→ən,
+  and→ənd, of→əv, for→fər, can→kən, was→wəz. The IPA must match how the sentence is
+  actually spoken, not dictionary citation forms.
+- Careful: main-verb "do"→du (NOT dʊ, NOT də). "too"/"two"→tu.
+
 STRICT RULES:
 1. 'fullLinkedSentence': Mark ALL natural linking points with '‿' in American English.
    - Consonant + Vowel: "tell‿us", "take‿it", "check‿out"
+   - Same-consonant merge: when a word ENDS with the same consonant sound the next word
+     STARTS with, link them — natives pronounce ONE consonant, not two:
+     "out‿tonight", "gas‿station", "stop‿pushing", "what‿time"
+     In fullLinkedPhonetic write that consonant ONCE: out‿tonight → aʊ.təˈnaɪt
    - Mark EVERY linking point in the sentence.
 
 2. 'intonationMap': MUST have one token for EACH word in the sentence.
@@ -236,6 +252,14 @@ STRICT RULES:
    b) Function words (a, the, to, for, in, on, or, and, but, you, I, we, can, do, is, was) → NO ˈ
    c) Use a SPACE between words.
    d) At each linking point (where ‿ appears in fullLinkedSentence), replace the space with a syllable dot .
+   d2) CRITICAL — chain linking: N words joined by ‿ must produce ONE phonetic block
+       with all atoms joined by dots. NEVER break the chain with a space.
+       Example: "rebook‿us‿on‿a" (4 linked words) → "riˈbʊ.kʌ.sɑ.nə" (one block, three dots).
+       Wrong: "riˈbʊ.kʌs ɑ.nə" (broken into two blocks).
+   d3) CONSISTENCY — fullLinkedSentence and fullLinkedPhonetic MUST have the SAME number of
+       space-separated blocks. If you merge words with dots in the phonetic, you MUST mark ‿
+       at the same boundaries in the sentence. E.g. phonetic "ˈhæŋɪŋ.aʊ.təˈnaɪt" (one block)
+       requires sentence "hanging‿out‿tonight" (one block). Check this before responding.
    e) Do NOT use ˌ (secondary stress). Do NOT use ‿ in fullLinkedPhonetic.
 
 Example for "Do you like it?":
@@ -257,6 +281,13 @@ Example for long sentence "Enter the code displayed in the app":
   "fullLinkedSentence": "Enter‿the code displayed‿in the‿app",
   "intonationMap": "● · ● ● · · ●↘",
   "fullLinkedPhonetic": "ˈɛn.tər ðə ˈkoʊd dɪˈspleɪd.ɪn ði.ˈæp"
+}
+
+Example demonstrating flap-T (note /t/→/ɾ/ in "due to"):
+{
+  "fullLinkedSentence": "It's due to personnel‿issues this time",
+  "intonationMap": "· ● · ● ● · ●↘",
+  "fullLinkedPhonetic": "ɪts ˈduː ɾə pɝrsəˈnɛl ˈɪʃuz ðɪs ˈtaɪm"
 }
 
 CRITICAL: For long sentences, you MUST include ALL words. Do not truncate or omit any words.
@@ -379,6 +410,11 @@ export const getLinkingAnalysisForText = async (text: string): Promise<any> => {
       const code = char.charCodeAt(0);
       return code !== 44 && code !== 65292 && code !== 12289;
     }).join('');
+
+    // Deterministic safety net: the LLM often merges same-consonant pairs in the
+    // phonetic ("out tonight" → aʊ.təˈnaɪt) but forgets the ‿ in the sentence.
+    // Add the missing ‿ ourselves so arcs match what the audio actually does.
+    cleanedLinkedSentence = enrichLinkedSentence(cleanedLinkedSentence);
 
     let finalPhonetic = parsed.fullLinkedPhonetic || '';
 

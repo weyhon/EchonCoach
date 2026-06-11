@@ -9,6 +9,8 @@ import {
   isYesNoQuestion,
   getSentenceIntonation,
   getHDroppedForm,
+  sameConsonantMerge,
+  enrichLinkedSentence,
 } from './linkingUtils';
 
 describe('endsWithConsonantSound', () => {
@@ -125,5 +127,54 @@ describe('getHDroppedForm', () => {
 
   it('keeps non-h-dropping words unchanged', () => {
     expect(getHDroppedForm('house')).toBe('house');
+  });
+});
+
+describe('sameConsonantMerge', () => {
+  it('detects same-consonant boundaries (gemination)', () => {
+    expect(sameConsonantMerge('out', 'tonight')).toBe(true);   // t + t
+    expect(sameConsonantMerge('what', 'time')).toBe(true);     // t + t
+    expect(sameConsonantMerge('this', 'side')).toBe(true);     // s + s
+  });
+
+  it('rejects different-consonant boundaries', () => {
+    expect(sameConsonantMerge('at', 'that')).toBe(false);      // t + ð
+    expect(sameConsonantMerge('big', 'time')).toBe(false);     // g + t
+  });
+
+  it('rejects consonant + vowel boundaries (handled by C+V rule, not merge)', () => {
+    expect(sameConsonantMerge('tell', 'us')).toBe(false);
+    expect(sameConsonantMerge('hanging', 'out')).toBe(false);
+  });
+
+  it('handles empty input', () => {
+    expect(sameConsonantMerge('', 'tonight')).toBe(false);
+    expect(sameConsonantMerge('out', '')).toBe(false);
+  });
+});
+
+describe('enrichLinkedSentence', () => {
+  it('adds missing ‿ at same-consonant boundaries the LLM forgot', () => {
+    expect(enrichLinkedSentence('hanging‿out tonight')).toBe('hanging‿out‿tonight');
+  });
+
+  it('keeps existing ‿ marks untouched', () => {
+    const input = 'hanging‿out‿tonight';
+    expect(enrichLinkedSentence(input)).toBe(input);
+  });
+
+  it('does not link across clause punctuation', () => {
+    // "tonight? at" — sentence boundary, must NOT merge despite t+t... wait t/æ.
+    // Use a t+t pair with punctuation: "out, tonight" style
+    expect(enrichLinkedSentence('I went out, tonight was fun')).toBe('I went out, tonight was fun');
+  });
+
+  it('leaves single-word sentences alone', () => {
+    expect(enrichLinkedSentence('hello')).toBe('hello');
+  });
+
+  it('does not force C+V links (left to the LLM)', () => {
+    // "tell us" is C+V — enrich must NOT add it (narrow scope: same-consonant only)
+    expect(enrichLinkedSentence('tell us')).toBe('tell us');
   });
 });

@@ -11,10 +11,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!text) return res.status(400).json({ error: 'Missing text' });
 
     const prompt = tutor
-      ? `Pronounce clearly with standard American English stress and intonation: "${text}"`
+      ? `Pronounce clearly in standard American English with natural flap-T (e.g., "water" sounds like "wader", "due to" sounds like "due-duh"): "${text}"`
       : slow
-        ? `Speak slowly and clearly with standard American English pronunciation: ${text}`
-        : `Read with standard American English pronunciation, natural stress and intonation: ${text}`;
+        ? `Speak slowly and clearly in standard American English, with deliberate pauses at commas and periods so each clause is easy to follow: ${text}`
+        : `Read in natural standard American English with: proper flap-T (water→wader, better→bedder, "due to"→"due-duh"), rhotic r, natural word linking, AND conversational prosody — brief breath pause at commas, longer pause at periods, NOT a flat monotone: ${text}`;
 
     const callTTS = () => {
       const timeout = new Promise<never>((_, reject) =>
