@@ -686,7 +686,7 @@ const App: React.FC = () => {
             <div className="rounded-xl p-5 card-hover" style={{ background: 'var(--surface)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
               {/* Label */}
               <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
-                <div className="label-micro" style={{ color: 'var(--text-placeholder)' }}>
+                <div className="label-micro" style={{ color: 'var(--text-muted)' }}>
                   PRACTICE SENTENCE
                 </div>
                 <span className="pixel-badge pixel-badge-a" style={{ fontSize: 8, padding: '1px 6px', opacity: 0.7 }}>LVL 1</span>

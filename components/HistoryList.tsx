@@ -78,7 +78,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
     <div className="space-y-4 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="label-micro" style={{ color: 'var(--text-placeholder)' }}>
+        <span className="label-micro" style={{ color: 'var(--text-muted)' }}>
           History
         </span>
         <button
@@ -88,7 +88,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
             fontWeight: 700,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
-            color: 'var(--text-placeholder)',
+            color: 'var(--text-muted)',
             background: 'none',
             border: 'none',
             cursor: 'pointer',
@@ -160,7 +160,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
                 }}>
                   {item.text}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-placeholder)', marginTop: 1 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
                   {formatTimestamp(item.timestamp)}
                 </div>
               </div>
