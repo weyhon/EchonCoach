@@ -78,9 +78,9 @@ export const HistoryList: React.FC<HistoryListProps> = ({
     <div className="space-y-4 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="label-micro" style={{ color: 'var(--text-muted)' }}>
+        <h2 className="label-micro" style={{ color: 'var(--text-muted)', margin: 0 }}>
           History
-        </span>
+        </h2>
         <button
           onClick={onClear}
           style={{

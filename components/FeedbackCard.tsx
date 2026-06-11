@@ -110,9 +110,9 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
       {/* === Unified Pronunciation Guide === */}
       <div className="px-5 pt-4 pb-3 border-b animate-section stagger-1 relative" style={{ borderColor: 'var(--border)' }} onMouseUp={handleMouseUp}>
         <div className="flex items-center justify-between mb-3">
-          <div className="label-micro" style={{ color: 'var(--text-muted)' }}>
+          <h2 className="label-micro" style={{ color: 'var(--text-muted)', margin: 0 }}>
             PRONUNCIATION GUIDE
-          </div>
+          </h2>
           {result.fullLinkedPhonetic && (
             <button
               onClick={() => setShowIPALegend(true)}

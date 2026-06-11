@@ -626,7 +626,7 @@ const App: React.FC = () => {
         style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
         <div className="flex items-center gap-2.5">
           <NebulaLogo size={28} />
-          <span style={{ fontFamily: "'Newsreader', Georgia, serif", fontSize: 17, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>Nebula</span>
+          <h1 style={{ fontFamily: "'Source Serif 4', Georgia, serif", fontSize: 17, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0 }}>Nebula</h1>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowIPALegend(true)}
@@ -669,7 +669,7 @@ const App: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{error}</span>
-            <button onClick={() => setError(null)} className="ml-1 transition-colors" style={{ color: 'var(--text-muted)' }}>
+            <button onClick={() => setError(null)} aria-label="Dismiss error" className="ml-1 transition-colors" style={{ color: 'var(--text-muted)' }}>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -686,13 +686,14 @@ const App: React.FC = () => {
             <div className="rounded-xl p-5 card-hover" style={{ background: 'var(--surface)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
               {/* Label */}
               <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
-                <div className="label-micro" style={{ color: 'var(--text-muted)' }}>
+                <label htmlFor="practice-sentence" className="label-micro" style={{ color: 'var(--text-muted)' }}>
                   PRACTICE SENTENCE
-                </div>
+                </label>
                 <span className="pixel-badge pixel-badge-a" style={{ fontSize: 8, padding: '1px 6px', opacity: 0.7 }}>LVL 1</span>
               </div>
               {/* Textarea */}
               <textarea
+                id="practice-sentence"
                 value={text}
                 onChange={e => { setText(e.target.value); setResult(null); }}
                 onKeyDown={(e) => {
@@ -806,7 +807,9 @@ const App: React.FC = () => {
                 <div className="flex ml-auto rounded-md overflow-hidden" style={{ background: 'var(--surface-muted)', padding: 2 }}>
                   {([{ key: 'normal', label: '1x' }, { key: 'slow', label: '0.8x' }] as const).map(({ key, label }) => (
                     <button key={key} onClick={() => setTtsSpeed(key as 'normal' | 'slow')}
-                      className="px-3 py-1 text-xs font-semibold rounded transition-all"
+                      aria-pressed={ttsSpeed === key}
+                      aria-label={`Playback speed ${label}`}
+                      className="px-3 py-1.5 text-xs font-semibold rounded transition-all"
                       style={ttsSpeed === key
                         ? { background: 'var(--surface)', color: 'var(--text-primary)', boxShadow: '0 1px 2px rgba(0,0,0,0.08)' }
                         : { color: 'var(--text-muted)', background: 'transparent' }}>
