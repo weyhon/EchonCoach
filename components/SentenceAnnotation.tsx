@@ -113,8 +113,12 @@ function smoothCurvePath(points: { x: number; y: number }[]): string {
   return d;
 }
 
-// Pitch displacement range — larger to make rise/fall clearly visible
-const PITCH_RANGE = 26;
+// Word displacement range — gentle sway only. On short sentences a large word
+// offset reads as a broken line wrap, so the TEXT moves little…
+const WORD_PITCH_RANGE = 12;
+// …while the curve gets extra amplitude on top of word positions, keeping the
+// contour expressive without dragging the words along.
+const CURVE_EXTRA = 14;
 
 export const SentenceAnnotation: React.FC<Props> = ({
   text, wordBreakdown, onWordClick, karaokeIndex = -1, isKaraokePlaying = false,
@@ -168,12 +172,13 @@ export const SentenceAnnotation: React.FC<Props> = ({
     if (cur.length > 0) lines.push(cur);
 
     // Curve floats just above words — close but not touching
-    const CURVE_GAP = 4;
+    const CURVE_GAP = 8;
     const newSegs = lines.map(pts => {
-      // Curve points: above each word, mirroring pitch displacement
+      // Curve points: above each word, with extra pitch amplitude beyond the
+      // (gentle) word displacement so the contour stays musical
       const curvePoints = pts.map(p => ({
         x: p.x,
-        y: p.wordTop - CURVE_GAP, // sits above the word
+        y: p.wordTop - CURVE_GAP - (p.pitch - 0.5) * CURVE_EXTRA,
         pitch: p.pitch,
       }));
       if (curvePoints.length < 2) return { curvePath: '', fillBelow: '', dots: curvePoints };
@@ -210,7 +215,7 @@ export const SentenceAnnotation: React.FC<Props> = ({
       className="select-none relative"
       style={{
         lineHeight: 1,
-        paddingTop: showPitchCurve ? PITCH_RANGE + 10 : 0,
+        paddingTop: showPitchCurve ? 30 : 0,
         paddingBottom: showPitchCurve ? 4 : 0,
       }}
     >
@@ -265,7 +270,7 @@ export const SentenceAnnotation: React.FC<Props> = ({
       {/* === Words with pitch displacement === */}
       <div
         className="flex items-end flex-wrap justify-center relative z-[1]"
-        style={{ gap: showPitchCurve ? '34px 0' : '12px 0' }}
+        style={{ gap: showPitchCurve ? '30px 0' : '12px 0' }}
       >
         {words.map((w, i) => {
           const isKaraokeCurrent = isKaraokePlaying && karaokeIndex === i;
@@ -278,7 +283,7 @@ export const SentenceAnnotation: React.FC<Props> = ({
           else if (isKaraokeFuture) color = 'var(--border-medium)';
 
           const pitch = pitchValues[i] ?? 0.5;
-          const yOffset = showPitchCurve ? -(pitch - 0.4) * PITCH_RANGE : 0;
+          const yOffset = showPitchCurve ? -(pitch - 0.4) * WORD_PITCH_RANGE : 0;
 
           return (
             <React.Fragment key={i}>
