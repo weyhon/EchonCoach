@@ -724,7 +724,7 @@ const App: React.FC = () => {
                       disabled={!text.trim() || isBusy || appState === AppState.RECORDING || appState === AppState.ANALYZING}
                       aria-label={appState === AppState.GENERATING_TTS ? 'Loading audio' : 'Play reference pronunciation'}
                       title="Play reference (Space)"
-                      className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-60"
+                      className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-60 min-h-[44px]"
                       style={{ background: isBusy ? 'var(--rose-50)' : 'var(--rose)', color: isBusy ? 'var(--rose)' : '#fff', border: isBusy ? '1.5px solid var(--rose)' : 'none' }}>
                       {isBusy ? (
                         <span className="pixel-spinner-sm"><span className="dot" /><span className="dot" /><span className="dot" /></span>
@@ -741,7 +741,7 @@ const App: React.FC = () => {
                     href={`https://youglish.com/pronounce/${text.trim().replace(/\s+/g, '+')}/english`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hidden sm:flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
+                    className="hidden sm:flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all min-h-[44px]"
                     style={{ color: 'var(--text-secondary)', background: 'var(--surface-muted)', textDecoration: 'none' }}
                   >
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -753,7 +753,7 @@ const App: React.FC = () => {
                     href={`https://www.playphrase.me/#/search?q=${encodeURIComponent(text.trim())}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hidden sm:flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
+                    className="hidden sm:flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all min-h-[44px]"
                     style={{ color: 'var(--text-secondary)', background: 'var(--surface-muted)', textDecoration: 'none' }}
                   >
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -767,7 +767,7 @@ const App: React.FC = () => {
                   <button onClick={startRecording} disabled={!text.trim() || appState === AppState.ANALYZING || appState === AppState.GENERATING_TTS}
                     aria-label="Record your pronunciation"
                     title="Record (R)"
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-40 min-h-[44px]"
                     style={{ background: 'var(--surface-muted)', color: 'var(--text-secondary)' }}>
                     <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2H3v2a9 9 0 0 0 8 8.94V23h2v-2.06A9 9 0 0 0 21 12v-2h-2z"/></svg>
                     Record
@@ -776,7 +776,7 @@ const App: React.FC = () => {
                   <button onClick={() => mediaRecorderRef.current?.stop()}
                     aria-label="Stop recording"
                     title="Stop recording (R)"
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold min-h-[44px]"
                     style={{ background: 'var(--text-primary)', color: 'var(--surface)', border: 'none' }}>
                     <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--surface)', display: 'inline-block' }} />
                     Stop Recording
@@ -796,7 +796,7 @@ const App: React.FC = () => {
                       audio.play().catch(() => setActiveAudioSource(null));
                     }}
                     aria-label="Replay your recording"
-                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
+                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all min-h-[44px]"
                     style={{ color: activeAudioSource === 'user_playback' ? 'var(--rose)' : 'var(--text-secondary)', background: activeAudioSource === 'user_playback' ? 'var(--rose-50)' : 'var(--surface-muted)' }}
                   >
                     <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2H3v2a9 9 0 0 0 8 8.94V23h2v-2.06A9 9 0 0 0 21 12v-2h-2z"/></svg>
