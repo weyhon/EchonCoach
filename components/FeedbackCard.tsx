@@ -200,7 +200,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
                 {isTutorLoading ? "Loading..." : isPlayingTutor ? "Playing..." : `"${selectedText.length > 15 ? selectedText.slice(0, 15) + '...' : selectedText}"`}
               </button>
             ) : (
-              <p className="text-[10px] font-medium select-none text-center opacity-30" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-[12px] font-medium select-none text-center opacity-60" style={{ color: 'var(--text-muted)' }}>
                 Tap a word to hear it · Select text for phrases
               </p>
             )}
@@ -222,7 +222,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
 
       {/* Color Legend */}
       {result.wordBreakdown?.length > 0 && (
-        <div className="flex items-center gap-4 text-[10px] font-medium justify-center flex-wrap pb-4 pt-3 animate-section stagger-2" style={{ color: 'var(--text-muted)' }}>
+        <div className="flex items-center gap-4 text-[11px] font-medium justify-center flex-wrap pb-4 pt-3 animate-section stagger-2" style={{ color: 'var(--text-muted)' }}>
           <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: 'var(--green)' }}></span>Correct</span>
           <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: 'var(--amber)' }}></span>Improve</span>
           <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: 'var(--red)' }}></span>Incorrect</span>
