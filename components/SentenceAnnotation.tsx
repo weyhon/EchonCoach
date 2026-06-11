@@ -324,6 +324,12 @@ export const SentenceAnnotation: React.FC<Props> = ({
                     letterSpacing: '-0.01em',
                   }}
                   onClick={onWordClick ? () => onWordClick(w.word.replace(/[?.!,;:'"()[\]{}]/g, '')) : undefined}
+                  onKeyDown={onWordClick ? (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onWordClick(w.word.replace(/[?.!,;:'"()[\]{}]/g, ''));
+                    }
+                  } : undefined}
                   title={onWordClick ? 'Click to hear pronunciation' : undefined}
                 >
                   {w.word}
