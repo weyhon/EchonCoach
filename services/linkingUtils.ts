@@ -5,6 +5,8 @@
  * Implements Level 1 (Foundation) linking rules from LINKING_STRATEGY.md
  */
 
+import { getWordPhonetic } from './phoneticUtils';
+
 // Words that end with consonant SOUNDS despite ending with vowel LETTERS
 // Based on actual pronunciation, not spelling
 const CONSONANT_ENDING_WORDS: Record<string, string> = {
@@ -156,6 +158,9 @@ const FUNCTION_WORDS = new Set([
  * Determines if a word ends with a consonant SOUND
  * Considers pronunciation, not just spelling
  */
+// Words ending in 'e' that genuinely end in a vowel SOUND (not silent-e)
+const VOWEL_E_WORDS = new Set(['be', 'he', 'me', 'she', 'we', 'bye', 'dye', 'eye', 'rye']);
+
 export function endsWithConsonantSound(word: string): boolean {
   if (!word) return false;
 
@@ -164,6 +169,15 @@ export function endsWithConsonantSound(word: string): boolean {
   // Check if word is in our special pronunciation dictionary
   if (CONSONANT_ENDING_WORDS[cleaned]) {
     return true;
+  }
+
+  // Silent-e pattern: "office", "dance", "make", "come", "home", etc.
+  // The letter before the final 'e' is the actual ending sound.
+  if (cleaned.length >= 3 && cleaned.endsWith('e') && !VOWEL_E_WORDS.has(cleaned)) {
+    const penultimate = cleaned[cleaned.length - 2];
+    if (/[bcdfghjklmnpqrstvwxz]/.test(penultimate)) {
+      return true;
+    }
   }
 
   // For regular words, check the last letter
@@ -201,6 +215,57 @@ export function shouldLink(currentWord: string, nextWord: string): boolean {
   const startsVowel = startsWithVowelSound(nextWord, true); // true = in connected speech
 
   return endsConsonant && startsVowel;
+}
+
+// IPA consonant chars we trust for boundary comparison (single-char phonemes)
+const IPA_CONSONANTS = new Set('bdfghjklmnprstvwzðθʃʒŋɾ'.split(''));
+
+/**
+ * Same-consonant merge (gemination): word1 ends with the same consonant sound
+ * word2 starts with — natives pronounce ONE consonant ("out tonight" → ou-tonight).
+ * Uses the phonetic dictionary/transliterator to compare boundary SOUNDS, not letters.
+ */
+export function sameConsonantMerge(currentWord: string, nextWord: string): boolean {
+  if (!currentWord || !nextWord) return false;
+
+  const stripIPA = (s: string) => s.replace(/[ˈˌ.ː]/g, '');
+  const w1 = stripIPA(getWordPhonetic(cleanWord(currentWord)));
+  const w2 = stripIPA(getWordPhonetic(cleanWord(nextWord)));
+  if (!w1 || !w2) return false;
+
+  const last = w1[w1.length - 1];
+  const first = w2[0];
+  return last === first && IPA_CONSONANTS.has(last);
+}
+
+/**
+ * Post-process an LLM-produced linked sentence: add any ‿ the model missed
+ * at same-consonant boundaries. Narrow on purpose — C+V linking judgment is
+ * left to the model (adding it here would over-link at phrase boundaries).
+ */
+export function enrichLinkedSentence(linkedSentence: string): string {
+  // Split into tokens, preserving existing ‿ groups
+  const groups = linkedSentence.trim().split(/\s+/);
+  if (groups.length < 2) return linkedSentence;
+
+  const result: string[] = [groups[0]];
+  for (let i = 1; i < groups.length; i++) {
+    const prevGroup = result[result.length - 1];
+    // Last word of the previous group vs first word of this group
+    const prevWords = prevGroup.split('‿');
+    const lastWord = prevWords[prevWords.length - 1];
+    const firstWord = groups[i].split('‿')[0];
+
+    // Never link across clause punctuation (comma/period/question mark…)
+    const hasBoundaryPunct = /[.!?,;:]$/.test(lastWord);
+
+    if (!hasBoundaryPunct && sameConsonantMerge(lastWord, firstWord)) {
+      result[result.length - 1] = prevGroup + '‿' + groups[i];
+    } else {
+      result.push(groups[i]);
+    }
+  }
+  return result.join(' ');
 }
 
 /**

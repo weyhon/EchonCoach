@@ -34,3 +34,5 @@ skills-lock.json
 .vercel
 .env*.local
 .gstack/
+screenshots/
+results.tsv

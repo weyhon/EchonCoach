@@ -5,21 +5,44 @@ import { HistoryList } from './components/HistoryList';
 import { NebulaLogo } from './components/NebulaLogo';
 import { generateSpeech, analyzePronunciation, getLinkingAnalysisForText, generateTutorAudio } from './services/geminiService';
 import { playBase64Audio, speakWithWebSpeech, cleanupAudioResources } from './services/audioUtils';
+import { azurePronunciationScore, isAzureSpeechAvailable } from './services/azureSpeechService';
 import { shouldLink } from './services/linkingUtils';
 import { generateIntonationMap } from './services/intonationUtils';
 import { IPALegend } from './components/IPALegend';
 import { AnalysisResult, AppState, HistoryItem } from './types';
 import { CACHE_CONFIG, UI_CONFIG, SILENCE_DETECTION } from './config/constants';
 import { safeGetJSON, safeSetJSON, safeRemoveItem } from './services/storageUtils';
+import { lruGet, lruSet } from './utils/lru';
+
+// LRU-style cache: evict oldest entries when over limit to prevent unbounded memory growth
+const MAX_TTS_CACHE = 20;  // ~20 * 50KB = ~1MB max
+const MAX_RESULT_CACHE = 50;
 
 const ttsCache = new Map<string, string>();
 const referenceCache = new Map<string, AnalysisResult>(); // For playAndAnalyze (linking/phonetics, score=0)
 const recordingCache = new Map<string, AnalysisResult>(); // For recording evaluation (has real score)
 
+// Demo data for UI screenshot scoring
+const DEMO_RESULT: AnalysisResult = {
+  score: 78,
+  overallComment: 'Good effort! Focus on the vowel sounds in "going" — try rounding your lips more for the /oʊ/ diphthong.',
+  speechScript: 'How is it going?',
+  wordBreakdown: [
+    { word: 'How', status: 'correct', phoneticCorrect: 'haʊ', phoneticUser: 'haʊ', wordScore: 95, suggestion: '' },
+    { word: 'is', status: 'correct', phoneticCorrect: 'ɪz', phoneticUser: 'ɪz', wordScore: 90, suggestion: '' },
+    { word: 'it', status: 'needs_improvement', phoneticCorrect: 'ɪt', phoneticUser: 'ɪtʰ', wordScore: 65, suggestion: 'Avoid aspirating the final /t/' },
+    { word: 'going', status: 'incorrect', phoneticCorrect: 'ˈɡoʊɪŋ', phoneticUser: 'ˈɡɔɪŋ', wordScore: 45, suggestion: 'Round your lips for /oʊ/ instead of /ɔ/' },
+  ],
+  fullLinkedSentence: 'How‿is it going?',
+  fullLinkedPhonetic: 'haʊ‿ɪz ɪt ˈɡoʊɪŋ',
+  intonationMap: '· · ● ↘',
+};
+
 const App: React.FC = () => {
+  const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === 'results';
   const [text, setText] = useState<string>('How is it going?');
-  const [appState, setAppState] = useState<AppState>(AppState.IDLE);
-  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [appState, setAppState] = useState<AppState>(isDemo ? AppState.SHOWING_RESULT : AppState.IDLE);
+  const [result, setResult] = useState<AnalysisResult | null>(isDemo ? DEMO_RESULT : null);
   const [activeAudioSource, setActiveAudioSource] = useState<string | null>(null);
   const [isAudioLoading, setIsAudioLoading] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -30,6 +53,8 @@ const App: React.FC = () => {
   const [showMobileHistory, setShowMobileHistory] = useState(false);
   const [showIPALegend, setShowIPALegend] = useState(false);
   const [ttsSpeed, setTtsSpeed] = useState<'normal' | 'slow'>('normal');
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const VOICES = [
     { id: 'Kore', label: 'Kore', desc: 'Firm' },
@@ -37,7 +62,9 @@ const App: React.FC = () => {
     { id: 'Charon', label: 'Charon', desc: 'Informative' },
     { id: 'Aoede', label: 'Aoede', desc: 'Breezy' },
   ] as const;
-  const [selectedVoice, setSelectedVoice] = useState('Kore');
+  const [selectedVoice, setSelectedVoice] = useState(() => {
+    try { return localStorage.getItem('echocoach_voice') || 'Kore'; } catch { return 'Kore'; }
+  });
 
   const showError = (message: string) => {
     setError(message);
@@ -48,8 +75,9 @@ const App: React.FC = () => {
     const parsed = safeGetJSON<HistoryItem[]>(CACHE_CONFIG.HISTORY_KEY, []);
     // Populate caches from history
     parsed.forEach(h => {
-      if (h.result && h.result.score > 0) recordingCache.set(h.text, h.result);
-      else if (h.result) referenceCache.set(h.text, h.result);
+      if (h.result && h.result.score > 0) lruSet(recordingCache, h.text, h.result, MAX_RESULT_CACHE);
+      // Only rehydrate reference cache for entries with valid IPA (skip stale/incomplete)
+      else if (h.result && h.result.fullLinkedPhonetic) lruSet(referenceCache, h.text, h.result, MAX_RESULT_CACHE);
     });
     return parsed;
   });
@@ -69,7 +97,7 @@ const App: React.FC = () => {
 
       // Safely save to localStorage (handles quota exceeded, disabled storage, etc.)
       if (!safeSetJSON(CACHE_CONFIG.HISTORY_KEY, updated)) {
-        console.warn('Failed to save history to localStorage, keeping in memory only');
+        showError('Storage full — history kept in memory only. Clear old entries to save.');
       }
 
       return updated;
@@ -83,6 +111,7 @@ const App: React.FC = () => {
   const silenceTimerRef = useRef<number | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mediaSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const enrichAbortRef = useRef<AbortController | null>(null);
 
   // Cleanup audio resources when stream/blob changes
   useEffect(() => {
@@ -106,9 +135,19 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Clear TTS cache when voice changes — cached audio is voice-specific
+  // Online/offline detection
+  useEffect(() => {
+    const goOnline = () => setIsOffline(false);
+    const goOffline = () => setIsOffline(true);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); };
+  }, []);
+
+  // Clear TTS cache and persist preference when voice changes
   useEffect(() => {
     ttsCache.clear();
+    try { localStorage.setItem('echocoach_voice', selectedVoice); } catch {}
   }, [selectedVoice]);
 
   // Keyboard shortcuts: Enter=Listen, Space=Play, S=Slow, R=Record/Stop
@@ -173,9 +212,14 @@ const App: React.FC = () => {
     if (!selectedText.trim()) return;
     if (isPlayingRef.current) return;
     isPlayingRef.current = true;
+    // Safety timeout: clear "Playing..." after 15s max in case of stuck state
+    const safetyTimer = setTimeout(() => {
+      setActiveAudioSource(null);
+      isPlayingRef.current = false;
+    }, 15000);
     try {
       const cacheKey = `tutor_${selectedText}`;
-      const cached = ttsCache.get(cacheKey);
+      const cached = lruGet(ttsCache, cacheKey);
       if (cached && cached.length > UI_CONFIG.MIN_BASE64_LENGTH) {
         await playAudio(cached, 'tutor');
         return;
@@ -184,13 +228,14 @@ const App: React.FC = () => {
       setActiveAudioSource('tutor_loading');
       try {
         const base64 = await generateTutorAudio(selectedText, selectedVoice);
-        ttsCache.set(cacheKey, base64);
+        lruSet(ttsCache, cacheKey, base64, MAX_TTS_CACHE);
         await playAudio(base64, 'tutor');
       } catch (e) {
         console.error("Tutor playback error", e);
         setActiveAudioSource(null);
       }
     } finally {
+      clearTimeout(safetyTimer);
       isPlayingRef.current = false;
     }
   };
@@ -203,7 +248,7 @@ const App: React.FC = () => {
     try {
       const cacheKey = `${textToSpeak}_${isSlow ? 'slow' : 'normal'}`;
       const sourceKey = isSlow ? 'input_slow' : 'input_normal';
-      const cached = ttsCache.get(cacheKey);
+      const cached = lruGet(ttsCache, cacheKey);
       if (cached && cached.length > UI_CONFIG.MIN_BASE64_LENGTH) {
         await playAudio(cached, sourceKey);
         return;
@@ -213,7 +258,7 @@ const App: React.FC = () => {
       setActiveAudioSource(sourceKey);
       try {
         const base64 = await generateSpeech(textToSpeak, isSlow, selectedVoice);
-        ttsCache.set(cacheKey, base64);
+        lruSet(ttsCache, cacheKey, base64, MAX_TTS_CACHE);
         await playAudio(base64, sourceKey);
       } catch (e: any) {
         console.error("TTS playback error", e);
@@ -244,11 +289,12 @@ const App: React.FC = () => {
   const playAndAnalyze = async (textToSpeak: string) => {
     if (!textToSpeak.trim()) return;
 
-    // Check reference cache first (linking/phonetics analysis)
-    const cachedRef = referenceCache.get(textToSpeak);
-    if (cachedRef) {
+    // Check reference cache first (linking/phonetics analysis).
+    // Skip stale cache entries with empty IPA — they came from incomplete prior runs.
+    const cachedRef = lruGet(referenceCache, textToSpeak);
+    if (cachedRef && cachedRef.fullLinkedPhonetic) {
       // If user has a recording result, merge linking data with it
-      const cachedRecording = recordingCache.get(textToSpeak);
+      const cachedRecording = lruGet(recordingCache, textToSpeak);
       setResult(cachedRecording || cachedRef);
       setAppState(AppState.SHOWING_RESULT);
       await handlePlayTTS(textToSpeak, false);
@@ -271,13 +317,13 @@ const App: React.FC = () => {
       speechScript: textToSpeak,
       wordBreakdown: [],
       fullLinkedSentence: linkedSentence,
-      fullLinkedPhonetic: words.map(w => w.replace(/[?.!,;]/g, '').toLowerCase()).join(' '),
+      fullLinkedPhonetic: '',
       intonationMap
     };
     setResult(localRes);
-    referenceCache.set(textToSpeak, localRes);
-    saveToHistory(textToSpeak, localRes);
     setAppState(AppState.SHOWING_RESULT);
+    // Note: don't cache or save-to-history yet — wait for linking to enrich the result,
+    // otherwise an incomplete (empty IPA) entry poisons the cache.
 
     // 2) Fire TTS + remote linking in parallel (audio plays when ready)
     setIsAudioLoading(true);
@@ -297,12 +343,17 @@ const App: React.FC = () => {
           intonationMap: linking.intonationMap
         };
         setResult(enrichedRes);
-        referenceCache.set(textToSpeak, enrichedRes);
+        lruSet(referenceCache, textToSpeak, enrichedRes, MAX_RESULT_CACHE);
+        saveToHistory(textToSpeak, enrichedRes);
+      } else {
+        // Linking failed — still save the local result so the entry shows in history,
+        // but it won't be cached (so next attempt will retry the API).
+        saveToHistory(textToSpeak, localRes);
       }
 
       if (ttsResult.status === 'fulfilled') {
         const base64 = ttsResult.value;
-        ttsCache.set(`${textToSpeak}_normal`, base64);
+        lruSet(ttsCache, `${textToSpeak}_normal`, base64, MAX_TTS_CACHE);
         setIsAudioLoading(false);
         await playAudio(base64, 'input_normal');
       } else {
@@ -410,10 +461,17 @@ const App: React.FC = () => {
 
   const startRecording = async () => {
     try {
+      // Cancel any pending Gemini enrichment from a previous recording
+      enrichAbortRef.current?.abort();
+      // Dismiss mobile keyboard to avoid UI shift during recording
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
       const ctx = await ensureAudioContext();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setActiveStream(stream);
-      const mediaRecorder = new MediaRecorder(stream);
+      // Lower bitrate (32kbps) — sufficient for speech analysis, ~75% smaller upload
+      const recorderOptions: MediaRecorderOptions = { audioBitsPerSecond: 32000 };
+      try { recorderOptions.mimeType = 'audio/webm;codecs=opus'; } catch {}
+      const mediaRecorder = new MediaRecorder(stream, recorderOptions);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
       mediaRecorder.ondataavailable = (e) => audioChunksRef.current.push(e.data);
@@ -436,22 +494,114 @@ const App: React.FC = () => {
 
         // Start analysis in parallel with playback
         setAppState(AppState.ANALYZING);
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const base64 = (reader.result as string).split(',')[1];
-          try {
-            const res = await analyzePronunciation(text, base64);
-            setResult(res);
-            setAppState(AppState.SHOWING_RESULT);
-            recordingCache.set(text, res);
-            saveToHistory(text, res);
-          } catch (err: any) {
-            console.error("Recording evaluation failure", err);
-            showError(err?.message || "Analysis failed. Please try again.");
-            setAppState(AppState.IDLE);
+        try {
+          let res: AnalysisResult;
+
+          if (isAzureSpeechAvailable()) {
+            // ── Azure path: dedicated acoustic model (~1-2s) ──
+            try {
+              res = await azurePronunciationScore(text, audioBlob);
+            } catch (azureErr) {
+              // Azure failed — fall back to Gemini
+              console.warn('Azure scoring failed, falling back to Gemini:', azureErr);
+              const buffer = await audioBlob.arrayBuffer();
+              const bytes = new Uint8Array(buffer);
+              let binary = '';
+              for (let i = 0; i < bytes.length; i += 8192) {
+                binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+              }
+              const base64 = btoa(binary);
+              const hasLinkingCache = referenceCache.has(text);
+              res = await analyzePronunciation(text, base64, hasLinkingCache);
+              if (hasLinkingCache && !res.fullLinkedSentence) {
+                const cached = lruGet(referenceCache, text)!;
+                res.fullLinkedSentence = cached.fullLinkedSentence;
+                res.fullLinkedPhonetic = cached.fullLinkedPhonetic;
+                res.intonationMap = cached.intonationMap;
+              }
+            }
+
+            // Enrich with Gemini coaching tips asynchronously (non-blocking)
+            const capturedText = text; // capture before async to avoid stale closure
+            const capturedRes = res; // snapshot for enrichment
+            const controller = new AbortController();
+            enrichAbortRef.current = controller;
+            const enrichWithGemini = async () => {
+              try {
+                if (controller.signal.aborted) return;
+                const buffer = await audioBlob.arrayBuffer();
+                const bytes = new Uint8Array(buffer);
+                let binary = '';
+                for (let i = 0; i < bytes.length; i += 8192) {
+                  binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+                }
+                const base64 = btoa(binary);
+                const geminiRes = await analyzePronunciation(capturedText, base64, true);
+                if (controller.signal.aborted) return;
+                // Only take coaching fields from Gemini, keep Azure's accurate scores
+                if (geminiRes.overallComment) {
+                  const enriched = { ...capturedRes, overallComment: geminiRes.overallComment, wordBreakdown: [...capturedRes.wordBreakdown] };
+                  // Merge per-word suggestions from Gemini where Azure had none
+                  geminiRes.wordBreakdown?.forEach(gw => {
+                    const match = enriched.wordBreakdown.find(w => w.word.toLowerCase() === gw.word.toLowerCase());
+                    if (match && !match.suggestion && gw.suggestion) {
+                      match.suggestion = gw.suggestion;
+                    }
+                  });
+                  setResult(enriched);
+                  lruSet(recordingCache, capturedText, enriched, MAX_RESULT_CACHE);
+                }
+              } catch { /* Gemini enrichment is optional */ }
+            };
+            enrichWithGemini();
+
+          } else {
+            // ── Gemini fallback: LLM-based analysis ──
+            const buffer = await audioBlob.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i += 8192) {
+              binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+            }
+            const base64 = btoa(binary);
+            const hasLinkingCache = referenceCache.has(text);
+            res = await analyzePronunciation(text, base64, hasLinkingCache);
+
+            // Merge linking data from cache if slim
+            if (hasLinkingCache && !res.fullLinkedSentence) {
+              const cached = lruGet(referenceCache, text)!;
+              res.fullLinkedSentence = cached.fullLinkedSentence;
+              res.fullLinkedPhonetic = cached.fullLinkedPhonetic;
+              res.intonationMap = cached.intonationMap;
+            }
           }
-        };
-        reader.readAsDataURL(audioBlob);
+
+          // Merge linking/prosody from reference cache
+          if (!res.fullLinkedSentence && referenceCache.has(text)) {
+            const cached = lruGet(referenceCache, text)!;
+            res.fullLinkedSentence = cached.fullLinkedSentence;
+            res.fullLinkedPhonetic = cached.fullLinkedPhonetic;
+            res.intonationMap = cached.intonationMap;
+          }
+
+          setResult(res);
+          setAppState(AppState.SHOWING_RESULT);
+          lruSet(recordingCache, text, res, MAX_RESULT_CACHE);
+          saveToHistory(text, res);
+
+          // If no linking data yet, fetch in background
+          if (!res.fullLinkedSentence) {
+            getLinkingAnalysisForText(text).then(linking => {
+              const enriched = { ...res, ...linking };
+              setResult(enriched);
+              lruSet(recordingCache, text, enriched, MAX_RESULT_CACHE);
+            }).catch(() => {});
+          }
+        } catch (err: any) {
+          console.error("Recording evaluation failure", err);
+          showError(err?.message || "Analysis failed. Please try again.");
+          setAppState(AppState.IDLE);
+        }
       };
       mediaRecorder.start();
       setAppState(AppState.RECORDING);
@@ -473,21 +623,21 @@ const App: React.FC = () => {
     <div className="min-h-screen pb-16 antialiased">
       {/* Fixed Top Header */}
       <header className="fixed top-0 w-full z-50 flex items-center justify-between px-5 h-[52px]"
-        style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)' }}>
+        style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
         <div className="flex items-center gap-2.5">
           <NebulaLogo size={28} />
-          <span className="font-brand font-extrabold tracking-tight" style={{ fontSize: 16, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>Nebula</span>
+          <h1 style={{ fontFamily: "'Source Serif 4', Georgia, serif", fontSize: 17, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0 }}>Nebula</h1>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowIPALegend(true)}
             className="px-3 py-2 rounded-md text-xs font-semibold transition-colors min-h-[44px] flex items-center"
-            style={{ background: 'var(--surface-muted)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+            style={{ background: 'var(--surface-muted)', color: 'var(--text-muted)' }}>
             IPA Guide
           </button>
           {history.length > 0 && (
             <button onClick={() => setShowMobileHistory(true)}
               className="lg:hidden px-3 py-2 rounded-md text-xs font-semibold flex items-center gap-1.5 min-h-[44px]"
-              style={{ background: 'var(--surface-muted)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+              style={{ background: 'var(--surface-muted)', color: 'var(--text-muted)' }}>
               History
               <span className="w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center text-white" style={{ background: 'var(--rose)' }}>
                 {Math.min(history.length, 9)}
@@ -497,6 +647,20 @@ const App: React.FC = () => {
         </div>
       </header>
 
+      {/* Offline Banner */}
+      {isOffline && (
+        <div className="fixed top-16 left-0 right-0 z-40 flex justify-center animate-fade-in">
+          <div className="px-4 py-2 rounded-b-lg text-xs font-semibold flex items-center gap-2"
+            style={{ background: 'var(--amber-bg)', color: 'var(--amber)' }}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728M5.636 18.364a9 9 0 010-12.728" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 12h.01" />
+            </svg>
+            You're offline — some features won't work
+          </div>
+        </div>
+      )}
+
       {/* Error Toast */}
       {error && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
@@ -505,7 +669,7 @@ const App: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{error}</span>
-            <button onClick={() => setError(null)} className="ml-1 transition-colors" style={{ color: 'var(--text-muted)' }}>
+            <button onClick={() => setError(null)} aria-label="Dismiss error" className="ml-1 transition-colors" style={{ color: 'var(--text-muted)' }}>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -519,13 +683,17 @@ const App: React.FC = () => {
         <div className="flex-1 px-6 lg:px-8 relative">
           <main className="max-w-[660px] mx-auto space-y-5 pt-7 pb-16">
             {/* Input Section */}
-            <div className="rounded-xl p-5 card-hover" style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+            <div className="rounded-xl p-5 card-hover" style={{ background: 'var(--surface)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
               {/* Label */}
-              <div className="label-micro" style={{ color: 'var(--text-placeholder)', marginBottom: 10 }}>
-                PRACTICE SENTENCE
+              <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
+                <label htmlFor="practice-sentence" className="label-micro" style={{ color: 'var(--text-muted)' }}>
+                  PRACTICE SENTENCE
+                </label>
+                <span className="pixel-badge pixel-badge-a" style={{ fontSize: 8, padding: '1px 6px', opacity: 0.7 }}>LVL 1</span>
               </div>
               {/* Textarea */}
               <textarea
+                id="practice-sentence"
                 value={text}
                 onChange={e => { setText(e.target.value); setResult(null); }}
                 onKeyDown={(e) => {
@@ -554,10 +722,12 @@ const App: React.FC = () => {
                     <button
                       onClick={() => { result ? handlePlayTTS(text, ttsSpeed === 'slow') : playAndAnalyze(text); }}
                       disabled={!text.trim() || isBusy || appState === AppState.RECORDING || appState === AppState.ANALYZING}
-                      className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-60"
+                      aria-label={appState === AppState.GENERATING_TTS ? 'Loading audio' : 'Play reference pronunciation'}
+                      title="Play reference (Space)"
+                      className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-60 min-h-[44px]"
                       style={{ background: isBusy ? 'var(--rose-50)' : 'var(--rose)', color: isBusy ? 'var(--rose)' : '#fff', border: isBusy ? '1.5px solid var(--rose)' : 'none' }}>
                       {isBusy ? (
-                        <div className="w-3.5 h-3.5 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--rose)', borderTopColor: 'transparent' }} />
+                        <span className="pixel-spinner-sm"><span className="dot" /><span className="dot" /><span className="dot" /></span>
                       ) : (
                         <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                       )}
@@ -571,8 +741,8 @@ const App: React.FC = () => {
                     href={`https://youglish.com/pronounce/${text.trim().replace(/\s+/g, '+')}/english`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hidden sm:flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
-                    style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)', background: 'var(--surface)', textDecoration: 'none' }}
+                    className="hidden sm:flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all min-h-[44px]"
+                    style={{ color: 'var(--text-secondary)', background: 'var(--surface-muted)', textDecoration: 'none' }}
                   >
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
@@ -583,8 +753,8 @@ const App: React.FC = () => {
                     href={`https://www.playphrase.me/#/search?q=${encodeURIComponent(text.trim())}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hidden sm:flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
-                    style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)', background: 'var(--surface)', textDecoration: 'none' }}
+                    className="hidden sm:flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all min-h-[44px]"
+                    style={{ color: 'var(--text-secondary)', background: 'var(--surface-muted)', textDecoration: 'none' }}
                   >
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
@@ -595,14 +765,18 @@ const App: React.FC = () => {
                 {/* Record */}
                 {appState !== AppState.RECORDING ? (
                   <button onClick={startRecording} disabled={!text.trim() || appState === AppState.ANALYZING || appState === AppState.GENERATING_TTS}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
-                    style={{ background: 'var(--surface-muted)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+                    aria-label="Record your pronunciation"
+                    title="Record (R)"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-40 min-h-[44px]"
+                    style={{ background: 'var(--surface-muted)', color: 'var(--text-secondary)' }}>
                     <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2H3v2a9 9 0 0 0 8 8.94V23h2v-2.06A9 9 0 0 0 21 12v-2h-2z"/></svg>
                     Record
                   </button>
                 ) : (
                   <button onClick={() => mediaRecorderRef.current?.stop()}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold"
+                    aria-label="Stop recording"
+                    title="Stop recording (R)"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold min-h-[44px]"
                     style={{ background: 'var(--text-primary)', color: 'var(--surface)', border: 'none' }}>
                     <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--surface)', display: 'inline-block' }} />
                     Stop Recording
@@ -621,18 +795,21 @@ const App: React.FC = () => {
                       audio.onerror = () => { setActiveAudioSource(null); };
                       audio.play().catch(() => setActiveAudioSource(null));
                     }}
-                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all"
-                    style={{ border: '1px solid var(--border)', color: activeAudioSource === 'user_playback' ? 'var(--rose)' : 'var(--text-secondary)', background: activeAudioSource === 'user_playback' ? 'var(--rose-50)' : 'var(--surface)' }}
+                    aria-label="Replay your recording"
+                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all min-h-[44px]"
+                    style={{ color: activeAudioSource === 'user_playback' ? 'var(--rose)' : 'var(--text-secondary)', background: activeAudioSource === 'user_playback' ? 'var(--rose-50)' : 'var(--surface-muted)' }}
                   >
                     <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2H3v2a9 9 0 0 0 8 8.94V23h2v-2.06A9 9 0 0 0 21 12v-2h-2z"/></svg>
                     {activeAudioSource === 'user_playback' ? 'Playing...' : 'My Voice'}
                   </button>
                 )}
                 {/* Speed toggle */}
-                <div className="flex ml-auto rounded-md overflow-hidden" style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', padding: 2 }}>
+                <div className="flex ml-auto rounded-md overflow-hidden" style={{ background: 'var(--surface-muted)', padding: 2 }}>
                   {([{ key: 'normal', label: '1x' }, { key: 'slow', label: '0.8x' }] as const).map(({ key, label }) => (
                     <button key={key} onClick={() => setTtsSpeed(key as 'normal' | 'slow')}
-                      className="px-3 py-1 text-xs font-semibold rounded transition-all"
+                      aria-pressed={ttsSpeed === key}
+                      aria-label={`Playback speed ${label}`}
+                      className="px-3 py-1.5 text-xs font-semibold rounded transition-all"
                       style={ttsSpeed === key
                         ? { background: 'var(--surface)', color: 'var(--text-primary)', boxShadow: '0 1px 2px rgba(0,0,0,0.08)' }
                         : { color: 'var(--text-muted)', background: 'transparent' }}>
@@ -642,40 +819,70 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* Recording state: waveform */}
-              {appState === AppState.RECORDING && (
-                <div className="flex items-center gap-3 mt-4 pt-3 animate-fade-in" style={{ borderTop: '1px solid var(--border)' }}>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: 'var(--red)' }} />
-                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Recording...</span>
+              {/* Pixel accent strip + hint */}
+              {appState === AppState.IDLE && !result && (
+                <div className="mt-4 flex flex-col items-center gap-2">
+                  <div className="pixel-strip">
+                    {[...Array(32)].map((_, i) => (
+                      <div key={i} className="pixel-block" style={{
+                        width: 6, height: 6,
+                        background: i % 7 === 0 ? 'var(--rose)' : i % 4 === 0 ? 'var(--rose-50, #ffd9de)' : i % 5 === 0 ? '#FFD700' : 'var(--surface-muted)',
+                      }} />
+                    ))}
                   </div>
-                  <div className="flex items-center gap-0.5 h-6">
-                    {[1,2,3,4,5,6,7].map(n => (
-                      <div key={n} className="rec-bar" style={{ width: 3, background: 'var(--rose)', borderRadius: 2, height: `${12 + (n % 3) * 8}px`, animationDelay: `${n * 0.12}s` }} />
+                  <span style={{ fontFamily: 'monospace', fontSize: 9, fontWeight: 700, color: 'var(--text-placeholder)', letterSpacing: '1px' }}>
+                    ▶ PRESS PLAY TO START ▶
+                  </span>
+                </div>
+              )}
+
+              {/* Recording state: pixel waveform */}
+              {appState === AppState.RECORDING && (
+                <div className="flex items-center gap-3 mt-4 animate-fade-in" style={{ background: 'var(--surface-muted)', borderRadius: 10, padding: '10px 14px' }}>
+                  <span className="pixel-badge pixel-badge-a" style={{ fontSize: 8, padding: '2px 6px', animation: 'pixel-blink 1s steps(1) infinite' }}>REC</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', fontFamily: 'monospace', letterSpacing: '0.5px' }}>Recording...</span>
+                  <div className="pixel-wave ml-auto">
+                    {[0,1,2,3,4,5,6,7,8].map(n => (
+                      <div key={n} className="pixel-wave-bar" style={{ background: 'var(--rose)', animationDelay: `${n * 100}ms` }} />
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Analyzing state */}
+              {/* Analyzing state: pixel style */}
               {appState === AppState.ANALYZING && (
-                <div className="flex items-center gap-2 mt-4 pt-3 animate-fade-in" style={{ borderTop: '1px solid var(--border)' }}>
-                  <div className="w-3.5 h-3.5 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--rose)', borderTopColor: 'transparent' }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Analyzing pronunciation...</span>
+                <div className="mt-4 animate-fade-in" style={{ background: 'var(--surface-muted)', borderRadius: 10, padding: '10px 14px' }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="pixel-spinner">
+                      <span className="dot active" /><span className="dot" />
+                      <span className="dot" /><span className="dot active" />
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', fontFamily: 'monospace', letterSpacing: '0.5px' }}>Analyzing...</span>
+                  </div>
+                  <div className="pixel-loading-bar">
+                    <div className="pixel-loading-fill" />
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Loading State */}
+            {/* Loading State: pixel grid animation */}
             {appState === AppState.ANALYZING && !result && (
-              <div className="glass rounded-2xl p-12 flex flex-col items-center gap-6 animate-fade-in-up nebula-glow" role="status" aria-busy="true" aria-label="Analyzing pronunciation">
-                <div className="relative w-16 h-16">
-                  <div className="absolute inset-0 border-[3px] rounded-full" style={{ borderColor: 'var(--border-subtle)' }}></div>
-                  <div className="absolute inset-0 border-[3px] rounded-full animate-spin" style={{ borderTopColor: 'var(--pink)', borderRightColor: 'rgba(232,88,122,0.3)', borderBottomColor: 'transparent', borderLeftColor: 'transparent' }}></div>
+              <div className="rounded-2xl p-10 flex flex-col items-center gap-5 animate-fade-in-up" style={{ background: 'var(--surface)', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }} role="status" aria-busy="true" aria-label="Analyzing pronunciation">
+                <div className="pixel-analyze-icon">
+                  {[...Array(25)].map((_, i) => {
+                    const row = Math.floor(i / 5);
+                    const col = i % 5;
+                    const isLit = (row + col) % 2 === 0 || row === 2 || col === 2;
+                    return <div key={i} className={`cell ${isLit ? 'lit' : ''}`} style={isLit ? { animationDelay: `${i * 80}ms` } : undefined} />;
+                  })}
                 </div>
-                <div className="text-center space-y-2">
-                  <p className="font-semibold text-base" style={{ color: 'var(--text-primary)' }}>Analyzing your pronunciation</p>
-                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Comparing phonemes, rhythm, and intonation...</p>
+                <div className="text-center space-y-1.5">
+                  <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'monospace', letterSpacing: '0.5px' }}>ANALYZING</p>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>phonemes ● rhythm ● intonation</p>
+                </div>
+                <div className="pixel-loading-bar" style={{ maxWidth: 200 }}>
+                  <div className="pixel-loading-fill" />
                 </div>
               </div>
             )}
@@ -710,7 +917,7 @@ const App: React.FC = () => {
               <button
                 onClick={() => { setText(''); setResult(null); setUserAudioBlob(null); setAppState(AppState.IDLE); }}
                 className="w-full py-3.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] animate-fade-in flex items-center justify-center gap-2"
-                style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', color: 'var(--text-secondary)' }}
+                style={{ background: 'var(--surface)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', color: 'var(--text-secondary)' }}
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -739,7 +946,7 @@ const App: React.FC = () => {
                     const linking = await getLinkingAnalysisForText(t);
                     const fixedResult = { ...item.result, fullLinkedSentence: linking.fullLinkedSentence, fullLinkedPhonetic: linking.fullLinkedPhonetic, intonationMap: linking.intonationMap };
                     setResult(fixedResult);
-                    referenceCache.set(t, fixedResult);
+                    lruSet(referenceCache, t, fixedResult, MAX_RESULT_CACHE);
                     const newHistory = history.map(h => h.text.trim().toLowerCase() === t.trim().toLowerCase() ? { ...h, result: fixedResult } : h);
                     setHistory(newHistory);
                     safeSetJSON(CACHE_CONFIG.HISTORY_KEY, newHistory);
@@ -751,12 +958,7 @@ const App: React.FC = () => {
                 }
               }
             }}
-            onClear={() => {
-              if (confirm("Clear all practice history?")) {
-                setHistory([]);
-                safeRemoveItem(CACHE_CONFIG.HISTORY_KEY);
-              }
-            }}
+            onClear={() => setShowClearConfirm(true)}
           />
         </aside>
       </div>
@@ -802,13 +1004,29 @@ const App: React.FC = () => {
                 const item = history.find(h => h.text.trim().toLowerCase() === t.trim().toLowerCase());
                 if (item?.result) setResult(item.result);
               }}
-              onClear={() => {
-                if (confirm("Clear all practice history?")) {
-                  setHistory([]);
-                  safeRemoveItem(CACHE_CONFIG.HISTORY_KEY);
-                }
-              }}
+              onClear={() => setShowClearConfirm(true)}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Clear History Confirm Dialog */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowClearConfirm(false)}>
+          <div className="rounded-2xl p-6 w-full max-w-xs animate-fade-in-up"
+            style={{ background: 'var(--surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
+            onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Clear all history?</p>
+            <p className="text-xs mb-5" style={{ color: 'var(--text-muted)' }}>This can't be undone.</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setShowClearConfirm(false)}
+                className="px-4 py-2 rounded-lg text-xs font-semibold"
+                style={{ background: 'var(--surface-muted)', color: 'var(--text-secondary)' }}>Cancel</button>
+              <button onClick={() => { setHistory([]); safeRemoveItem(CACHE_CONFIG.HISTORY_KEY); setShowClearConfirm(false); }}
+                className="px-4 py-2 rounded-lg text-xs font-semibold"
+                style={{ background: 'var(--red)', color: '#fff' }}>Clear</button>
+            </div>
           </div>
         </div>
       )}

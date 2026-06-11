@@ -77,57 +77,201 @@ const WORD_PHONETICS: Record<string, string> = {
   'pm': 'ˌpiˈɛm',
   'three': 'θri',
   'going': 'ˈgoʊɪŋ',
+
+  // Lax /ʊ/ "oo" — without dict, transliterate would still use ʊ (correct), but explicit is safer
+  'good': 'ɡʊd',
+  'book': 'bʊk',
+  'look': 'lʊk',
+  'took': 'tʊk',
+  'foot': 'fʊt',
+  'wood': 'wʊd',
+  'cook': 'kʊk',
+  'hook': 'hʊk',
+  'put': 'pʊt',
+
+  // Tense /u/ "oo" — these need dict; default transliterate would give ʊ (wrong)
+  'too': 'tu',
+  'food': 'fud',
+  'moon': 'mun',
+  'soon': 'sun',
+  'room': 'rum',
+  'boot': 'but',
+  'school': 'skul',
+  'pool': 'pul',
+  'true': 'tru',
+  'blue': 'blu',
+  'due': 'du',
+  'news': 'nuz',
+  'few': 'fju',
+  'new': 'nu',
+
+  // Irregular silent letters / spellings
+  'two': 'tu',          // silent w
+  'one': 'wʌn',         // irregular onset
+  'once': 'wʌns',
+  'said': 'sɛd',
+  'says': 'sɛz',
+  'dead': 'dɛd',        // 'ea' as /ɛ/
+  'head': 'hɛd',
+  'bread': 'brɛd',
+  'ready': 'ˈrɛdi',
+  'eight': 'eɪt',       // silent gh
+  'write': 'raɪt',      // silent w
+  'wrote': 'roʊt',
+  'wrong': 'rɑŋ',
+
+  // Common flap-T words (American: /t/ → /ɾ/ between vowels)
+  'water': 'ˈwɔɾər',
+  'better': 'ˈbɛɾər',
+  'butter': 'ˈbʌɾər',
+  'letter': 'ˈlɛɾər',
+  'letters': 'ˈlɛɾərz',
+  'matter': 'ˈmæɾər',
+  'city': 'ˈsɪɾi',
+  'pretty': 'ˈprɪɾi',
+  'party': 'ˈpɑrɾi',
+  'sorry': 'ˈsɑri',
+  'really': 'ˈrili',
+  'later': 'ˈleɪɾər',
+  'meeting': 'ˈmiɾɪŋ',
+  'getting': 'ˈɡɛɾɪŋ',
+  'sitting': 'ˈsɪɾɪŋ',
+  'writing': 'ˈraɪɾɪŋ',
+  'daughter': 'ˈdɔɾər',
+  'bottle': 'ˈbɑɾəl',
+  'little': 'ˈlɪɾəl',
+  'middle': 'ˈmɪdəl',
+
+  // Vowels that transliterate gets wrong
+  'pilot': 'ˈpaɪlət',
+  'hi': 'haɪ',
+  'high': 'haɪ',
+  'time': 'taɪm',
+  'nice': 'naɪs',
+  'like': 'laɪk',
+  'make': 'meɪk',
+  'home': 'hoʊm',
+
+  // Common content words seen in test sessions (workflow corpus)
+  'here': 'hɪr',
+  'there': 'ðɛr',
+  'sure': 'ʃʊr',
+  'work': 'wɜrk',
+  'house': 'haʊs',
+  'people': 'ˈpipəl',
+  'family': 'ˈfæməli',
+  'friend': 'frɛnd',
+  'mother': 'ˈmʌðər',
+  'father': 'ˈfɑðər',
+  'sister': 'ˈsɪstər',
+  'brother': 'ˈbrʌðər',
+  'another': 'əˈnʌðər',
+  'flight': 'flaɪt',
+  'hours': 'aʊərz',
+  'announced': 'əˈnaʊnst',
+  'delayed': 'dɪˈleɪd',
+  'rebook': 'riˈbʊk',
+  'airline': 'ˈɛrlaɪn',
+  'personnel': 'pɝrsəˈnɛl',
+  'issues': 'ˈɪʃuz',
+  'because': 'bɪˈkʌz',
+  'beautiful': 'ˈbjuɾəfəl',
 };
 
 /**
- * Simple rule-based English → IPA transliteration for unknown words.
- * Not perfect, but much better than showing raw English inside IPA.
+ * Slot placeholders — guaranteed non-Latin so single-letter rules can't cannibalize digraph output.
+ * E.g. "good" → "g⦀21⦁d" after digraph pass → ʊ stays safe → final "ɡʊd".
+ * The previous bug: oo→uː, then u→ʌ destroyed the uː → "gʌːd".
+ */
+const SLOT_IPA: Record<number, string> = {
+  1: 'eɪ', 2: 'aɪ', 3: 'oʊ', 4: 'u',
+  10: 'ʃən', 11: 'ʒən', 12: 'aɪt', 13: 'oʊ', 14: 'ɔ',
+  20: 'u', 21: 'ʊ', 22: 'i', 23: 'oʊ',
+  24: 'eɪ', 25: 'ɔɪ', 26: 'aʊ', 27: 'ɪr', 28: 'ɛr', 29: 'aʊər',
+  30: 'f', 31: 'tʃ', 32: 'ʃ', 33: 'ð', 34: 'ŋ', 35: 'k', 36: 'w',
+};
+const slot = (n: number): string => `⦀${n}⦁`;
+
+/**
+ * Rule-based English → IPA transliteration for unknown words (fallback when dict misses).
+ * Uses slot placeholders to prevent digraph output from being clobbered by later single-letter rules.
  */
 function transliterateToIPA(word: string): string {
-  return word
-    // Multi-char replacements first (order matters)
-    .replace(/tion/g, 'ʃən')
-    .replace(/sion/g, 'ʒən')
-    .replace(/ough/g, 'oʊ')
-    .replace(/augh/g, 'ɔ')
-    .replace(/ight/g, 'aɪt')
-    .replace(/igh/g, 'aɪ')
-    .replace(/ear/g, 'ɪər')
-    .replace(/eer/g, 'ɪər')
-    .replace(/air/g, 'ɛər')
-    .replace(/oor/g, 'ʊər')
-    .replace(/our/g, 'aʊər')
-    .replace(/ow$/g, 'oʊ')
-    .replace(/ow/g, 'aʊ')
-    .replace(/oi/g, 'ɔɪ')
-    .replace(/ou/g, 'aʊ')
-    .replace(/ee/g, 'iː')
-    .replace(/ea/g, 'iː')
-    .replace(/ay/g, 'eɪ')
-    .replace(/ai/g, 'eɪ')
-    .replace(/oa/g, 'oʊ')
-    .replace(/oo/g, 'uː')
-    .replace(/ph/g, 'f')
-    .replace(/ch/g, 'tʃ')
-    .replace(/sh/g, 'ʃ')
-    .replace(/th/g, 'ð')
-    .replace(/ng/g, 'ŋ')
-    .replace(/wh/g, 'w')
-    .replace(/ck/g, 'k')
-    .replace(/ce$/g, 's')
-    .replace(/ge$/g, 'dʒ')
-    // Single vowels
+  let s = word;
+
+  // Pass 1: Multi-char patterns → slot placeholders.
+  // Silent-e CVCe → long vowel + drop final e
+  s = s
+    .replace(/([bcdfghjklmnpqrstvwxz])a([bcdfghjklmnpqrstvwxz])e\b/g, `$1${slot(1)}$2`)
+    .replace(/([bcdfghjklmnpqrstvwxz])i([bcdfghjklmnpqrstvwxz])e\b/g, `$1${slot(2)}$2`)
+    .replace(/([bcdfghjklmnpqrstvwxz])o([bcdfghjklmnpqrstvwxz])e\b/g, `$1${slot(3)}$2`)
+    .replace(/([bcdfghjklmnpqrstvwxz])u([bcdfghjklmnpqrstvwxz])e\b/g, `$1${slot(4)}$2`);
+
+  // Trigraphs / morphemes
+  s = s
+    .replace(/tion\b/g, slot(10))
+    .replace(/sion\b/g, slot(11))
+    .replace(/ight/g, slot(12))
+    .replace(/ough/g, slot(13))
+    .replace(/augh/g, slot(14));
+
+  // R-colored digraphs (must come before plain ow/ou rules)
+  s = s
+    .replace(/ear/g, slot(27))
+    .replace(/eer/g, slot(27))
+    .replace(/air/g, slot(28))
+    .replace(/our/g, slot(29));
+
+  // Vowel digraphs
+  s = s
+    .replace(/ew/g, slot(20))   // fixes "news" → nuz
+    .replace(/ue/g, slot(20))   // fixes "true/blue/due"
+    .replace(/oo/g, slot(21))   // defaults to lax ʊ (good, book); tense /u/ "oo" words live in dict
+    .replace(/ee/g, slot(22))
+    .replace(/ea/g, slot(22))
+    .replace(/oa/g, slot(23))
+    .replace(/ai/g, slot(24))
+    .replace(/ay/g, slot(24))
+    .replace(/oi/g, slot(25))
+    .replace(/oy/g, slot(25))
+    .replace(/ou/g, slot(26))
+    .replace(/ow\b/g, slot(23))  // word-final → oʊ
+    .replace(/ow/g, slot(26));   // elsewhere → aʊ
+
+  // Consonant digraphs
+  s = s
+    .replace(/ph/g, slot(30))
+    .replace(/ch/g, slot(31))
+    .replace(/sh/g, slot(32))
+    .replace(/th/g, slot(33))
+    .replace(/ng/g, slot(34))
+    .replace(/ck/g, slot(35))
+    .replace(/wh/g, slot(36));
+
+  // Pass 2: Single letters — safe now, digraphs are non-Latin slots
+  s = s
     .replace(/a/g, 'æ')
+    .replace(/e\b/g, '')        // drop final orphan e (silent)
     .replace(/e/g, 'ɛ')
     .replace(/i/g, 'ɪ')
     .replace(/o/g, 'ɑ')
     .replace(/u/g, 'ʌ')
-    .replace(/y$/g, 'i')
+    .replace(/y\b/g, 'i')
     .replace(/y/g, 'j')
-    // Single consonants
     .replace(/c/g, 'k')
     .replace(/x/g, 'ks')
     .replace(/q/g, 'k');
+
+  // Pass 3: Decode slot placeholders → IPA
+  s = s.replace(/⦀(\d+)⦁/g, (_m, n) => SLOT_IPA[Number(n)] ?? '');
+
+  // Pass 4: American refinements
+  // Final s → z after a voiced sound (rough: vowel or voiced consonant)
+  s = s.replace(/([æɑɛɪʊʌəɔiueɪaɪoʊaʊɔɪmnŋlrbdɡvðzʒ])s\b/g, '$1z');
+  // Flap-T between vowels (intervocalic /t/ → /ɾ/) — American casual register
+  s = s.replace(/([æɑɛɪʊʌəaɪoʊeɪ])t([æɑɛɪʊʌəaɪoʊeɪ])/g, '$1ɾ$2');
+
+  return s;
 }
 
 /**
@@ -183,12 +327,21 @@ export function isPhoneticComplete(text: string, phonetic: string): boolean {
     return false;
   }
 
-  // Detect if AI left raw English words in the phonetic (e.g. "spicy", "original")
-  // A segment is "raw English" if it contains only ASCII letters and no IPA characters
-  const ipaChars = /[æɑɒɛɪɯɔʊəɐɜɞœøɵɶɨʉɘɵɤɑɒɚɝʌɵʏɤɶɑɒ̞ɐɵɤɑɒɞœɨɞɵɚɪʏɞɤɑɪɛɵɞɜɘɵɐɤ̞ɑɐɪɤɵɘɞɜɵɤɑɒɛɵɐɪɘɶɵɜɤɵɤɑɒɐɪɤɘɵɞɛɵɶɸɰɥʋɹɻɰʁɽɸβðθʃʒʧʤŋɲɴʍʎɫɬɮɣχɦɧɕʑɭɻʈɖɗɓɠʔˈˌ]/;
+  // Detect untranslated English by looking for English-only SIGNALS, not by requiring
+  // non-ASCII IPA glyphs. Many valid IPA symbols are plain ASCII (i, u, t, n, z, r, l,
+  // h, b, d, k, m, p, s, w), so the old "must contain non-ASCII" rule false-positive'd
+  // on perfectly good IPA like 'nuz' (news), 'tru' (true), 'rili' (really).
+  const ENGLISH_ONLY_LETTERS = /[acqxyeo]/i;
+  // c/q/x/y never appear in American English IPA; a/e/o are replaced by æ/ɛ/ɑ/ə/ɔ.
+  const ENGLISH_ONLY_DIGRAPHS = /th|sh|ch|ng|ck|ph|gh|wh|qu|ll|ss|tt|ee|oo|ea|ou|ow|ai|ay|ie|ue/i;
   const rawEnglishSegments = phoneticSegments.filter(seg => {
-    const clean = seg.replace(/[ˈˌ.ː]/g, '');
-    return /^[a-z]{3,}$/.test(clean) && !ipaChars.test(clean);
+    const clean = seg.replace(/[ˈˌ.ːʰʷʲˠˤ]/g, '');
+    // Already contains non-ASCII IPA glyph → definitely IPA
+    if (/[^\x00-\x7F]/.test(clean)) return false;
+    // Short ASCII segments (< 4 chars) are too ambiguous to flag — 'nuz', 'tru', 'hi' all valid IPA
+    if (clean.length < 4) return false;
+    // Long ASCII segment is suspicious only if it contains English-only letters or digraphs
+    return ENGLISH_ONLY_LETTERS.test(clean) || ENGLISH_ONLY_DIGRAPHS.test(clean);
   });
 
   if (rawEnglishSegments.length > 0) {

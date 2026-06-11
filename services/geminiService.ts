@@ -1,7 +1,8 @@
 
 import { GoogleGenAI, Modality } from "@google/genai";
 import { AnalysisResult } from "../types";
-import { shouldLink } from "./linkingUtils";
+import { API_CONFIG } from "../config/constants";
+import { shouldLink, enrichLinkedSentence } from "./linkingUtils";
 import {
   isPhoneticComplete,
   fixCommonPhoneticErrors,
@@ -22,32 +23,47 @@ if (!USE_PROXY) {
   ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
 }
 
-// ── Proxy fetch helper ──────────────────────────────────────────────
+// ── Proxy fetch helper with retry ──────────────────────────────────
 async function proxyPost(endpoint: string, body: Record<string, any>, timeoutMs = 25000): Promise<any> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(`/api/${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(err.error || `API ${endpoint} failed (${res.status})`);
+  let lastError: any;
+  for (let attempt = 0; attempt < API_CONFIG.RETRY_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(`/api/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        const status = res.status;
+        // Don't retry on 4xx client errors (bad request, auth, rate limit)
+        if (status >= 400 && status < 500) {
+          throw new Error(err.error || `API ${endpoint} failed (${status})`);
+        }
+        // 5xx server errors — retry
+        throw new Error(err.error || `API ${endpoint} server error (${status})`);
+      }
+      return res.json();
+    } catch (e: any) {
+      lastError = e;
+      if (e.name === 'AbortError') {
+        lastError = new Error('Request timed out. Please try again.');
+        (lastError as any).code = 'REQUEST_TIMEOUT';
+      }
+      // Don't retry on client errors or if last attempt
+      if ((e.message && /4\d{2}/.test(e.message)) || attempt === API_CONFIG.RETRY_ATTEMPTS - 1) {
+        break;
+      }
+      // Wait before retry with exponential backoff
+      await new Promise(r => setTimeout(r, API_CONFIG.RETRY_DELAY * (attempt + 1)));
+    } finally {
+      clearTimeout(timer);
     }
-    return res.json();
-  } catch (e: any) {
-    if (e.name === 'AbortError') {
-      const err = new Error('Request timed out. Please try again.');
-      (err as any).code = 'REQUEST_TIMEOUT';
-      throw err;
-    }
-    throw e;
-  } finally {
-    clearTimeout(timer);
   }
+  throw lastError;
 }
 
 // ── TTS ─────────────────────────────────────────────────────────────
@@ -60,8 +76,8 @@ export const generateSpeech = async (text: string, slow: boolean = false, voiceN
 
   try {
     const prompt = slow
-      ? `Speak slowly and clearly with standard American English pronunciation: ${text}`
-      : `Read with standard American English pronunciation, natural stress and intonation: ${text}`;
+      ? `Speak slowly and clearly in standard American English, with deliberate pauses at commas and periods so each clause is easy to follow: ${text}`
+      : `Read in natural standard American English with: proper flap-T (water→wader, better→bedder, "due to"→"due-duh"), rhotic r, natural word linking, AND conversational prosody — brief breath pause at commas, longer pause at periods, NOT a flat monotone: ${text}`;
     const response = await ai!.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: prompt }] }],
@@ -88,7 +104,7 @@ export const generateTutorAudio = async (text: string, voiceName: string = 'Kore
   try {
     const response = await ai!.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: `Pronounce clearly with standard American English stress and intonation: "${text}"` }] }],
+      contents: [{ parts: [{ text: `Pronounce clearly in standard American English with natural flap-T (e.g., "water" sounds like "wader", "due to" sounds like "due-duh"): "${text}"` }] }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
@@ -105,111 +121,95 @@ export const generateTutorAudio = async (text: string, voiceName: string = 'Kore
 
 // ── Pronunciation Analysis ──────────────────────────────────────────
 
-const PRONUNCIATION_ANALYSIS_INSTRUCTION = `You are an expert English pronunciation evaluator with deep phonetics knowledge.
+// Slim prompt: scoring only — linking/prosody is merged from cache separately
+const PRONUNCIATION_SCORING_INSTRUCTION = `You are an expert English pronunciation evaluator.
 
-Your task: Listen carefully to the audio and compare EVERY word to the reference sentence. You MUST identify what the learner actually said, even when close to correct.
+Listen to the audio and score EVERY word against the reference sentence.
 
-## MANDATORY FIELDS — never omit these
+## MANDATORY: For EVERY word in wordBreakdown
+- "phoneticUser": REQUIRED — IPA of what the learner actually produced. Copy phoneticCorrect if perfect.
+- "phonemes": REQUIRED when wordScore < 90. Each entry MUST have "userPhoneme" when score < 85.
 
-For EVERY word in wordBreakdown:
-- "phoneticUser": REQUIRED — write what the learner actually produced in IPA.
-  - If perfect: copy phoneticCorrect exactly.
-  - If different: write the actual sounds heard (e.g. "wɛri" instead of "vɛri").
-- "phonemes": REQUIRED for every word with wordScore < 90.
-  - Each phoneme entry MUST include "userPhoneme" when score < 85, even if close.
+## Scoring (0-100)
+- 90-100: all phonemes correct, natural rhythm
+- 75-89: 1-2 minor substitutions, correct stress
+- 60-74: noticeable errors, some stress issues
+- 40-59: frequent errors affecting clarity
+- 0-39: most phonemes wrong
 
-## Scoring Rubric (0-100)
+## Focus: /æ/ɛ/, /ɪ/iː/, /θ/ð/→/s/z/, /r/l/, /v/w/, dropped final consonants, stress placement
 
-### 90-100: Excellent — all phonemes correct, natural rhythm, proper linking
-### 75-89: Good — 1-2 minor substitutions, correct stress, slight accent
-### 60-74: Fair — noticeable errors, some stress issues, choppy rhythm
-### 40-59: Needs Work — frequent errors affecting clarity, wrong stress
-### 0-39: Significant — most phonemes wrong, very hard to understand
+## Status: "correct" | "needs_improvement" | "incorrect"
 
-## Focus Areas
-
-1. **Vowels**: /æ/ vs /ɛ/, /ɪ/ vs /iː/, /ʊ/ vs /uː/, /ɑː/ vs /ʌ/, /ɜːr/ vs /ɔ/
-2. **Consonants**: /θ/ /ð/ (often → /s/ /z/ or /t/ /d/), /r/ vs /l/, /v/ vs /w/ or /b/
-3. **Final consonants**: dropped /t/ /d/ /s/ /z/ at word endings
-4. **Stress**: primary stress on content words, weak forms for function words
-5. **Intonation & linking**: rising yes/no questions, falling statements
-6. **Common L2 errors**: adding vowels between consonant clusters, shortening long vowels
-
-## Word Status
-
-- "correct": sounds accurate, stress right — phoneticUser still REQUIRED
-- "needs_improvement": understandable but noticeable issues
-- "incorrect": phoneme substitution that obscures the word
-
-## Output Format (strict JSON — no markdown, no extra text)
-
+## JSON Output (no markdown):
 {
   "score": <0-100>,
-  "overallComment": "<1-2 sentences: most impactful improvement the learner can make>",
-  "speechScript": "<exact reference text>",
+  "overallComment": "<1 sentence: most impactful tip>",
+  "speechScript": "<exact reference>",
   "wordBreakdown": [
     {
       "word": "<word>",
-      "status": "correct" | "needs_improvement" | "incorrect",
-      "phoneticCorrect": "<correct IPA, no stress marks>",
-      "phoneticUser": "<REQUIRED: what learner actually produced in IPA>",
+      "status": "<status>",
+      "phoneticCorrect": "<correct IPA>",
+      "phoneticUser": "<REQUIRED: learner IPA>",
       "wordScore": <0-100>,
-      "phonemes": [
-        {
-          "phoneme": "<correct phoneme>",
-          "score": <0-100>,
-          "userPhoneme": "<REQUIRED when score < 85: what learner produced>"
-        }
-      ],
-      "suggestion": "<physical tip: tongue position, lip shape, airflow — empty string if correct>"
+      "phonemes": [{ "phoneme": "<correct>", "score": <0-100>, "userPhoneme": "<learner>" }],
+      "suggestion": "<tip or empty>"
     }
+  ]
+}
+
+CRITICAL: Be honest. phoneticUser is NEVER optional. Silent/unintelligible = score 0.`;
+
+// Full prompt: includes linking/prosody fields (used when no cache available)
+const PRONUNCIATION_FULL_INSTRUCTION = `${PRONUNCIATION_SCORING_INSTRUCTION.replace(
+  '## JSON Output (no markdown):',
+  '## JSON Output (no markdown) — include linking fields:'
+).replace(
+  `    }
+  ]
+}`,
+  `    }
   ],
   "fullLinkedSentence": "<reference with ‿ linking>",
   "fullLinkedPhonetic": "<IPA with ˈ on content words, . at linking points>",
   "intonationMap": "<space-separated ● · tokens, last token has ↗ or ↘>"
-}
+}`
+)}`;
 
-CRITICAL:
-- Be honest, not flattering. Do not inflate scores.
-- phoneticUser is NEVER optional. Always fill it in.
-- If audio is silent or unintelligible, return score 0.`;
-
-const ANALYSIS_MODELS = ["gemini-3.1-pro-preview", "gemini-3-flash-preview"] as const;
+// Flash model only — pronunciation scoring doesn't need pro-level reasoning
+const ANALYSIS_MODEL = "gemini-3-flash-preview";
 
 export const analyzePronunciation = async (
   referenceText: string,
-  userAudioBase64: string
+  userAudioBase64: string,
+  /** When true, omit linking/prosody fields from prompt for faster response */
+  slim = false,
 ): Promise<AnalysisResult> => {
+  const t0 = performance.now();
   if (USE_PROXY) {
-    return proxyPost('analyze', { referenceText, audioBase64: userAudioBase64 });
+    const result = await proxyPost('analyze', { referenceText, audioBase64: userAudioBase64, slim });
+    console.log(`[perf] analyzePronunciation: ${((performance.now() - t0) / 1000).toFixed(1)}s (proxy, slim=${slim})`);
+    return result;
   }
 
-  let lastError: any;
-  for (const model of ANALYSIS_MODELS) {
-    try {
-      console.log(`Trying pronunciation analysis with ${model}...`);
-      const response = await ai!.models.generateContent({
-        model,
-        contents: {
-          parts: [
-            { inlineData: { mimeType: "audio/webm", data: userAudioBase64 } },
-            { text: `Reference sentence: "${referenceText}"\n\nListen to my recording and evaluate my pronunciation of this sentence. Score each word individually and provide overall feedback.` }
-          ]
-        },
-        config: {
-          systemInstruction: PRONUNCIATION_ANALYSIS_INSTRUCTION,
-          responseMimeType: "application/json",
-        }
-      });
-      const text = response.text || "{}";
-      console.log(`Analysis succeeded with ${model}`);
-      return JSON.parse(text.replace(/```json|```/g, '').trim());
-    } catch (error) {
-      console.error(`${model} failed:`, error);
-      lastError = error;
+  const instruction = slim ? PRONUNCIATION_SCORING_INSTRUCTION : PRONUNCIATION_FULL_INSTRUCTION;
+  const response = await ai!.models.generateContent({
+    model: ANALYSIS_MODEL,
+    contents: {
+      parts: [
+        { inlineData: { mimeType: "audio/webm", data: userAudioBase64 } },
+        { text: `Reference sentence: "${referenceText}"\n\nEvaluate my pronunciation. Score each word.` }
+      ]
+    },
+    config: {
+      systemInstruction: instruction,
+      responseMimeType: "application/json",
     }
-  }
-  throw lastError;
+  });
+  const text = response.text || "{}";
+  console.log(`[perf] analyzePronunciation: ${((performance.now() - t0) / 1000).toFixed(1)}s (direct, slim=${slim})`);
+  return JSON.parse(text.replace(/```json|```/g, '').trim());
 };
 
 // ── Linking / Prosody Analysis ──────────────────────────────────────
@@ -217,9 +217,25 @@ export const analyzePronunciation = async (
 const TUTOR_SYSTEM_INSTRUCTION = `You are a world-class English Phonetics Coach specializing in American English.
 Your goal is to provide complete prosody analysis for ANY sentence, no matter how long.
 
+AMERICAN ENGLISH PRONUNCIATION (apply throughout fullLinkedPhonetic):
+- Flap-T: When /t/ sits between two vowel sounds AND the following vowel is unstressed,
+  transcribe as /ɾ/ instead of /t/. Applies whether or not there's a ‿ linking mark.
+  • Within word: water→ˈwɔɾər, better→ˈbɛɾər, city→ˈsɪɾi, getting→ˈɡɛɾɪŋ, party→ˈpɑrɾi
+  • Across words: "due to"→duː ɾə, "get up"→ɡɛɾ ʌp, "what is"→wʌɾ ɪz, "a lot of"→ə ˈlɑɾ əv
+- Rhotic /r/: always show r in r-colored vowels (work→ˈwɜrk, driver→ˈdraɪvər, more→mɔr).
+- American vowels: /oʊ/ for go/home (NOT British /əʊ/), /æ/ for cat/dance, /ɑ/ for lot/hot.
+- Weak forms: unstressed function words use their reduced SPOKEN form — to→tə, a→ə, an→ən,
+  and→ənd, of→əv, for→fər, can→kən, was→wəz. The IPA must match how the sentence is
+  actually spoken, not dictionary citation forms.
+- Careful: main-verb "do"→du (NOT dʊ, NOT də). "too"/"two"→tu.
+
 STRICT RULES:
 1. 'fullLinkedSentence': Mark ALL natural linking points with '‿' in American English.
    - Consonant + Vowel: "tell‿us", "take‿it", "check‿out"
+   - Same-consonant merge: when a word ENDS with the same consonant sound the next word
+     STARTS with, link them — natives pronounce ONE consonant, not two:
+     "out‿tonight", "gas‿station", "stop‿pushing", "what‿time"
+     In fullLinkedPhonetic write that consonant ONCE: out‿tonight → aʊ.təˈnaɪt
    - Mark EVERY linking point in the sentence.
 
 2. 'intonationMap': MUST have one token for EACH word in the sentence.
@@ -236,6 +252,14 @@ STRICT RULES:
    b) Function words (a, the, to, for, in, on, or, and, but, you, I, we, can, do, is, was) → NO ˈ
    c) Use a SPACE between words.
    d) At each linking point (where ‿ appears in fullLinkedSentence), replace the space with a syllable dot .
+   d2) CRITICAL — chain linking: N words joined by ‿ must produce ONE phonetic block
+       with all atoms joined by dots. NEVER break the chain with a space.
+       Example: "rebook‿us‿on‿a" (4 linked words) → "riˈbʊ.kʌ.sɑ.nə" (one block, three dots).
+       Wrong: "riˈbʊ.kʌs ɑ.nə" (broken into two blocks).
+   d3) CONSISTENCY — fullLinkedSentence and fullLinkedPhonetic MUST have the SAME number of
+       space-separated blocks. If you merge words with dots in the phonetic, you MUST mark ‿
+       at the same boundaries in the sentence. E.g. phonetic "ˈhæŋɪŋ.aʊ.təˈnaɪt" (one block)
+       requires sentence "hanging‿out‿tonight" (one block). Check this before responding.
    e) Do NOT use ˌ (secondary stress). Do NOT use ‿ in fullLinkedPhonetic.
 
 Example for "Do you like it?":
@@ -257,6 +281,13 @@ Example for long sentence "Enter the code displayed in the app":
   "fullLinkedSentence": "Enter‿the code displayed‿in the‿app",
   "intonationMap": "● · ● ● · · ●↘",
   "fullLinkedPhonetic": "ˈɛn.tər ðə ˈkoʊd dɪˈspleɪd.ɪn ði.ˈæp"
+}
+
+Example demonstrating flap-T (note /t/→/ɾ/ in "due to"):
+{
+  "fullLinkedSentence": "It's due to personnel‿issues this time",
+  "intonationMap": "· ● · ● ● · ●↘",
+  "fullLinkedPhonetic": "ɪts ˈduː ɾə pɝrsəˈnɛl ˈɪʃuz ðɪs ˈtaɪm"
 }
 
 CRITICAL: For long sentences, you MUST include ALL words. Do not truncate or omit any words.
@@ -379,6 +410,11 @@ export const getLinkingAnalysisForText = async (text: string): Promise<any> => {
       const code = char.charCodeAt(0);
       return code !== 44 && code !== 65292 && code !== 12289;
     }).join('');
+
+    // Deterministic safety net: the LLM often merges same-consonant pairs in the
+    // phonetic ("out tonight" → aʊ.təˈnaɪt) but forgets the ‿ in the sentence.
+    // Add the missing ‿ ourselves so arcs match what the audio actually does.
+    cleanedLinkedSentence = enrichLinkedSentence(cleanedLinkedSentence);
 
     let finalPhonetic = parsed.fullLinkedPhonetic || '';
 

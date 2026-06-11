@@ -2,7 +2,29 @@
   "permissions": {
     "allow": [
       "Bash(xargs kill -9)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Read(//Users/mac/40_Creative/Cursor/05 EchoCoach/$BASE/**)",
+      "Read(//Users/mac/40_Creative/Cursor/05 EchoCoach/$BASE/24-Professional/**)",
+      "Read(//Users/mac/40_Creative/Cursor/05 EchoCoach/**)",
+      "Bash(BASE=\"/Users/mac/Library/CloudStorage/坚果云-88540001@qq.com/weihong/20-Learn/26-AI\")",
+      "Bash(do basename:*)",
+      "Bash(BASE=\"/Users/mac/Library/CloudStorage/坚果云-88540001@qq.com/weihong/20-Learn/26-AI/Prompts\")",
+      "Bash(BASE=\"/Users/mac/Library/CloudStorage/坚果云-88540001@qq.com/weihong/20-Learn/26-AI/Meta-Skills\")",
+      "Bash(mkdir -p \"$BASE/25-Skills/25.2-Learning-Methods\")",
+      "Bash(mv \"$BASE/26-AI/Meta-Skills/01 杜威十进制图书分类法.md\" \"$BASE/25-Skills/25.2-Learning-Methods/\")",
+      "Bash(mv \"$BASE/26-AI/Meta-Skills/02 柳比歇夫工作法 1.md\" \"$BASE/25-Skills/25.2-Learning-Methods/\")",
+      "Bash(mv \"$BASE/26-AI/Meta-Skills/03 知识体系建立.md\" \"$BASE/25-Skills/25.2-Learning-Methods/\")",
+      "Bash(rmdir \"$BASE/26-AI/Meta-Skills\")",
+      "Bash(mv \"$BASE/Prompts/216-Claude Code状态词汇笔记.md\" \"$BASE/Programming/\")",
+      "Bash(mv \"$BASE/Prompts/Claude Code 中英双语标注配置.md\" \"$BASE/Programming/\")",
+      "Read(//Users/mac/40_Creative/Cursor/05 EchoCoach/$BASE/26-AI/**)",
+      "Read(//Users/mac/40_Creative/Cursor/05 EchoCoach/$BASE/25-Skills/**)",
+      "WebFetch(domain:www.spotify.com)"
+    ],
+    "additionalDirectories": [
+      "/Users/mac/40_Creative/Cursor/05 EchoCoach/$BASE/25-Skills",
+      "/Users/mac/40_Creative/Cursor/05 EchoCoach/$BASE/Programming",
+      "/Users/mac/Library/CloudStorage/坚果云-88540001@qq.com/weihong/20-Learn/26-AI/Prompts"
     ]
   },
   "enabledMcpjsonServers": [

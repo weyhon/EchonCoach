@@ -69,14 +69,9 @@ const stopCurrentAudio = () => {
     }
   }
 
-  if (currentAudioContext) {
-    try {
-      currentAudioContext.close();
-      currentAudioContext = null;
-    } catch (e) {
-      console.warn("Error closing audio context:", e);
-    }
-  }
+  // Don't close AudioContext here — just clear the reference.
+  // The global singleton context is reused and only closed on app unmount.
+  currentAudioContext = null;
 };
 
 export const decodePCM = (
@@ -137,10 +132,9 @@ export const playPCMAudio = async (base64Audio: string): Promise<void> => {
       source.connect(audioContext.destination);
 
       source.onended = () => {
-        console.log("PCM playback ended");
         currentAudioSource = null;
         currentAudioContext = null;
-        audioContext.close();
+        // Don't close the global AudioContext — it's reused across playbacks
         resolve();
       };
 
@@ -190,3 +184,68 @@ export const cleanupAudioResources = () => {
     globalAudioContext = null;
   }
 };
+
+/**
+ * Convert a webm audio Blob to 16kHz 16-bit PCM mono WAV.
+ * Azure Speech API requires WAV format for pronunciation assessment.
+ */
+export const convertToWav = async (blob: Blob): Promise<Blob> => {
+  const ctx = getAudioContext();
+  const arrayBuf = await blob.arrayBuffer();
+  const audioBuf = await ctx.decodeAudioData(arrayBuf);
+
+  // Downsample to 16kHz mono
+  const targetRate = 16000;
+  const offline = new OfflineAudioContext(1, Math.ceil(audioBuf.duration * targetRate), targetRate);
+  const source = offline.createBufferSource();
+  source.buffer = audioBuf;
+  source.connect(offline.destination);
+  source.start(0);
+  const rendered = await offline.startRendering();
+
+  // Encode as WAV
+  const pcm = rendered.getChannelData(0);
+  const wavBuf = encodeWav(pcm, targetRate);
+  return new Blob([wavBuf], { type: 'audio/wav' });
+};
+
+/** Encode Float32 PCM samples to a WAV ArrayBuffer */
+function encodeWav(samples: Float32Array, sampleRate: number): ArrayBuffer {
+  const numSamples = samples.length;
+  const buffer = new ArrayBuffer(44 + numSamples * 2);
+  const view = new DataView(buffer);
+
+  // RIFF header
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + numSamples * 2, true);
+  writeString(view, 8, 'WAVE');
+
+  // fmt chunk
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);           // chunk size
+  view.setUint16(20, 1, true);            // PCM format
+  view.setUint16(22, 1, true);            // mono
+  view.setUint32(24, sampleRate, true);    // sample rate
+  view.setUint32(28, sampleRate * 2, true); // byte rate
+  view.setUint16(32, 2, true);            // block align
+  view.setUint16(34, 16, true);           // bits per sample
+
+  // data chunk
+  writeString(view, 36, 'data');
+  view.setUint32(40, numSamples * 2, true);
+
+  // PCM samples — clamp to [-1, 1] then scale to 16-bit
+  let offset = 44;
+  for (let i = 0; i < numSamples; i++, offset += 2) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+
+  return buffer;
+}
+
+function writeString(view: DataView, offset: number, str: string) {
+  for (let i = 0; i < str.length; i++) {
+    view.setUint8(offset + i, str.charCodeAt(i));
+  }
+}

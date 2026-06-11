@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { WordAnalysis } from '../types';
 import { PHONEME_VIDEOS } from '../data/phonemeVideos';
 
@@ -12,6 +12,100 @@ interface WordDetailModalProps {
   onPlayPhoneme: (phonemeText: string) => void;
   isCoachPlaying: boolean;
   hasUserRecording: boolean;
+}
+
+// Maps IPA phonemes to "wrong" English words/sounds that TTS will pronounce differently.
+// Key: correct IPA phoneme, Value: a confusable word snippet that sounds wrong.
+const WRONG_SOUND: Record<string, string> = {
+  // Consonants
+  'ʃ': 's',      // sh → s: "sure" → "soor"
+  'ʒ': 'z',      // zh → z: "measure" → "mezure"
+  'θ': 's',      // th → s: "think" → "sink"
+  'ð': 'd',      // th → d: "the" → "duh"
+  'ɹ': 'l',      // r → l: "red" → "led"
+  'v': 'w',      // v → w: "very" → "wery"
+  'ŋ': 'n',      // ng → n: "sing" → "sin"
+  'tʃ': 'ts',    // ch → ts: "church" → "tsurtsh"
+  'dʒ': 'z',     // j → z: "judge" → "zuz"
+  // Vowels & diphthongs
+  'æ': 'ɛ',      // cat → "ket"
+  'ɪ': 'i',      // bit → "beat"
+  'ʊ': 'u',      // book → "buke"
+  'oʊ': 'ɔ',     // go → "gaw"
+  'aɪ': 'a',     // my → "mah"
+  'aʊ': 'ɑ',     // how → "hah"
+  'eɪ': 'ɛ',     // day → "deh"
+  'ɝ': 'ɜ',      // bird → non-rhotic
+};
+
+// Map each IPA phoneme to a TTS-friendly English spelling
+const IPA_TO_SPELL: [string, string][] = [
+  ['aɪ', 'eye'], ['aʊ', 'ow'], ['ɔɪ', 'oy'], ['eɪ', 'ay'], ['oʊ', 'oh'],
+  ['tʃ', 'ch'], ['dʒ', 'j'],
+  ['ʃ', 'sh'], ['ʒ', 'zh'], ['θ', 'th'], ['ð', 'th'], ['ŋ', 'ng'],
+  ['ɹ', 'r'], ['j', 'y'],
+  ['b', 'b'], ['d', 'd'], ['f', 'f'], ['g', 'g'], ['h', 'h'],
+  ['k', 'k'], ['l', 'l'], ['m', 'm'], ['n', 'n'], ['p', 'p'],
+  ['s', 's'], ['t', 't'], ['v', 'v'], ['w', 'w'], ['z', 'z'],
+  ['i', 'ee'], ['ɪ', 'ih'], ['ɛ', 'eh'], ['e', 'eh'],
+  ['æ', 'a'], ['ɑ', 'ah'], ['ɔ', 'aw'],
+  ['ʊ', 'oo'], ['u', 'oo'], ['ʌ', 'uh'], ['ə', 'uh'],
+  ['ɝ', 'er'], ['ɜ', 'ur'],
+];
+
+/**
+ * Build a TTS-speakable mispronunciation of the word.
+ * Strategy: take the correct IPA, swap low-scoring phonemes with common errors,
+ * then convert to English respelling so TTS reads it differently.
+ */
+export function buildMispronunciation(item: WordAnalysis): string {
+  if (!item.phoneticCorrect || !item.phonemes?.length) return item.word;
+
+  // Find which phonemes scored poorly
+  const weakPhonemes = new Set(
+    item.phonemes.filter(p => p.score < 70).map(p => p.phoneme)
+  );
+
+  if (weakPhonemes.size === 0) return item.word;
+
+  // Build the user's IPA by swapping weak phonemes
+  let ipa = item.phoneticCorrect.replace(/[ˈˌ.]/g, '');
+  // Sort WRONG_SOUND keys by length descending so longer matches go first
+  const sortedKeys = Object.keys(WRONG_SOUND).sort((a, b) => b.length - a.length);
+  for (const phoneme of sortedKeys) {
+    if (weakPhonemes.has(phoneme)) {
+      ipa = ipa.replace(phoneme, WRONG_SOUND[phoneme]);
+    }
+  }
+
+  // Convert IPA to English respelling
+  let result = '';
+  let i = 0;
+  while (i < ipa.length) {
+    let matched = false;
+    for (const [ipaStr, spelling] of IPA_TO_SPELL) {
+      if (ipa.startsWith(ipaStr, i)) {
+        result += spelling;
+        i += ipaStr.length;
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) { result += ipa[i]; i++; }
+  }
+
+  // If respelling equals the original word, something didn't work — use fallback
+  if (result.toLowerCase() === item.word.toLowerCase()) return item.word;
+
+  return result;
+}
+
+/** Convert a single IPA phoneme to a TTS-speakable syllable */
+export function phonemeToSpeakable(ipa: string): string {
+  for (const [ipaStr, spelling] of IPA_TO_SPELL) {
+    if (ipa === ipaStr) return spelling;
+  }
+  return ipa; // pass through if unknown
 }
 
 const VideoIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
@@ -91,7 +185,30 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
   };
 
   const handleCoachPlay = () => onPlayCoach(item.word);
-  const handleYouPlay = () => onPlayUser();
+  const [youPlaying, setYouPlaying] = useState(false);
+  const youTimerRef = useRef<number | null>(null);
+  const handleYouPlay = () => {
+    const mispronounced = buildMispronunciation(item);
+    if (youTimerRef.current) clearTimeout(youTimerRef.current);
+    setYouPlaying(true);
+    onPlayPhoneme(mispronounced);
+    youTimerRef.current = window.setTimeout(() => setYouPlaying(false), 5000);
+  };
+
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  // Focus management: capture previous focus, auto-focus dialog, restore on close
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement as HTMLElement;
+    // Small delay to ensure the dialog is rendered
+    requestAnimationFrame(() => {
+      dialogRef.current?.focus();
+    });
+    return () => {
+      previousFocusRef.current?.focus();
+    };
+  }, []);
 
   // Close on Escape key
   useEffect(() => {
@@ -100,12 +217,18 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [onClose]);
 
+  // Cleanup youPlay timer on unmount
+  useEffect(() => {
+    return () => { if (youTimerRef.current) clearTimeout(youTimerRef.current); };
+  }, []);
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto p-4"
       style={{ background: 'rgba(0,0,0,0.15)', backdropFilter: 'blur(8px)' }}
       onClick={onClose}>
       <div className="min-h-full flex items-center justify-center">
-      <div role="dialog" aria-label="Word detail" className="rounded-2xl overflow-hidden w-full max-w-md max-h-[90vh] flex flex-col animate-modal-in my-4"
+      <div ref={dialogRef} role="dialog" aria-label="Word detail" aria-modal="true" tabIndex={-1}
+        className="rounded-2xl overflow-hidden w-full max-w-md max-h-[90vh] flex flex-col animate-modal-in my-4 focus:outline-none"
         style={{ background: 'var(--surface)', boxShadow: '0 8px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)' }}
         onClick={e => e.stopPropagation()}>
 
@@ -179,8 +302,8 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
             {hasUserRecording && (
               <button onClick={handleYouPlay}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
-                style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)', background: 'var(--surface)' }}>
-                ◎ You
+                style={{ border: '1px solid var(--border)', color: youPlaying ? 'var(--amber)' : 'var(--text-secondary)', background: 'var(--surface)' }}>
+                ◎ {youPlaying ? 'Playing...' : 'You'}
               </button>
             )}
             <button
@@ -200,13 +323,16 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
                   if (ph.score < 80) warnMissingVideo(ph.phoneme);
                   return (
                     <div key={i} className="flex items-center gap-3 py-2" style={{ borderBottom: '1px solid var(--surface-muted)' }}>
-                      {/* Symbol */}
-                      <span className="font-mono text-center" style={{ fontSize: 15, fontWeight: 600, width: 32, color: ph.score >= 70 ? 'var(--green)' : 'var(--red)' }}>
+                      {/* Symbol + correct play button */}
+                      <span className="font-mono text-center flex items-center gap-0.5" style={{ fontSize: 15, fontWeight: 600, width: 44, color: ph.score >= 70 ? 'var(--green)' : 'var(--red)' }}>
                         {ph.phoneme}
+                        <button onClick={() => handlePlayPhoneme(phonemeToSpeakable(ph.phoneme), `correct-${i}`)}
+                          className="shrink-0"
+                          style={{ fontSize: 10, color: 'var(--green)', border: 'none', background: 'none', cursor: 'pointer', padding: '0 1px', opacity: playingPhoneme === `correct-${i}` ? 1 : 0.6 }}>▶</button>
                       </span>
                       {/* Bar + you said */}
                       <div className="flex-1">
-                        <div className="rounded-full overflow-hidden" style={{ height: 5, background: 'var(--surface-muted)' }}>
+                        <div className="rounded-full overflow-hidden" style={{ height: 6, background: 'var(--surface-muted)' }}>
                           <div className="rounded-full h-full"
                             style={{ width: `${ph.score}%`, background: ph.score >= 70 ? 'var(--green)' : 'var(--red)' }} />
                         </div>
@@ -214,8 +340,8 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
                           <div className="flex items-center gap-1 mt-1">
                             <span style={{ fontSize: 11, color: 'var(--text-placeholder)' }}>You said:</span>
                             <span className="font-mono" style={{ fontSize: 12, color: 'var(--red)' }}>{ph.userPhoneme}</span>
-                            <button onClick={() => handlePlayPhoneme(`Pronounce the English phoneme sound: /${ph.userPhoneme}/`, `user-${i}`)}
-                              style={{ fontSize: 11, color: 'var(--text-placeholder)', border: 'none', background: 'none', cursor: 'pointer' }}>▶</button>
+                            <button onClick={() => handlePlayPhoneme(phonemeToSpeakable(ph.userPhoneme!), `user-${i}`)}
+                              style={{ fontSize: 10, color: 'var(--red)', border: 'none', background: 'none', cursor: 'pointer', opacity: playingPhoneme === `user-${i}` ? 1 : 0.6 }}>▶</button>
                           </div>
                         )}
                       </div>
@@ -288,7 +414,7 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
                     <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Correct</span>
                     <span className="font-mono font-semibold px-5 py-2.5 rounded-xl inline-flex items-center gap-2 transition-all"
                       style={{ fontSize: 22, backgroundColor: 'var(--surface-muted)', color: 'var(--green)', border: '1px solid var(--border)' }}>
-                      /{diffPhonetics(item.phoneticUser!, item.phoneticCorrect!, 'rgba(34,197,94,0.15)')}/
+                      /{diffPhonetics(item.phoneticUser!, item.phoneticCorrect!, 'var(--green-bg)')}/
                     </span>
                   </button>
                   <div className="flex flex-col items-center gap-1">
@@ -296,11 +422,7 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
                   </div>
                   <button
                     onClick={() => {
-                      // Build a descriptive prompt so the TTS deliberately reproduces the learner's error
-                      const errorHint = item.suggestion
-                        ? ` The learner's mistake: ${item.suggestion}`
-                        : '';
-                      const prompt = `You are demonstrating a common pronunciation mistake. Say the word "${item.word}" but DELIBERATELY mispronounce it as /${item.phoneticUser}/ instead of the correct /${item.phoneticCorrect}/.${errorHint} Exaggerate the error slightly so the difference is obvious. Only say the single word, nothing else.`;
+                      const prompt = buildMispronunciation(item);
                       handlePlayPhoneme(prompt, 'fallback-user');
                     }}
                     className="flex flex-col items-center gap-1.5 group transition-all active:scale-95"
@@ -308,7 +430,7 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
                     <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>You said</span>
                     <span className="font-mono font-semibold px-5 py-2.5 rounded-xl inline-flex items-center gap-2 transition-all"
                       style={{ fontSize: 22, backgroundColor: 'var(--surface-muted)', color: 'var(--red)', border: '1px solid var(--border)' }}>
-                      /{diffPhonetics(item.phoneticCorrect!, item.phoneticUser!, 'rgba(239,68,68,0.15)')}/
+                      /{diffPhonetics(item.phoneticCorrect!, item.phoneticUser!, 'var(--red-bg)')}/
                     </span>
                   </button>
                 </div>

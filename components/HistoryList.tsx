@@ -59,7 +59,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
     hideTimerRef.current = window.setTimeout(() => setTooltip(null), HIDE_DELAY);
   }, [clearHideTimer]);
 
-  const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>, id: string) => {
+  const handleMouseEnter = (e: React.MouseEvent<HTMLElement>, id: string) => {
     clearHideTimer();
     const rect = e.currentTarget.getBoundingClientRect();
     const left = Math.max(8, rect.left - TOOLTIP_WIDTH - TOOLTIP_GAP);
@@ -78,9 +78,9 @@ export const HistoryList: React.FC<HistoryListProps> = ({
     <div className="space-y-4 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="label-micro" style={{ color: 'var(--text-placeholder)' }}>
+        <h2 className="label-micro" style={{ color: 'var(--text-muted)', margin: 0 }}>
           History
-        </span>
+        </h2>
         <button
           onClick={onClear}
           style={{
@@ -88,7 +88,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
             fontWeight: 700,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
-            color: 'var(--text-placeholder)',
+            color: 'var(--text-muted)',
             background: 'none',
             border: 'none',
             cursor: 'pointer',
@@ -127,10 +127,12 @@ export const HistoryList: React.FC<HistoryListProps> = ({
           const isActive = tooltip?.id === item.id;
 
           return (
-            <div
+            <button
               key={item.id}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors"
-              style={{ background: isActive ? 'var(--rose-50)' : 'transparent' }}
+              type="button"
+              aria-label={`Practice "${item.text}"`}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors min-h-[48px] w-full text-left"
+              style={{ background: isActive ? 'var(--rose-50)' : 'transparent', border: 'none', font: 'inherit' }}
               onMouseEnter={(e) => {
                 handleMouseEnter(e, item.id);
                 if (!isActive) e.currentTarget.style.background = 'var(--surface-muted)';
@@ -160,7 +162,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
                 }}>
                   {item.text}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-placeholder)', marginTop: 1 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
                   {formatTimestamp(item.timestamp)}
                 </div>
               </div>
@@ -177,7 +179,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
               }}>
                 {item.score > 0 ? `${item.score}%` : '—'}
               </span>
-            </div>
+            </button>
           );
         })}
       </div>

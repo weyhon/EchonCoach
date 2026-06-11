@@ -99,7 +99,7 @@ export const IPALegend: React.FC<IPALegendProps> = ({ show, onClose }) => {
           {/* Intonation */}
           <section>
             <h3 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              <span className="w-7 h-7 rounded-md flex items-center justify-center text-lg" style={{ backgroundColor: 'rgba(251,191,36,0.1)', color: 'var(--amber)' }}>↗</span>
+              <span className="w-7 h-7 rounded-md flex items-center justify-center text-lg" style={{ backgroundColor: 'var(--amber-bg)', color: 'var(--amber)' }}>↗</span>
               Intonation
             </h3>
             <div className="rounded-xl p-4 space-y-4" style={{ backgroundColor: 'var(--bg-elevated)' }}>
