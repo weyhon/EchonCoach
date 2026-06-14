@@ -262,32 +262,39 @@ STRICT RULES:
        requires sentence "hanging‿out‿tonight" (one block). Check this before responding.
    e) Do NOT use ˌ (secondary stress). Do NOT use ‿ in fullLinkedPhonetic.
 
+4. 'translation': a natural Simplified Chinese (简体中文) translation of the sentence.
+   Conversational and idiomatic, NOT word-for-word. Capture the real meaning.
+
 Example for "Do you like it?":
 {
   "fullLinkedSentence": "Do you like‿it?",
   "intonationMap": "· · ● ·↗",
-  "fullLinkedPhonetic": "du ju ˈlaɪ.kɪt"
+  "fullLinkedPhonetic": "du ju ˈlaɪ.kɪt",
+  "translation": "你喜欢吗？"
 }
 
 Example for "Just tap your phone or pay the driver in cash":
 {
   "fullLinkedSentence": "Just‿ tap your phone or‿ pay the‿driver‿in cash",
   "intonationMap": "● · · ● · ● · ● · ●↘",
-  "fullLinkedPhonetic": "ˈdʒʌst ˈtæp jər ˈfoʊn ɔr.ˈpeɪ ðə.ˈdraɪ.vər.ɪn ˈkæʃ"
+  "fullLinkedPhonetic": "ˈdʒʌst ˈtæp jər ˈfoʊn ɔr.ˈpeɪ ðə.ˈdraɪ.vər.ɪn ˈkæʃ",
+  "translation": "刷一下手机，或者付现金给司机就行。"
 }
 
 Example for long sentence "Enter the code displayed in the app":
 {
   "fullLinkedSentence": "Enter‿the code displayed‿in the‿app",
   "intonationMap": "● · ● ● · · ●↘",
-  "fullLinkedPhonetic": "ˈɛn.tər ðə ˈkoʊd dɪˈspleɪd.ɪn ði.ˈæp"
+  "fullLinkedPhonetic": "ˈɛn.tər ðə ˈkoʊd dɪˈspleɪd.ɪn ði.ˈæp",
+  "translation": "输入 app 里显示的验证码。"
 }
 
 Example demonstrating flap-T (note /t/→/ɾ/ in "due to"):
 {
   "fullLinkedSentence": "It's due to personnel‿issues this time",
   "intonationMap": "· ● · ● ● · ●↘",
-  "fullLinkedPhonetic": "ɪts ˈduː ɾə pɝrsəˈnɛl ˈɪʃuz ðɪs ˈtaɪm"
+  "fullLinkedPhonetic": "ɪts ˈduː ɾə pɝrsəˈnɛl ˈɪʃuz ðɪs ˈtaɪm",
+  "translation": "这次是因为人事问题。"
 }
 
 CRITICAL: For long sentences, you MUST include ALL words. Do not truncate or omit any words.

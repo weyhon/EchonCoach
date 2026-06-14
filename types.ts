@@ -24,6 +24,7 @@ export interface AnalysisResult {
   fullLinkedSentence?: string; 
   fullLinkedPhonetic?: string; 
   intonationMap?: string; // This will now be used for word-by-word mapping
+  translation?: string; // Simplified Chinese translation of speechScript
 }
 
 export interface HistoryItem {

@@ -36,6 +36,7 @@ const DEMO_RESULT: AnalysisResult = {
   fullLinkedSentence: 'How‿is it going?',
   fullLinkedPhonetic: 'haʊ‿ɪz ɪt ˈɡoʊɪŋ',
   intonationMap: '· · ● ↘',
+  translation: '最近怎么样？',
 };
 
 const App: React.FC = () => {
@@ -340,7 +341,8 @@ const App: React.FC = () => {
           ...localRes,
           fullLinkedSentence: linking.fullLinkedSentence,
           fullLinkedPhonetic: linking.fullLinkedPhonetic,
-          intonationMap: linking.intonationMap
+          intonationMap: linking.intonationMap,
+          translation: linking.translation
         };
         setResult(enrichedRes);
         lruSet(referenceCache, textToSpeak, enrichedRes, MAX_RESULT_CACHE);
@@ -518,6 +520,7 @@ const App: React.FC = () => {
                 res.fullLinkedSentence = cached.fullLinkedSentence;
                 res.fullLinkedPhonetic = cached.fullLinkedPhonetic;
                 res.intonationMap = cached.intonationMap;
+                res.translation = cached.translation;
               }
             }
 
@@ -573,6 +576,7 @@ const App: React.FC = () => {
               res.fullLinkedSentence = cached.fullLinkedSentence;
               res.fullLinkedPhonetic = cached.fullLinkedPhonetic;
               res.intonationMap = cached.intonationMap;
+              res.translation = cached.translation;
             }
           }
 

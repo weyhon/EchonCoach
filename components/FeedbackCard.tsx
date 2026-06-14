@@ -29,12 +29,17 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
   const [showIPALegend, setShowIPALegend] = useState<boolean>(false);
   const [karaokeIndex, setKaraokeIndex] = useState<number>(-1);
   const [detailWord, setDetailWord] = useState<WordAnalysis | null>(null);
+  const [showTranslation, setShowTranslation] = useState<boolean>(false);
   const karaokeTimerRef = useRef<number | null>(null);
   const isPlayingNormal = activeAudioSource === 'input_normal';
   const isPlayingSlow = activeAudioSource === 'input_slow';
   const isKaraokePlaying = isPlayingNormal || isPlayingSlow;
   const isPlayingTutor = activeAudioSource === 'tutor';
   const isTutorLoading = activeAudioSource === 'tutor_loading';
+
+  // Collapse the translation whenever the sentence changes, so each new
+  // sentence starts hidden (learners try to understand before revealing).
+  useEffect(() => { setShowTranslation(false); }, [result.speechScript]);
 
   const handleMouseUp = () => {
     setTimeout(() => {
@@ -151,6 +156,39 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
           isKaraokePlaying={isKaraokePlaying}
           showPitchCurve
         />
+
+        {/* Chinese translation — hidden by default, tap to reveal */}
+        {result.translation && (
+          <div className="flex flex-col items-center mt-3">
+            {showTranslation ? (
+              <>
+                <div
+                  className="px-4 py-2 rounded-xl text-center animate-fade-in"
+                  style={{ background: 'var(--surface-muted)', color: 'var(--text-secondary)', fontSize: 15, lineHeight: 1.5, maxWidth: '90%' }}
+                >
+                  {result.translation}
+                </div>
+                <button
+                  onClick={() => setShowTranslation(false)}
+                  aria-expanded={true}
+                  className="mt-1.5 text-[11px] font-semibold uppercase tracking-wider transition-colors hover-rose"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  隐藏中文 ▴
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setShowTranslation(true)}
+                aria-expanded={false}
+                className="text-[11px] font-semibold uppercase tracking-wider transition-colors hover-rose"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                显示中文 ▾
+              </button>
+            )}
+          </div>
+        )}
 
         {/* A/B Compare bar */}
         {hasUserRecording && (
