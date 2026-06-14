@@ -174,7 +174,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
                   className="mt-1.5 text-[11px] font-semibold uppercase tracking-wider transition-colors hover-rose"
                   style={{ color: 'var(--text-muted)' }}
                 >
-                  隐藏中文 ▴
+                  Hide Chinese ▴
                 </button>
               </>
             ) : (
@@ -184,7 +184,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
                 className="text-[11px] font-semibold uppercase tracking-wider transition-colors hover-rose"
                 style={{ color: 'var(--text-muted)' }}
               >
-                显示中文 ▾
+                Show Chinese ▾
               </button>
             )}
           </div>
