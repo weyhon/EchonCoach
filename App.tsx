@@ -717,16 +717,40 @@ const App: React.FC = () => {
                 }}
                 disabled={appState !== AppState.IDLE && appState !== AppState.SHOWING_RESULT}
               />
-              {/* Action row — typewriter controls over the sentence rule */}
+              {/* Action row — typewriter controls over the sentence rule.
+                  Listening is the user's primary action, so Play Reference
+                  carries the accent; Record is a quiet text control. */}
               <div className="flex items-center gap-2 mt-4 flex-wrap gap-y-2">
-                {/* Record — THE accent action */}
+                {/* Play Reference — THE accent action */}
+                {(() => {
+                  const isBusy = appState === AppState.GENERATING_TTS || activeAudioSource?.startsWith('input_');
+                  return (
+                    <button
+                      onClick={() => { result ? handlePlayTTS(text, ttsSpeed === 'slow') : playAndAnalyze(text); }}
+                      disabled={!text.trim() || isBusy || appState === AppState.RECORDING || appState === AppState.ANALYZING}
+                      aria-label={appState === AppState.GENERATING_TTS ? 'Loading audio' : 'Play reference pronunciation'}
+                      title="Play reference (Space)"
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-[2px] text-[11px] font-semibold uppercase tracking-[0.08em] transition-all disabled:opacity-60 min-h-[44px]"
+                      style={isBusy
+                        ? { background: 'transparent', color: 'var(--rose)', border: '1px solid var(--rose)' }
+                        : { background: 'var(--rose)', color: '#fff', border: '1px solid var(--rose)' }}>
+                      {isBusy ? (
+                        <span className="pixel-spinner-sm"><span className="dot" /><span className="dot" /><span className="dot" /></span>
+                      ) : (
+                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                      )}
+                      {appState === AppState.GENERATING_TTS ? 'Loading...' : activeAudioSource?.startsWith('input_') ? 'Playing...' : 'Play Reference'}
+                    </button>
+                  );
+                })()}
+                {/* Record — secondary text control */}
                 {appState !== AppState.RECORDING ? (
                   <button onClick={startRecording} disabled={!text.trim() || appState === AppState.ANALYZING || appState === AppState.GENERATING_TTS}
                     aria-label="Record your pronunciation"
                     title="Record (R)"
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-[2px] text-[11px] font-semibold uppercase tracking-[0.08em] transition-all disabled:opacity-40 min-h-[44px]"
-                    style={{ background: 'var(--rose)', color: '#fff' }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff', display: 'inline-block' }} />
+                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-[2px] text-[11px] font-medium uppercase tracking-[0.08em] transition-all disabled:opacity-40 min-h-[44px] hover-rose"
+                    style={{ background: 'transparent', color: 'var(--text-secondary)', border: 'none' }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
                     Record
                   </button>
                 ) : (
@@ -739,26 +763,6 @@ const App: React.FC = () => {
                     Stop
                   </button>
                 )}
-                {/* Play Reference */}
-                {(() => {
-                  const isBusy = appState === AppState.GENERATING_TTS || activeAudioSource?.startsWith('input_');
-                  return (
-                    <button
-                      onClick={() => { result ? handlePlayTTS(text, ttsSpeed === 'slow') : playAndAnalyze(text); }}
-                      disabled={!text.trim() || isBusy || appState === AppState.RECORDING || appState === AppState.ANALYZING}
-                      aria-label={appState === AppState.GENERATING_TTS ? 'Loading audio' : 'Play reference pronunciation'}
-                      title="Play reference (Space)"
-                      className="flex items-center gap-1.5 px-3 py-2.5 rounded-[2px] text-[11px] font-medium uppercase tracking-[0.08em] transition-all disabled:opacity-60 min-h-[44px] hover-rose"
-                      style={{ background: 'transparent', color: isBusy ? 'var(--rose)' : 'var(--text-secondary)', border: 'none' }}>
-                      {isBusy ? (
-                        <span className="pixel-spinner-sm"><span className="dot" /><span className="dot" /><span className="dot" /></span>
-                      ) : (
-                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                      )}
-                      {appState === AppState.GENERATING_TTS ? 'Loading...' : activeAudioSource?.startsWith('input_') ? 'Playing...' : 'Reference'}
-                    </button>
-                  );
-                })()}
                 {/* Video reference links — hidden on mobile to avoid overflow */}
                 {text.trim() && (<>
                   <a
