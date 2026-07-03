@@ -763,14 +763,14 @@ const App: React.FC = () => {
                     Stop
                   </button>
                 )}
-                {/* Video reference links — hidden on mobile to avoid overflow */}
+                {/* Video reference links — outlined so they read as buttons; visible on all viewports (flex-wrap handles narrow screens) */}
                 {text.trim() && (<>
                   <a
                     href={`https://youglish.com/pronounce/${text.trim().replace(/\s+/g, '+')}/english`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hidden sm:flex items-center gap-1.5 px-2.5 py-2.5 rounded-[2px] text-[11px] font-medium uppercase tracking-[0.08em] transition-all min-h-[44px]"
-                    style={{ color: 'var(--text-muted)', background: 'transparent', textDecoration: 'none' }}
+                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-[2px] text-[11px] font-medium uppercase tracking-[0.08em] transition-all min-h-[44px] hover-rose"
+                    style={{ color: 'var(--text-secondary)', background: 'transparent', border: '1px solid var(--border-medium)', textDecoration: 'none' }}
                   >
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
@@ -781,8 +781,8 @@ const App: React.FC = () => {
                     href={`https://www.playphrase.me/#/search?q=${encodeURIComponent(text.trim())}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hidden sm:flex items-center gap-1.5 px-2.5 py-2.5 rounded-[2px] text-[11px] font-medium uppercase tracking-[0.08em] transition-all min-h-[44px]"
-                    style={{ color: 'var(--text-muted)', background: 'transparent', textDecoration: 'none' }}
+                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-[2px] text-[11px] font-medium uppercase tracking-[0.08em] transition-all min-h-[44px] hover-rose"
+                    style={{ color: 'var(--text-secondary)', background: 'transparent', border: '1px solid var(--border-medium)', textDecoration: 'none' }}
                   >
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
