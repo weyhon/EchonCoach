@@ -730,12 +730,14 @@ const App: React.FC = () => {
                       disabled={!text.trim() || isBusy || appState === AppState.RECORDING || appState === AppState.ANALYZING}
                       aria-label={appState === AppState.GENERATING_TTS ? 'Loading audio' : 'Play reference pronunciation'}
                       title="Play reference (Space)"
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-[2px] text-[11px] font-semibold uppercase tracking-[0.08em] transition-all disabled:opacity-60 min-h-[44px]"
+                      className={`flex items-center gap-2 px-5 py-2.5 rounded-[2px] text-[11px] font-semibold uppercase tracking-[0.1em] disabled:opacity-60 min-h-[44px] ${isBusy ? '' : 'btn-press'}`}
                       style={isBusy
                         ? { background: 'transparent', color: 'var(--rose)', border: '1px solid var(--rose)' }
-                        : { background: 'var(--rose)', color: '#fff', border: '1px solid var(--rose)' }}>
+                        : { background: 'var(--rose)', color: '#fff' }}>
                       {isBusy ? (
-                        <span className="pixel-spinner-sm"><span className="dot" /><span className="dot" /><span className="dot" /></span>
+                        appState === AppState.GENERATING_TTS
+                          ? <span className="pixel-spinner-sm"><span className="dot" /><span className="dot" /><span className="dot" /></span>
+                          : <span className="eq-mini" aria-hidden="true"><span /><span /><span /></span>
                       ) : (
                         <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                       )}
