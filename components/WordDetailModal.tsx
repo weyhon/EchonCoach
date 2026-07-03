@@ -228,8 +228,8 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
       onClick={onClose}>
       <div className="min-h-full flex items-center justify-center">
       <div ref={dialogRef} role="dialog" aria-label="Word detail" aria-modal="true" tabIndex={-1}
-        className="rounded-2xl overflow-hidden w-full max-w-md max-h-[90vh] flex flex-col animate-modal-in my-4 focus:outline-none"
-        style={{ background: 'var(--surface)', boxShadow: '0 8px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)' }}
+        className="rounded-[2px] overflow-hidden w-full max-w-md max-h-[90vh] flex flex-col animate-modal-in my-4 focus:outline-none"
+        style={{ background: 'var(--surface)', border: '1px solid var(--text-primary)' }}
         onClick={e => e.stopPropagation()}>
 
         {/* ─── Horizontal word pills ─── */}
@@ -243,10 +243,10 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
                 <button
                   key={i}
                   onClick={() => onSelectWord?.(w)}
-                  className="shrink-0 px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all active:scale-95"
+                  className="shrink-0 px-3 py-1.5 rounded-[2px] text-[12px] font-medium transition-all active:scale-95"
                   style={{
                     backgroundColor: isActive ? 'var(--surface-muted)' : 'var(--surface)',
-                    border: isActive ? `1.5px solid ${wColor}` : '1.5px solid var(--border)',
+                    border: isActive ? `1px solid ${wColor}` : '1px solid var(--border)',
                     color: isActive ? wColor : 'var(--text-secondary)',
                   }}
                 >
@@ -295,20 +295,20 @@ export const WordDetailModal: React.FC<WordDetailModalProps> = ({
           {/* Action buttons row */}
           <div className="flex items-center gap-2 px-5 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
             <button onClick={handleCoachPlay}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
-              style={{ border: '1.5px solid var(--rose)', color: 'var(--rose)', background: 'var(--surface)' }}>
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[2px] text-xs font-medium"
+              style={{ border: '1px solid var(--rose)', color: 'var(--rose)', background: 'transparent' }}>
               ♪ {isCoachPlaying ? 'Playing...' : 'Coach'}
             </button>
             {hasUserRecording && (
               <button onClick={handleYouPlay}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
-                style={{ border: '1px solid var(--border)', color: youPlaying ? 'var(--amber)' : 'var(--text-secondary)', background: 'var(--surface)' }}>
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[2px] text-xs font-medium"
+                style={{ border: '1px solid var(--border-medium)', color: youPlaying ? 'var(--amber)' : 'var(--text-secondary)', background: 'transparent' }}>
                 ◎ {youPlaying ? 'Playing...' : 'You'}
               </button>
             )}
             <button
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ml-auto"
-              style={{ border: '1px solid var(--border)', color: 'var(--text-muted)', background: 'var(--surface-muted)' }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[2px] text-xs font-medium ml-auto"
+              style={{ border: '1px solid var(--border-medium)', color: 'var(--text-muted)', background: 'transparent' }}
               onClick={onClose}>
               ⏺ Re-record word
             </button>

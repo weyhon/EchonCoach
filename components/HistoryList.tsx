@@ -110,9 +110,9 @@ export const HistoryList: React.FC<HistoryListProps> = ({
           placeholder="Search..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-9 pr-4 py-2.5 rounded-lg text-[12px] font-medium focus:outline-none transition-colors input-focus"
+          className="w-full pl-9 pr-4 py-2.5 text-[12px] font-medium focus:outline-none transition-colors input-focus"
           style={{
-            background: 'var(--surface-muted)',
+            background: 'transparent',
             color: 'var(--text-primary)',
           }}
         />
@@ -121,8 +121,8 @@ export const HistoryList: React.FC<HistoryListProps> = ({
       {/* Progress chart */}
       <ScoreChart history={history} />
 
-      {/* List */}
-      <div className="space-y-0.5">
+      {/* List — book index rows over hairline rules */}
+      <div>
         {filteredHistory.map((item) => {
           const isActive = tooltip?.id === item.id;
 
@@ -131,8 +131,8 @@ export const HistoryList: React.FC<HistoryListProps> = ({
               key={item.id}
               type="button"
               aria-label={`Practice "${item.text}"`}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors min-h-[48px] w-full text-left"
-              style={{ background: isActive ? 'var(--rose-50)' : 'transparent', border: 'none', font: 'inherit' }}
+              className="flex items-center gap-3 px-1 py-2.5 cursor-pointer transition-colors min-h-[48px] w-full text-left"
+              style={{ background: isActive ? 'var(--rose-50)' : 'transparent', border: 'none', borderBottom: '1px solid var(--border)', borderRadius: 0, font: 'inherit' }}
               onMouseEnter={(e) => {
                 handleMouseEnter(e, item.id);
                 if (!isActive) e.currentTarget.style.background = 'var(--surface-muted)';
@@ -152,8 +152,8 @@ export const HistoryList: React.FC<HistoryListProps> = ({
             >
               {/* Text */}
               <div className="flex-1 min-w-0">
-                <div style={{
-                  fontSize: 12,
+                <div className="font-display" style={{
+                  fontSize: 13.5,
                   fontWeight: 500,
                   color: 'var(--text-primary)',
                   overflow: 'hidden',
@@ -162,22 +162,19 @@ export const HistoryList: React.FC<HistoryListProps> = ({
                 }}>
                   {item.text}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                <div className="font-mono" style={{ fontSize: 10, letterSpacing: '0.06em', color: 'var(--text-muted)', marginTop: 2 }}>
                   {formatTimestamp(item.timestamp)}
                 </div>
               </div>
 
-              {/* Score badge */}
-              <span style={{
-                fontSize: 11,
-                fontWeight: 700,
-                padding: '3px 8px',
-                borderRadius: 20,
+              {/* Score — bare mono numeral, no pill */}
+              <span className="font-mono num" style={{
+                fontSize: 12,
+                fontWeight: 600,
                 flexShrink: 0,
-                background: item.score >= 80 ? 'var(--green-bg)' : item.score >= 60 ? 'var(--amber-bg)' : 'var(--red-bg)',
                 color: item.score >= 80 ? 'var(--green)' : item.score >= 60 ? 'var(--amber)' : 'var(--red)',
               }}>
-                {item.score > 0 ? `${item.score}%` : '—'}
+                {item.score > 0 ? item.score : '—'}
               </span>
             </button>
           );

@@ -26,7 +26,7 @@ export const ScoreChart: React.FC<ScoreChartProps> = ({ history }) => {
   const trend = scored[scored.length - 1].score - scored[0].score;
 
   return (
-    <div className="rounded-xl p-3" style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
+    <div className="py-3" style={{ borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
       <div className="flex items-center justify-between mb-2">
         <span className="label-micro" style={{ color: 'var(--text-muted)' }}>
           Progress · last {scored.length}
@@ -45,10 +45,10 @@ export const ScoreChart: React.FC<ScoreChartProps> = ({ history }) => {
         {/* Area fill */}
         <polygon
           points={`${x(0)},${H - PAD} ${points} ${x(scored.length - 1)},${H - PAD}`}
-          fill="var(--pink)" opacity="0.08"
+          fill="var(--pink)" opacity="0.06"
         />
-        {/* Line */}
-        <polyline points={points} fill="none" stroke="var(--pink)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Line — ink stroke, accent marks the latest point */}
+        <polyline points={points} fill="none" stroke="var(--text-primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         {/* Last point dot */}
         <circle cx={x(scored.length - 1)} cy={y(last.score)} r="3" fill="var(--pink)" />
       </svg>
