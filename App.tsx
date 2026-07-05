@@ -699,7 +699,7 @@ const App: React.FC = () => {
               <textarea
                 id="practice-sentence"
                 value={text}
-                onChange={e => { setText(e.target.value); setResult(null); }}
+                onChange={e => { setText(e.target.value); setResult(null); setUserAudioBlob(null); }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     if (e.metaKey) return;
@@ -900,7 +900,7 @@ const App: React.FC = () => {
                 onPlayWord={(w) => handlePlayTutor(w)}
                 onPlayTutor={(s) => handlePlayTutor(s)}
                 playingWord={null}
-                hasUserRecording={!!userAudioBlob}
+                hasUserRecording={!!userAudioBlob || isDemo}
                 onPlayUserRecording={() => {
                   if (userAudioBlob) {
                     if (activeBlobUrl) URL.revokeObjectURL(activeBlobUrl);

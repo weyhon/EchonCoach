@@ -256,8 +256,11 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
 
       {/* Pitch contour is integrated into SentenceAnnotation above */}
 
+      {/* Scoring sections below only appear after the user has recorded
+          in this session — pure listening stays a quiet reading page. */}
+
       {/* Color Legend */}
-      {result.wordBreakdown?.length > 0 && (
+      {hasUserRecording && result.wordBreakdown?.length > 0 && (
         <div className="flex items-center gap-4 text-[11px] font-medium justify-center flex-wrap pb-4 pt-3 animate-section stagger-2" style={{ color: 'var(--text-muted)' }}>
           <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: 'var(--green)' }}></span>Correct</span>
           <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: 'var(--amber)' }}></span>Improve</span>
@@ -266,7 +269,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
       )}
 
       {/* Analysis Details — Word Breakdown, set like a book's index */}
-      {result.wordBreakdown?.length > 0 && (
+      {hasUserRecording && result.wordBreakdown?.length > 0 && (
         <div className="px-1 pb-5 space-y-4 animate-section stagger-3">
           {/* Score — a huge serif numeral in accent ink */}
           {result.score > 0 && (() => {
@@ -337,7 +340,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
       )}
 
       {/* Coach's note — italic serif against an accent rule, like a margin annotation */}
-      {result.overallComment && result.score > 0 && (
+      {hasUserRecording && result.overallComment && result.score > 0 && (
         <div className="mx-1 mb-6 animate-section stagger-4"
           style={{ borderLeft: `2px solid ${result.score >= 90 ? 'var(--green)' : 'var(--rose)'}`, paddingLeft: 16, paddingTop: 2, paddingBottom: 2 }}>
           <div className="label-micro mb-1.5" style={{ color: result.score >= 90 ? 'var(--green)' : 'var(--rose)' }}>
