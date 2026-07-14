@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseWordDefinition } from './minimaxService';
+import { parseWordDefinition } from './geminiService';
 
 describe('parseWordDefinition', () => {
   it('parses plain JSON content', () => {

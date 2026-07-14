@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Modality } from "@google/genai";
-import { AnalysisResult } from "../types";
+import { AnalysisResult, WordDefinition } from "../types";
 import { API_CONFIG } from "../config/constants";
 import { shouldLink, enrichLinkedSentence } from "./linkingUtils";
 import {
@@ -449,4 +449,71 @@ export const getLinkingAnalysisForText = async (text: string): Promise<any> => {
     console.log("✅ Smart fallback generated:", fallback);
     return fallback;
   }
+};
+
+// ── 点词查义（Word Lookup）──────────────────────────────────────────
+// 与 getLinkingAnalysisForText 相同的双模式：生产走 /api/define 代理，
+// 本地配了 VITE_API_KEY 时直连 Gemini。
+
+const DEFINE_SYSTEM_INSTRUCTION = `You are an English-Chinese dictionary inside a pronunciation learning app.
+Given a word and the sentence it appears in, return:
+- "ipa": American English IPA for the word, wrapped in slashes
+- "meaning": concise Simplified Chinese meaning (≤ 20 characters) that fits THIS sentence's context
+
+Example: word "going" in "How is it going?" → {"ipa":"/ˈgoʊɪŋ/","meaning":"（近况）进展"}
+
+Return ONLY valid JSON with exactly these 2 fields. No markdown, no explanation.`;
+
+// 校验并规范化 LLM 返回的对象
+const toWordDefinition = (obj: any): WordDefinition | null => {
+  const rawIpa = typeof obj?.ipa === 'string' ? obj.ipa.trim() : '';
+  const meaning = typeof obj?.meaning === 'string' ? obj.meaning.trim() : '';
+  if (!meaning) return null;
+  const ipa = rawIpa && !rawIpa.startsWith('/') ? `/${rawIpa}/` : rawIpa;
+  return { ipa, meaning };
+};
+
+// 纯解析函数（字符串 → WordDefinition），导出仅为单元测试
+export const parseWordDefinition = (content: string): WordDefinition | null => {
+  try {
+    return toWordDefinition(JSON.parse(content.replace(/```json|```/g, '').trim()));
+  } catch {
+    return null;
+  }
+};
+
+// 会话内缓存：同一 (词, 句子) 只请求一次
+const definitionCache = new Map<string, WordDefinition>();
+
+export const getWordDefinition = async (
+  word: string,
+  sentence: string
+): Promise<WordDefinition> => {
+  const cacheKey = `${word.toLowerCase()}::${sentence}`;
+  const cached = definitionCache.get(cacheKey);
+  if (cached) return cached;
+
+  let parsed: WordDefinition | null;
+  if (USE_PROXY) {
+    const raw = await proxyPost('define', { word, sentence });
+    parsed = toWordDefinition(raw);
+  } else {
+    const response = await ai!.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: `Word: "${word}"\nSentence: "${sentence}"`,
+      config: {
+        systemInstruction: DEFINE_SYSTEM_INSTRUCTION,
+        responseMimeType: 'application/json',
+      },
+    });
+    parsed = parseWordDefinition(response.text || '{}');
+  }
+
+  if (!parsed) {
+    const err: any = new Error('释义解析失败');
+    err.code = 'PARSE_ERROR';
+    throw err;
+  }
+  definitionCache.set(cacheKey, parsed);
+  return parsed;
 };

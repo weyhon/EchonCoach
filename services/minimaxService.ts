@@ -1,4 +1,4 @@
-import { AnalysisResult, WordDefinition } from "../types";
+import { AnalysisResult } from "../types";
 import { AUDIO_CONFIG, API_CONFIG, UI_CONFIG } from "../config/constants";
 import { generateIntonationMap } from "./intonationUtils";
 
@@ -480,59 +480,3 @@ Status must be one of: 'correct', 'incorrect', 'needs_improvement'`;
   }
 };
 
-// ============ 点词查义（Word Lookup） ============
-
-// 纯解析函数，导出仅为单元测试
-export const parseWordDefinition = (content: string): WordDefinition | null => {
-  try {
-    const jsonStr = content.replace(/```json|```/g, '').trim();
-    const obj = JSON.parse(jsonStr);
-    const rawIpa = typeof obj.ipa === 'string' ? obj.ipa.trim() : '';
-    const meaning = typeof obj.meaning === 'string' ? obj.meaning.trim() : '';
-    if (!meaning) return null;
-    const ipa = rawIpa && !rawIpa.startsWith('/') ? `/${rawIpa}/` : rawIpa;
-    return { ipa, meaning };
-  } catch {
-    return null;
-  }
-};
-
-// 会话内缓存：同一 (词, 句子) 只请求一次
-const definitionCache = new Map<string, WordDefinition>();
-
-export const getWordDefinition = async (
-  word: string,
-  sentence: string
-): Promise<WordDefinition> => {
-  const cacheKey = `${word.toLowerCase()}::${sentence}`;
-  const cached = definitionCache.get(cacheKey);
-  if (cached) return cached;
-
-  const systemPrompt = `You are an English-Chinese dictionary inside a pronunciation learning app.
-Given a word and the sentence it appears in, return:
-- "ipa": American English IPA for the word, wrapped in slashes
-- "meaning": concise Simplified Chinese meaning (≤ 20 characters) that fits THIS sentence's context
-
-Example: word "going" in "How is it going?" → {"ipa":"/ˈgoʊɪŋ/","meaning":"（近况）进展"}
-
-Return ONLY valid JSON with exactly these 2 fields. No markdown, no explanation.`;
-
-  const data = await postWithFallback("/text/chatcompletion_v2", {
-    model: "abab6.5s-chat",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: `Word: "${word}"\nSentence: "${sentence}"` },
-    ],
-    temperature: 0.2,
-    max_tokens: 120,
-  });
-  const content = data.choices?.[0]?.message?.content || "";
-  const parsed = parseWordDefinition(content);
-  if (!parsed) {
-    const err: any = new Error("释义解析失败");
-    err.code = "PARSE_ERROR";
-    throw err;
-  }
-  definitionCache.set(cacheKey, parsed);
-  return parsed;
-};

@@ -4,7 +4,7 @@ import { shouldLink, isFunctionWord } from '../services/linkingUtils';
 import { generateIntonationTokens as getTokens } from '../services/intonationUtils';
 import { isYesNoQuestion, isWhQuestion } from '../services/linkingUtils';
 import { WordPopover } from './WordPopover';
-import { getWordDefinition } from '../services/minimaxService';
+import { getWordDefinition } from '../services/geminiService';
 
 export interface AnnotationWord {
   word: string;
