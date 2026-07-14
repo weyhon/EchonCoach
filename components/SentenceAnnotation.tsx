@@ -366,7 +366,7 @@ export const SentenceAnnotation: React.FC<Props> = ({
                 <span
                   role={onWordClick ? 'button' : undefined}
                   tabIndex={onWordClick ? 0 : undefined}
-                  aria-label={onWordClick ? `Hear "${w.word.replace(/[?.!,;:'"()[\]{}]/g, '')}"` : undefined}
+                  aria-label={onWordClick ? `Hear and define "${w.word.replace(/[?.!,;:'"()[\]{}]/g, '')}"` : undefined}
                   className={`leading-none font-display${onWordClick ? ' cursor-pointer hover:opacity-70 active:scale-95 transition-all duration-150' : ''}`}
                   style={{
                     fontSize: 22,
