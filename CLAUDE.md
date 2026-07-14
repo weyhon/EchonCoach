@@ -11,7 +11,8 @@ EchoCoach is an AI-powered English pronunciation assistant. It helps users pract
 - **React 19** + **TypeScript 5.7**
 - **Vite 6.0** for build tooling
 - **Tailwind CSS** (loaded via CDN in index.html)
-- **MiniMax API** for TTS and pronunciation analysis
+- **Google Gemini API** for TTS, linking analysis, word definitions, and coaching feedback (via `services/geminiService.ts`)
+- **Azure Speech** for pronunciation scoring (primary engine)
 - **Web Audio API** and **MediaRecorder API** for audio handling
 
 ## Common Commands
@@ -50,14 +51,19 @@ npm run preview
   - Only used for natural language feedback, not scoring
   - Runs in background after Azure scores are shown
 
-### AI Integration (MiniMax)
-All AI features use MiniMax API with multi-base-URL fallback:
+### AI Integration (Gemini)
+**App.tsx imports from `services/geminiService.ts`** — all AI features use Google Gemini:
 - `generateSpeech()` - TTS with speed control (normal/slow)
 - `generateTutorAudio()` - Single word pronunciation
-- `getLinkingAnalysisForText()` - Linking and intonation analysis
+- `getLinkingAnalysisForText()` - Linking/intonation analysis + sentence translation
 - `analyzePronunciation()` - Compare user recording to reference
+- `getWordDefinition()` - Per-word IPA + context-aware Chinese meaning (word lookup popover)
 
-API endpoints tried in order: `VITE_MINIMAX_BASE_URL` → `api.minimax.chat` → `api.minimax.io` → `api.minimaxi.com`
+**Dual-mode calls** (`USE_PROXY` in geminiService.ts):
+- Production (Vercel): browser → `/api/*` serverless functions (`api/tts.ts`, `api/linking.ts`, `api/analyze.ts`, `api/define.ts`) → Gemini. API key stays server-side (`API_KEY` env var).
+- Local dev: set `VITE_API_KEY` in `.env.local` to call Gemini directly from the browser. Without it, `/api/*` calls 404 under plain `npm run dev` (vite doesn't serve Vercel functions) and features degrade to fallbacks.
+
+⚠️ `services/minimaxService.ts` is **legacy dead code** — not imported by the app. Do not add features there.
 
 ### Visual Feedback Notation
 The app uses special symbols in feedback display:
@@ -77,16 +83,16 @@ The app uses special symbols in feedback display:
 Create `.env.local` file:
 
 ```
-VITE_MINIMAX_API_KEY=your_key_here
-VITE_MINIMAX_GROUP_ID=your_group_id
-VITE_MINIMAX_BASE_URL=https://api.minimax.chat/v1  # optional custom base URL
+# Gemini (local dev direct mode; production uses server-side API_KEY via /api proxy)
+VITE_API_KEY=your_gemini_key
 
 # Azure Speech (optional — enables fast pronunciation scoring via dedicated ASR)
 VITE_AZURE_SPEECH_KEY=your_azure_speech_key
 VITE_AZURE_SPEECH_REGION=eastasia   # pick region closest to your users
 
-# For Vercel deployment, set server-side vars (used by api/speech-token.ts):
-# AZURE_SPEECH_KEY=your_azure_speech_key
+# For Vercel deployment, set server-side vars:
+# API_KEY=your_gemini_key            (used by api/tts.ts, api/linking.ts, api/analyze.ts, api/define.ts)
+# AZURE_SPEECH_KEY=your_azure_speech_key    (used by api/speech-token.ts)
 # AZURE_SPEECH_REGION=eastasia
 ```
 
@@ -95,12 +101,14 @@ VITE_AZURE_SPEECH_REGION=eastasia   # pick region closest to your users
 - `App.tsx` - Main state container, coordinates between services and UI
 - `types.ts` - Shared TypeScript interfaces
 - `components/` - React UI components
-- `services/minimaxService.ts` - MiniMax API integration with retry logic
+- `services/geminiService.ts` - Gemini API integration (proxy/direct dual-mode, retry logic)
+- `services/azureSpeechService.ts` - Azure pronunciation scoring
+- `services/minimaxService.ts` - ⚠️ legacy, unused (kept for reference only)
 - `services/audioUtils.ts` - Audio encoding/decoding and playback utilities
+- `api/` - Vercel serverless functions proxying Gemini/Azure (keys stay server-side)
 
 ## Key Implementation Notes
 
-- Hex-to-base64 conversion required for MiniMax audio responses
 - Byte alignment fix applied in PCM decoding (handles odd-length buffers)
 - Linking analysis parses JSON from LLM responses with markdown code block stripping
 - Audio playback uses `Promise.allSettled` to handle independent API calls
