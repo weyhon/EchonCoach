@@ -146,7 +146,7 @@ export const SentenceAnnotation: React.FC<Props> = ({
 
   // === 点词查义 popover ===
   const [popover, setPopover] = useState<{
-    word: string; left: number; top: number; placement: 'above' | 'below';
+    word: string; left: number; top: number; placement: 'above' | 'below'; caretShift: number;
   } | null>(null);
   const [definition, setDefinition] = useState<WordDefinition | null>(null);
   const [defError, setDefError] = useState(false);
@@ -157,16 +157,19 @@ export const SentenceAnnotation: React.FC<Props> = ({
     if (!containerRef.current) return;
     const cr = containerRef.current.getBoundingClientRect();
     const r = el.getBoundingClientRect();
-    const half = 110; // 卡片宽 220 的一半，用于视口内钳位
+    const half = 92; // 卡片最小宽 148 时半宽约 74，取 92 兼顾 max-content 加宽的情况
+    const rawCenter = r.left - cr.left + r.width / 2;
     const left = Math.min(
-      Math.max(r.left - cr.left + r.width / 2, half),
+      Math.max(rawCenter, half),
       Math.max(cr.width - half, half)
     );
+    // 卡片被钳位后，小纸角仍要指向单词（限制在卡片内 ±60px）
+    const caretShift = Math.max(-60, Math.min(60, rawCenter - left));
     // 上方空间不足 110px 时放到单词下方
     const placement: 'above' | 'below' = r.top - cr.top < 110 ? 'below' : 'above';
-    const top = placement === 'above' ? r.top - cr.top - 8 : r.bottom - cr.top + 8;
+    const top = placement === 'above' ? r.top - cr.top - 10 : r.bottom - cr.top + 10;
 
-    setPopover({ word: cleanWord, left, top, placement });
+    setPopover({ word: cleanWord, left, top, placement, caretShift });
     setDefinition(null);
     setDefError(false);
     lookupRef.current = cleanWord;
@@ -423,6 +426,7 @@ export const SentenceAnnotation: React.FC<Props> = ({
           left={popover.left}
           top={popover.top}
           placement={popover.placement}
+          caretShift={popover.caretShift}
           onReplay={() => onWordClick?.(popover.word)}
           onClose={() => setPopover(null)}
         />

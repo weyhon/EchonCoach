@@ -225,3 +225,21 @@ a[class*="rounded"]:hover {
   0%, 100% { background: var(--rose-50, #f7e8e0); }
   50% { background: var(--rose, #c2410c); }
 }
+
+/* ── Word lookup popover: 160ms 浮现（词条从纸面上轻轻立起来） ── */
+@keyframes wordPopoverEnter {
+  from { opacity: 0; margin-top: 4px; }
+  to   { opacity: 1; margin-top: 0; }
+}
+.word-popover-enter {
+  animation: wordPopoverEnter 160ms ease-out;
+}
+
+/* 查询中的呼吸感（细微，非发光） */
+@keyframes wordPopoverPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+.word-popover-pulse {
+  animation: wordPopoverPulse 1.2s ease-in-out infinite;
+}
