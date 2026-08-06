@@ -440,6 +440,19 @@ export function fixCommonPhoneticErrors(text: string, phonetic: string): string 
     '$1ði'
   );
 
+  // Step 4.9: 句中有 "all" 时，光杆 ɔ/ɑ 音节要还原丢掉的 /l/
+  // （连读合并时模型偶发吞音素："you‿all‿after" → ju.ɔ.æftər 丢 l）
+  // 光杆 ɔ/ɑ 整音节只可能是 awe 或丢了 l 的 all，用 \ball\b 门控避免误伤
+  if (/\ball\b/i.test(text)) {
+    // 后接元音：l 挪到下一音节开头（ɔ.ˈæftər → ɔ.ˈlæftər）
+    fixed = fixed.replace(
+      new RegExp(`([\\s.ˈ])([ɔɑ])\\.(ˈ?)([${VOWELS}])`, 'g'),
+      '$1$2.$3l$4'
+    );
+    // 后接辅音/块尾：直接补回 l（ju.ɔ dɪd → ju.ɔl dɪd）
+    fixed = fixed.replace(/([\s.ˈ])([ɔɑ])(?=\s|$)/g, '$1$2l');
+  }
+
   // Step 5: Fix "this" missing /s/ sound
   fixed = fixed.replace(/ðɪ\s+æ/g, 'ðɪs‿æ'); // "this a..." → "ðɪs‿æ"
   fixed = fixed.replace(/ðɪ\s+ɑ/g, 'ðɪs‿ɑ'); // "this o..." → "ðɪs‿ɑ"

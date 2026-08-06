@@ -23,6 +23,8 @@ AMERICAN ENGLISH PRONUNCIATION (apply throughout fullLinkedPhonetic):
   after→ˈæftər (NOT ˈæfɾər), sixty→ˈsɪksti (NOT ˈsɪksɾi).
 - ONE primary stress ˈ per word maximum. For words with secondary + primary stress,
   mark ONLY the primary: afternoon → æftərˈnun (NOT ˈæftərˈnun), engineer → ɛndʒəˈnɪr.
+- NEVER drop a phoneme when chain-linking. Every sound of every word must survive:
+  you‿all‿after → ju.ɔ.ˈlæftər (the l of "all" starts the next syllable) — NOT ju.ɔ.æftər.
 
 STRICT RULES:
 1. 'fullLinkedSentence': Mark ALL natural linking points with '‿' in American English.

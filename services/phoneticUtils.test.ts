@@ -251,3 +251,25 @@ describe('fixCommonPhoneticErrors — flap-T corrections', () => {
       .toBe('ˈpɑrɾi');
   });
 });
+
+describe('fixCommonPhoneticErrors — "all" keeps its /l/ in chain linking', () => {
+  it('restores dropped l before a linked vowel (user-reported: join you all after)', () => {
+    expect(fixCommonPhoneticErrors("Perhaps I'll join you all after my training.", 'pərˈhæps ˈaɪl ˈdʒɔɪn.ju.ˈɔ.ˈæftər maɪ ˈtreɪnɪŋ'))
+      .toBe('pərˈhæps ˈaɪl ˈdʒɔɪn.ju.ˈɔ.ˈlæftər maɪ ˈtreɪnɪŋ');
+  });
+
+  it('restores dropped l at block end before a consonant word', () => {
+    expect(fixCommonPhoneticErrors('you all did it', 'ju.ɔ dɪd ɪt'))
+      .toBe('ju.ɔl dɪd ɪt');
+  });
+
+  it('leaves intact ɔl untouched', () => {
+    expect(fixCommonPhoneticErrors('join you all after', 'ˈdʒɔɪn ju.ɔl.æftər'))
+      .toBe('ˈdʒɔɪn ju.ɔl.æftər');
+  });
+
+  it('does nothing when the sentence has no "all" (awe stays bare)', () => {
+    expect(fixCommonPhoneticErrors('the awe of nature', 'ðə ˈɔ əv ˈneɪtʃər'))
+      .toBe('ði ˈɔ əv ˈneɪtʃər');
+  });
+});
