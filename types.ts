@@ -24,6 +24,7 @@ export interface AnalysisResult {
   fullLinkedSentence?: string; 
   fullLinkedPhonetic?: string; 
   intonationMap?: string; // This will now be used for word-by-word mapping
+  translation?: string; // Simplified Chinese translation of speechScript
 }
 
 export interface HistoryItem {
@@ -41,4 +42,9 @@ export enum AppState {
   RECORDING = 'RECORDING',
   ANALYZING = 'ANALYZING',
   SHOWING_RESULT = 'SHOWING_RESULT'
+}
+
+export interface WordDefinition {
+  ipa: string;     // e.g. "/ˈgoʊɪŋ/"，可能为空串
+  meaning: string; // 结合语境的简体中文释义
 }

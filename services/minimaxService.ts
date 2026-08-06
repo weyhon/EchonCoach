@@ -335,13 +335,14 @@ RULES:
    - Yes/No questions (Do/Is/Can...): ↗ at the end
    - Wh-questions (What/Where...): ↘ at the end
 
-EXAMPLES:
-"I love you" → {"fullLinkedSentence":"I love you","intonationMap":"· ● ·↘","fullLinkedPhonetic":"aɪ lʌv ju"}
-"Do you like‿it?" → {"fullLinkedSentence":"Do you like‿it?","intonationMap":"· · ● ·↗","fullLinkedPhonetic":"du ju laɪ kɪt"}
-"Where‿are you going?" → {"fullLinkedSentence":"Where‿are you going?","intonationMap":"● · · ●↘","fullLinkedPhonetic":"wɛr ər ju goʊɪŋ"}
-"It's due to personnel‿issues this time" → {"fullLinkedSentence":"It's due to personnel‿issues this time","intonationMap":"· ● · ● ● · ●↘","fullLinkedPhonetic":"ɪts duː ɾə pɝrsəˈnɛl ˈɪʃuz ðɪs ˈtaɪm"}
+4. Translation (翻译): natural Simplified Chinese, conversational not word-for-word.
 
-Return ONLY valid JSON with these 3 fields. No markdown, no explanation.`;
+EXAMPLES:
+"I love you" → {"fullLinkedSentence":"I love you","intonationMap":"· ● ·↘","fullLinkedPhonetic":"aɪ lʌv ju","translation":"我爱你。"}
+"Do you like‿it?" → {"fullLinkedSentence":"Do you like‿it?","intonationMap":"· · ● ·↗","fullLinkedPhonetic":"du ju laɪ kɪt","translation":"你喜欢吗？"}
+"Where‿are you going?" → {"fullLinkedSentence":"Where‿are you going?","intonationMap":"● · · ●↘","fullLinkedPhonetic":"wɛr ər ju goʊɪŋ","translation":"你要去哪儿？"}
+
+Return ONLY valid JSON with these 4 fields. No markdown, no explanation.`;
 
     // Simple fallback for linked sentence (just joins with linking marks)
     const buildFallbackLinked = (raw: string) => {
@@ -380,6 +381,7 @@ Return ONLY valid JSON with these 3 fields. No markdown, no explanation.`;
         fullLinkedSentence,
         fullLinkedPhonetic: result.fullLinkedPhonetic || "",
         intonationMap,
+        translation: result.translation || "",
       };
     } catch (parseError) {
       console.error("JSON 解析错误:", parseError);
@@ -477,3 +479,4 @@ Status must be one of: 'correct', 'incorrect', 'needs_improvement'`;
     throw error;
   }
 };
+

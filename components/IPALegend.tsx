@@ -18,7 +18,7 @@ export const IPALegend: React.FC<IPALegendProps> = ({ show, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-      <div role="dialog" aria-label="IPA Symbol Guide" className="glass rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto relative" style={{ boxShadow: '0 8px 48px rgba(0,0,0,0.1)' }} onClick={e => e.stopPropagation()}>
+      <div role="dialog" aria-label="IPA Symbol Guide" className="glass rounded-[2px] max-w-2xl w-full max-h-[85vh] overflow-y-auto relative" onClick={e => e.stopPropagation()}>
         {/* Fixed close button — always visible */}
         <button
           onClick={onClose}
@@ -169,11 +169,11 @@ export const IPALegend: React.FC<IPALegendProps> = ({ show, onClose }) => {
           </section>
         </div>
 
-        <div className="sticky bottom-0 px-6 py-4 rounded-b-2xl" style={{ backgroundColor: 'var(--bg-card)', borderTop: '1px solid var(--border-subtle)' }}>
+        <div className="sticky bottom-0 px-6 py-4" style={{ backgroundColor: 'var(--bg-card)', borderTop: '1px solid var(--border-subtle)' }}>
           <button
             onClick={onClose}
-            className="w-full text-white font-semibold py-2.5 px-6 rounded-full transition-colors text-sm hover:opacity-90"
-            style={{ backgroundColor: 'var(--pink)', boxShadow: '0 2px 12px var(--pink-dim)' }}
+            className="w-full text-white font-medium py-2.5 px-6 rounded-[2px] transition-colors text-sm uppercase tracking-[0.08em] hover:opacity-90"
+            style={{ backgroundColor: 'var(--pink)' }}
           >
             Got it
           </button>

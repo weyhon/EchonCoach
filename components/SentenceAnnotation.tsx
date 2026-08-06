@@ -1,8 +1,10 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { WordAnalysis } from '../types';
+import { WordAnalysis, WordDefinition } from '../types';
 import { shouldLink, isFunctionWord } from '../services/linkingUtils';
 import { generateIntonationTokens as getTokens } from '../services/intonationUtils';
 import { isYesNoQuestion, isWhQuestion } from '../services/linkingUtils';
+import { WordPopover } from './WordPopover';
+import { getWordDefinition } from '../services/geminiService';
 
 export interface AnnotationWord {
   word: string;
@@ -141,6 +143,55 @@ export const SentenceAnnotation: React.FC<Props> = ({
     dots: { x: number; y: number; pitch: number }[];
   }[]>([]);
   const [svgSize, setSvgSize] = useState({ w: 0, h: 0 });
+
+  // === 点词查义 popover ===
+  const [popover, setPopover] = useState<{
+    word: string; left: number; top: number; placement: 'above' | 'below'; caretShift: number;
+  } | null>(null);
+  const [definition, setDefinition] = useState<WordDefinition | null>(null);
+  const [defError, setDefError] = useState(false);
+  // 竞态守卫：快速连点多个词时，只显示最后点击词的结果
+  const lookupRef = useRef<string>('');
+
+  const openPopover = (cleanWord: string, el: HTMLElement) => {
+    if (!containerRef.current) return;
+    const cr = containerRef.current.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const half = 92; // 卡片最小宽 148 时半宽约 74，取 92 兼顾 max-content 加宽的情况
+    const rawCenter = r.left - cr.left + r.width / 2;
+    const left = Math.min(
+      Math.max(rawCenter, half),
+      Math.max(cr.width - half, half)
+    );
+    // 卡片被钳位后，小纸角仍要指向单词（限制在卡片内 ±60px）
+    const caretShift = Math.max(-60, Math.min(60, rawCenter - left));
+    // 上方空间不足 110px 时放到单词下方
+    const placement: 'above' | 'below' = r.top - cr.top < 110 ? 'below' : 'above';
+    const top = placement === 'above' ? r.top - cr.top - 10 : r.bottom - cr.top + 10;
+
+    setPopover({ word: cleanWord, left, top, placement, caretShift });
+    setDefinition(null);
+    setDefError(false);
+    lookupRef.current = cleanWord;
+    getWordDefinition(cleanWord, text)
+      .then((def) => {
+        if (lookupRef.current === cleanWord) setDefinition(def);
+      })
+      .catch(() => {
+        if (lookupRef.current === cleanWord) setDefError(true);
+      });
+  };
+
+  // 点击卡片外部任意处关闭
+  useEffect(() => {
+    if (!popover) return;
+    const onDown = (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest('[data-word-popover]')) return;
+      setPopover(null);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [popover]);
 
   const updateCurve = useCallback(() => {
     if (!showPitchCurve || !containerRef.current || wordRefs.current.length === 0) return;
@@ -318,7 +369,7 @@ export const SentenceAnnotation: React.FC<Props> = ({
                 <span
                   role={onWordClick ? 'button' : undefined}
                   tabIndex={onWordClick ? 0 : undefined}
-                  aria-label={onWordClick ? `Hear "${w.word.replace(/[?.!,;:'"()[\]{}]/g, '')}"` : undefined}
+                  aria-label={onWordClick ? `Hear and define "${w.word.replace(/[?.!,;:'"()[\]{}]/g, '')}"` : undefined}
                   className={`leading-none font-display${onWordClick ? ' cursor-pointer hover:opacity-70 active:scale-95 transition-all duration-150' : ''}`}
                   style={{
                     fontSize: 22,
@@ -328,14 +379,20 @@ export const SentenceAnnotation: React.FC<Props> = ({
                     paddingBottom: w.isStressed && !isKaraokePlaying && !showPitchCurve ? 2 : 0,
                     letterSpacing: '-0.01em',
                   }}
-                  onClick={onWordClick ? () => onWordClick(w.word.replace(/[?.!,;:'"()[\]{}]/g, '')) : undefined}
+                  onClick={onWordClick ? (e) => {
+                    const clean = w.word.replace(/[?.!,;:'"()[\]{}]/g, '');
+                    onWordClick(clean);                                   // 现有行为：播放发音
+                    openPopover(clean, e.currentTarget as HTMLElement);   // 新增：弹出释义卡片
+                  } : undefined}
                   onKeyDown={onWordClick ? (e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      onWordClick(w.word.replace(/[?.!,;:'"()[\]{}]/g, ''));
+                      const clean = w.word.replace(/[?.!,;:'"()[\]{}]/g, '');
+                      onWordClick(clean);
+                      openPopover(clean, e.currentTarget as HTMLElement);
                     }
                   } : undefined}
-                  title={onWordClick ? 'Click to hear pronunciation' : undefined}
+                  title={onWordClick ? 'Click to hear & see meaning' : undefined}
                 >
                   {w.word}
                 </span>
@@ -360,6 +417,20 @@ export const SentenceAnnotation: React.FC<Props> = ({
           );
         })}
       </div>
+
+      {popover && (
+        <WordPopover
+          word={popover.word}
+          definition={definition}
+          error={defError}
+          left={popover.left}
+          top={popover.top}
+          placement={popover.placement}
+          caretShift={popover.caretShift}
+          onReplay={() => onWordClick?.(popover.word)}
+          onClose={() => setPopover(null)}
+        />
+      )}
     </div>
   );
 };

@@ -2,7 +2,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FeedbackCard } from './components/FeedbackCard';
 import { HistoryList } from './components/HistoryList';
-import { NebulaLogo } from './components/NebulaLogo';
 import { generateSpeech, analyzePronunciation, getLinkingAnalysisForText, generateTutorAudio } from './services/geminiService';
 import { playBase64Audio, speakWithWebSpeech, cleanupAudioResources } from './services/audioUtils';
 import { azurePronunciationScore, isAzureSpeechAvailable } from './services/azureSpeechService';
@@ -36,6 +35,7 @@ const DEMO_RESULT: AnalysisResult = {
   fullLinkedSentence: 'How‿is it going?',
   fullLinkedPhonetic: 'haʊ‿ɪz ɪt ˈɡoʊɪŋ',
   intonationMap: '· · ● ↘',
+  translation: '最近怎么样？',
 };
 
 const App: React.FC = () => {
@@ -340,7 +340,8 @@ const App: React.FC = () => {
           ...localRes,
           fullLinkedSentence: linking.fullLinkedSentence,
           fullLinkedPhonetic: linking.fullLinkedPhonetic,
-          intonationMap: linking.intonationMap
+          intonationMap: linking.intonationMap,
+          translation: linking.translation
         };
         setResult(enrichedRes);
         lruSet(referenceCache, textToSpeak, enrichedRes, MAX_RESULT_CACHE);
@@ -518,6 +519,7 @@ const App: React.FC = () => {
                 res.fullLinkedSentence = cached.fullLinkedSentence;
                 res.fullLinkedPhonetic = cached.fullLinkedPhonetic;
                 res.intonationMap = cached.intonationMap;
+                res.translation = cached.translation;
               }
             }
 
@@ -573,6 +575,7 @@ const App: React.FC = () => {
               res.fullLinkedSentence = cached.fullLinkedSentence;
               res.fullLinkedPhonetic = cached.fullLinkedPhonetic;
               res.intonationMap = cached.intonationMap;
+              res.translation = cached.translation;
             }
           }
 
@@ -623,23 +626,24 @@ const App: React.FC = () => {
     <div className="min-h-screen pb-16 antialiased">
       {/* Fixed Top Header */}
       <header className="fixed top-0 w-full z-50 flex items-center justify-between px-5 h-[52px]"
-        style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        style={{ background: 'rgba(252,252,250,0.92)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', borderBottom: '1px solid var(--text-primary)' }}>
         <div className="flex items-center gap-2.5">
-          <NebulaLogo size={28} />
-          <h1 style={{ fontFamily: "'Source Serif 4', Georgia, serif", fontSize: 17, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0 }}>Nebula</h1>
+          <h1 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 19, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em', margin: 0 }}>
+            EchoCoach<span aria-hidden="true" style={{ color: 'var(--rose)' }}>°</span>
+          </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <button onClick={() => setShowIPALegend(true)}
-            className="px-3 py-2 rounded-md text-xs font-semibold transition-colors min-h-[44px] flex items-center"
-            style={{ background: 'var(--surface-muted)', color: 'var(--text-muted)' }}>
+            className="px-3 py-2 text-[11px] font-medium uppercase tracking-[0.12em] transition-colors min-h-[44px] flex items-center hover-rose"
+            style={{ background: 'transparent', color: 'var(--text-secondary)' }}>
             IPA Guide
           </button>
           {history.length > 0 && (
             <button onClick={() => setShowMobileHistory(true)}
-              className="lg:hidden px-3 py-2 rounded-md text-xs font-semibold flex items-center gap-1.5 min-h-[44px]"
-              style={{ background: 'var(--surface-muted)', color: 'var(--text-muted)' }}>
+              className="lg:hidden px-3 py-2 text-[11px] font-medium uppercase tracking-[0.12em] flex items-center gap-1.5 min-h-[44px] hover-rose"
+              style={{ background: 'transparent', color: 'var(--text-secondary)' }}>
               History
-              <span className="w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center text-white" style={{ background: 'var(--rose)' }}>
+              <span className="w-4 h-4 rounded-[1px] text-[9px] font-bold flex items-center justify-center text-white" style={{ background: 'var(--rose)' }}>
                 {Math.min(history.length, 9)}
               </span>
             </button>
@@ -664,7 +668,7 @@ const App: React.FC = () => {
       {/* Error Toast */}
       {error && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
-          <div className="glass px-5 py-3 rounded-2xl flex items-center gap-3" style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.1)' }}>
+          <div className="glass px-5 py-3 rounded-[2px] flex items-center gap-3">
             <svg className="w-4 h-4 shrink-0" style={{ color: 'var(--red)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -682,20 +686,20 @@ const App: React.FC = () => {
         {/* Main Content Area */}
         <div className="flex-1 px-6 lg:px-8 relative">
           <main className="max-w-[660px] mx-auto space-y-5 pt-7 pb-16">
-            {/* Input Section */}
-            <div className="rounded-xl p-5 card-hover" style={{ background: 'var(--surface)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+            {/* Input Section — open page, no card */}
+            <div className="pt-3">
               {/* Label */}
-              <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
+              <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
                 <label htmlFor="practice-sentence" className="label-micro" style={{ color: 'var(--text-muted)' }}>
                   PRACTICE SENTENCE
                 </label>
-                <span className="pixel-badge pixel-badge-a" style={{ fontSize: 8, padding: '1px 6px', opacity: 0.7 }}>LVL 1</span>
+                <span className="font-mono" style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.14em', color: 'var(--rose)' }}>LVL 1</span>
               </div>
-              {/* Textarea */}
+              {/* Textarea — set like a book pull-quote over a hairline rule */}
               <textarea
                 id="practice-sentence"
                 value={text}
-                onChange={e => { setText(e.target.value); setResult(null); }}
+                onChange={e => { setText(e.target.value); setResult(null); setUserAudioBlob(null); }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     if (e.metaKey) return;
@@ -706,16 +710,18 @@ const App: React.FC = () => {
                 placeholder="Type or paste a sentence to practice..."
                 className="w-full resize-none outline-none input-focus"
                 style={{
-                  minHeight: 56, padding: '11px 13px',
-                  background: 'var(--surface-muted)', borderRadius: 8,
-                  fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 500, color: 'var(--text-primary)',
-                  lineHeight: 1.55,
+                  minHeight: 72, padding: '12px 0 16px',
+                  background: 'transparent', borderRadius: 0,
+                  fontFamily: "'Fraunces', Georgia, serif", fontSize: 25, fontWeight: 400, color: 'var(--text-primary)',
+                  lineHeight: 1.35, letterSpacing: '-0.01em',
                 }}
                 disabled={appState !== AppState.IDLE && appState !== AppState.SHOWING_RESULT}
               />
-              {/* Action row */}
-              <div className="flex items-center gap-2 mt-3 flex-wrap gap-y-2">
-                {/* Play Reference */}
+              {/* Action row — typewriter controls over the sentence rule.
+                  Listening is the user's primary action, so Play Reference
+                  carries the accent; Record is a quiet text control. */}
+              <div className="flex items-center gap-2 mt-4 flex-wrap gap-y-2">
+                {/* Play Reference — THE accent action */}
                 {(() => {
                   const isBusy = appState === AppState.GENERATING_TTS || activeAudioSource?.startsWith('input_');
                   return (
@@ -724,10 +730,14 @@ const App: React.FC = () => {
                       disabled={!text.trim() || isBusy || appState === AppState.RECORDING || appState === AppState.ANALYZING}
                       aria-label={appState === AppState.GENERATING_TTS ? 'Loading audio' : 'Play reference pronunciation'}
                       title="Play reference (Space)"
-                      className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-60 min-h-[44px]"
-                      style={{ background: isBusy ? 'var(--rose-50)' : 'var(--rose)', color: isBusy ? 'var(--rose)' : '#fff', border: isBusy ? '1.5px solid var(--rose)' : 'none' }}>
+                      className={`flex items-center gap-2 px-5 py-2.5 rounded-[2px] text-[11px] font-semibold uppercase tracking-[0.1em] disabled:opacity-60 min-h-[44px] ${isBusy ? '' : 'btn-press'}`}
+                      style={isBusy
+                        ? { background: 'transparent', color: 'var(--rose)', border: '1px solid var(--rose)' }
+                        : { background: 'var(--rose)', color: '#fff' }}>
                       {isBusy ? (
-                        <span className="pixel-spinner-sm"><span className="dot" /><span className="dot" /><span className="dot" /></span>
+                        appState === AppState.GENERATING_TTS
+                          ? <span className="pixel-spinner-sm"><span className="dot" /><span className="dot" /><span className="dot" /></span>
+                          : <span className="eq-mini" aria-hidden="true"><span /><span /><span /></span>
                       ) : (
                         <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                       )}
@@ -735,14 +745,34 @@ const App: React.FC = () => {
                     </button>
                   );
                 })()}
-                {/* Video reference links — hidden on mobile to avoid overflow */}
+                {/* Record — secondary text control */}
+                {appState !== AppState.RECORDING ? (
+                  <button onClick={startRecording} disabled={!text.trim() || appState === AppState.ANALYZING || appState === AppState.GENERATING_TTS}
+                    aria-label="Record your pronunciation"
+                    title="Record (R)"
+                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-[2px] text-[11px] font-medium uppercase tracking-[0.08em] transition-all disabled:opacity-40 min-h-[44px] hover-rose"
+                    style={{ background: 'transparent', color: 'var(--text-secondary)', border: 'none' }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
+                    Record
+                  </button>
+                ) : (
+                  <button onClick={() => mediaRecorderRef.current?.stop()}
+                    aria-label="Stop recording"
+                    title="Stop recording (R)"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-[2px] text-[11px] font-semibold uppercase tracking-[0.08em] min-h-[44px]"
+                    style={{ background: 'var(--text-primary)', color: 'var(--bg)', border: 'none' }}>
+                    <span style={{ width: 9, height: 9, borderRadius: 1, background: 'var(--bg)', display: 'inline-block' }} />
+                    Stop
+                  </button>
+                )}
+                {/* Video reference links — outlined so they read as buttons; visible on all viewports (flex-wrap handles narrow screens) */}
                 {text.trim() && (<>
                   <a
                     href={`https://youglish.com/pronounce/${text.trim().replace(/\s+/g, '+')}/english`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hidden sm:flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all min-h-[44px]"
-                    style={{ color: 'var(--text-secondary)', background: 'var(--surface-muted)', textDecoration: 'none' }}
+                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-[2px] text-[11px] font-medium uppercase tracking-[0.08em] transition-all min-h-[44px] hover-rose"
+                    style={{ color: 'var(--text-secondary)', background: 'transparent', border: '1px solid var(--border-medium)', textDecoration: 'none' }}
                   >
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
@@ -753,8 +783,8 @@ const App: React.FC = () => {
                     href={`https://www.playphrase.me/#/search?q=${encodeURIComponent(text.trim())}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hidden sm:flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all min-h-[44px]"
-                    style={{ color: 'var(--text-secondary)', background: 'var(--surface-muted)', textDecoration: 'none' }}
+                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-[2px] text-[11px] font-medium uppercase tracking-[0.08em] transition-all min-h-[44px] hover-rose"
+                    style={{ color: 'var(--text-secondary)', background: 'transparent', border: '1px solid var(--border-medium)', textDecoration: 'none' }}
                   >
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
@@ -762,26 +792,6 @@ const App: React.FC = () => {
                     PlayPhrase
                   </a>
                 </>)}
-                {/* Record */}
-                {appState !== AppState.RECORDING ? (
-                  <button onClick={startRecording} disabled={!text.trim() || appState === AppState.ANALYZING || appState === AppState.GENERATING_TTS}
-                    aria-label="Record your pronunciation"
-                    title="Record (R)"
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-40 min-h-[44px]"
-                    style={{ background: 'var(--surface-muted)', color: 'var(--text-secondary)' }}>
-                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2H3v2a9 9 0 0 0 8 8.94V23h2v-2.06A9 9 0 0 0 21 12v-2h-2z"/></svg>
-                    Record
-                  </button>
-                ) : (
-                  <button onClick={() => mediaRecorderRef.current?.stop()}
-                    aria-label="Stop recording"
-                    title="Stop recording (R)"
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold min-h-[44px]"
-                    style={{ background: 'var(--text-primary)', color: 'var(--surface)', border: 'none' }}>
-                    <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--surface)', display: 'inline-block' }} />
-                    Stop Recording
-                  </button>
-                )}
                 {/* Replay my recording */}
                 {userAudioBlob && appState !== AppState.RECORDING && (
                   <button
@@ -796,51 +806,45 @@ const App: React.FC = () => {
                       audio.play().catch(() => setActiveAudioSource(null));
                     }}
                     aria-label="Replay your recording"
-                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all min-h-[44px]"
-                    style={{ color: activeAudioSource === 'user_playback' ? 'var(--rose)' : 'var(--text-secondary)', background: activeAudioSource === 'user_playback' ? 'var(--rose-50)' : 'var(--surface-muted)' }}
+                    className="flex items-center gap-1.5 px-2.5 py-2.5 rounded-[2px] text-[11px] font-medium uppercase tracking-[0.08em] transition-all min-h-[44px] hover-rose"
+                    style={{ color: activeAudioSource === 'user_playback' ? 'var(--rose)' : 'var(--text-muted)', background: 'transparent' }}
                   >
                     <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2H3v2a9 9 0 0 0 8 8.94V23h2v-2.06A9 9 0 0 0 21 12v-2h-2z"/></svg>
                     {activeAudioSource === 'user_playback' ? 'Playing...' : 'My Voice'}
                   </button>
                 )}
-                {/* Speed toggle */}
-                <div className="flex ml-auto rounded-md overflow-hidden" style={{ background: 'var(--surface-muted)', padding: 2 }}>
-                  {([{ key: 'normal', label: '1x' }, { key: 'slow', label: '0.8x' }] as const).map(({ key, label }) => (
+                {/* Speed toggle — underlined ink, like a book footnote marker */}
+                <div className="flex ml-auto items-center gap-1">
+                  {([{ key: 'normal', label: '1×' }, { key: 'slow', label: '0.8×' }] as const).map(({ key, label }) => (
                     <button key={key} onClick={() => setTtsSpeed(key as 'normal' | 'slow')}
                       aria-pressed={ttsSpeed === key}
                       aria-label={`Playback speed ${label}`}
-                      className="px-3 py-1.5 text-xs font-semibold rounded transition-all"
+                      className="px-2 py-1.5 text-xs transition-all"
                       style={ttsSpeed === key
-                        ? { background: 'var(--surface)', color: 'var(--text-primary)', boxShadow: '0 1px 2px rgba(0,0,0,0.08)' }
-                        : { color: 'var(--text-muted)', background: 'transparent' }}>
+                        ? { background: 'transparent', color: 'var(--text-primary)', fontWeight: 600, borderBottom: '2px solid var(--rose)', borderRadius: 0 }
+                        : { color: 'var(--text-placeholder)', background: 'transparent', fontWeight: 400, borderBottom: '2px solid transparent', borderRadius: 0 }}>
                       {label}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Pixel accent strip + hint */}
+              {/* Idle hint — a quiet footnote between hairline rules */}
               {appState === AppState.IDLE && !result && (
-                <div className="mt-4 flex flex-col items-center gap-2">
-                  <div className="pixel-strip">
-                    {[...Array(32)].map((_, i) => (
-                      <div key={i} className="pixel-block" style={{
-                        width: 6, height: 6,
-                        background: i % 7 === 0 ? 'var(--rose)' : i % 4 === 0 ? 'var(--rose-50, #ffd9de)' : i % 5 === 0 ? '#FFD700' : 'var(--surface-muted)',
-                      }} />
-                    ))}
-                  </div>
-                  <span style={{ fontFamily: 'monospace', fontSize: 9, fontWeight: 700, color: 'var(--text-placeholder)', letterSpacing: '1px' }}>
-                    ▶ PRESS PLAY TO START ▶
+                <div className="mt-6 flex items-center gap-3" aria-hidden="true">
+                  <div className="h-px flex-1" style={{ background: 'var(--border)' }} />
+                  <span className="font-mono" style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-placeholder)', letterSpacing: '0.18em' }}>
+                    SPACE TO PLAY · R TO RECORD
                   </span>
+                  <div className="h-px flex-1" style={{ background: 'var(--border)' }} />
                 </div>
               )}
 
-              {/* Recording state: pixel waveform */}
+              {/* Recording state: ink waveform over a rule */}
               {appState === AppState.RECORDING && (
-                <div className="flex items-center gap-3 mt-4 animate-fade-in" style={{ background: 'var(--surface-muted)', borderRadius: 10, padding: '10px 14px' }}>
+                <div className="flex items-center gap-3 mt-4 animate-fade-in" style={{ borderTop: '1px solid var(--border)', padding: '12px 2px 2px' }}>
                   <span className="pixel-badge pixel-badge-a" style={{ fontSize: 8, padding: '2px 6px', animation: 'pixel-blink 1s steps(1) infinite' }}>REC</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', fontFamily: 'monospace', letterSpacing: '0.5px' }}>Recording...</span>
+                  <span className="font-mono" style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-secondary)', letterSpacing: '0.1em' }}>Recording…</span>
                   <div className="pixel-wave ml-auto">
                     {[0,1,2,3,4,5,6,7,8].map(n => (
                       <div key={n} className="pixel-wave-bar" style={{ background: 'var(--rose)', animationDelay: `${n * 100}ms` }} />
@@ -849,15 +853,15 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              {/* Analyzing state: pixel style */}
+              {/* Analyzing state */}
               {appState === AppState.ANALYZING && (
-                <div className="mt-4 animate-fade-in" style={{ background: 'var(--surface-muted)', borderRadius: 10, padding: '10px 14px' }}>
+                <div className="mt-4 animate-fade-in" style={{ borderTop: '1px solid var(--border)', padding: '12px 2px 2px' }}>
                   <div className="flex items-center gap-2 mb-2">
                     <span className="pixel-spinner">
                       <span className="dot active" /><span className="dot" />
                       <span className="dot" /><span className="dot active" />
                     </span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', fontFamily: 'monospace', letterSpacing: '0.5px' }}>Analyzing...</span>
+                    <span className="font-mono" style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)', letterSpacing: '0.1em' }}>Analyzing…</span>
                   </div>
                   <div className="pixel-loading-bar">
                     <div className="pixel-loading-fill" />
@@ -866,9 +870,9 @@ const App: React.FC = () => {
               )}
             </div>
 
-            {/* Loading State: pixel grid animation */}
+            {/* Loading State: dot matrix over an ink rule */}
             {appState === AppState.ANALYZING && !result && (
-              <div className="rounded-2xl p-10 flex flex-col items-center gap-5 animate-fade-in-up" style={{ background: 'var(--surface)', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }} role="status" aria-busy="true" aria-label="Analyzing pronunciation">
+              <div className="p-10 flex flex-col items-center gap-5 animate-fade-in-up" style={{ borderTop: '1px solid var(--text-primary)' }} role="status" aria-busy="true" aria-label="Analyzing pronunciation">
                 <div className="pixel-analyze-icon">
                   {[...Array(25)].map((_, i) => {
                     const row = Math.floor(i / 5);
@@ -878,8 +882,8 @@ const App: React.FC = () => {
                   })}
                 </div>
                 <div className="text-center space-y-1.5">
-                  <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'monospace', letterSpacing: '0.5px' }}>ANALYZING</p>
-                  <p style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>phonemes ● rhythm ● intonation</p>
+                  <p className="font-mono" style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '0.14em' }}>ANALYZING</p>
+                  <p className="font-mono" style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.06em' }}>phonemes · rhythm · intonation</p>
                 </div>
                 <div className="pixel-loading-bar" style={{ maxWidth: 200 }}>
                   <div className="pixel-loading-fill" />
@@ -896,7 +900,7 @@ const App: React.FC = () => {
                 onPlayWord={(w) => handlePlayTutor(w)}
                 onPlayTutor={(s) => handlePlayTutor(s)}
                 playingWord={null}
-                hasUserRecording={!!userAudioBlob}
+                hasUserRecording={!!userAudioBlob || isDemo}
                 onPlayUserRecording={() => {
                   if (userAudioBlob) {
                     if (activeBlobUrl) URL.revokeObjectURL(activeBlobUrl);
@@ -916,8 +920,8 @@ const App: React.FC = () => {
             {result && appState === AppState.SHOWING_RESULT && (
               <button
                 onClick={() => { setText(''); setResult(null); setUserAudioBlob(null); setAppState(AppState.IDLE); }}
-                className="w-full py-3.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] animate-fade-in flex items-center justify-center gap-2"
-                style={{ background: 'var(--surface)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', color: 'var(--text-secondary)' }}
+                className="w-full py-3.5 rounded-[2px] text-[11px] font-medium uppercase tracking-[0.12em] transition-all active:scale-[0.98] animate-fade-in flex items-center justify-center gap-2 hover-rose"
+                style={{ background: 'transparent', border: '1px solid var(--border-medium)', color: 'var(--text-secondary)' }}
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -928,9 +932,10 @@ const App: React.FC = () => {
           </main>
         </div>
 
-        {/* Right Sidebar - History */}
-        <aside className="hidden lg:flex flex-col w-[280px] shrink-0 h-[calc(100vh-52px)] sticky top-[52px] overflow-y-auto px-3 py-4"
-          style={{ background: 'var(--surface)', borderLeft: '1px solid var(--border)' }}>
+        {/* Right Sidebar - History (hidden entirely when empty so the ink rule doesn't hang in space) */}
+        {history.length > 0 && (
+        <aside className="hidden lg:flex flex-col w-[280px] shrink-0 h-[calc(100vh-52px)] sticky top-[52px] overflow-y-auto px-4 py-5"
+          style={{ background: 'transparent', borderLeft: '1px solid var(--text-primary)' }}>
           <HistoryList
             history={history}
             onQuickAnalyze={(t) => { setText(t); playAndAnalyze(t); }}
@@ -961,14 +966,15 @@ const App: React.FC = () => {
             onClear={() => setShowClearConfirm(true)}
           />
         </aside>
+        )}
       </div>
 
       {/* Mobile: floating history button */}
       {history.length > 0 && (
         <button
           onClick={() => setShowMobileHistory(true)}
-          className="fixed bottom-6 right-6 z-40 lg:hidden w-12 h-12 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-          style={{ backgroundColor: 'var(--pink)', boxShadow: '0 4px 20px var(--pink-dim)' }}
+          className="fixed bottom-6 right-6 z-40 lg:hidden w-12 h-12 rounded-[4px] flex items-center justify-center active:scale-95 transition-all"
+          style={{ backgroundColor: 'var(--pink)', boxShadow: '0 2px 12px rgba(17,17,16,0.18)' }}
           title="Practice history"
         >
           <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -989,11 +995,11 @@ const App: React.FC = () => {
         <div className="fixed inset-0 z-50 lg:hidden" onClick={() => setShowMobileHistory(false)}>
           <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} />
           <div
-            className="absolute bottom-0 left-0 right-0 rounded-t-2xl p-6 overflow-y-auto animate-float-up"
-            style={{ backgroundColor: 'var(--bg-surface)', maxHeight: '80vh' }}
+            className="absolute bottom-0 left-0 right-0 rounded-t-[2px] p-6 overflow-y-auto animate-float-up"
+            style={{ backgroundColor: 'var(--bg)', borderTop: '1px solid var(--text-primary)', maxHeight: '80vh' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ backgroundColor: 'var(--border-medium)' }} />
+            <div className="w-10 h-0.5 mx-auto mb-5" style={{ backgroundColor: 'var(--border-medium)' }} />
             <HistoryList
               history={history}
               onQuickAnalyze={(t) => { setShowMobileHistory(false); setText(t); playAndAnalyze(t); }}
@@ -1014,17 +1020,17 @@ const App: React.FC = () => {
       {showClearConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}
           onClick={() => setShowClearConfirm(false)}>
-          <div className="rounded-2xl p-6 w-full max-w-xs animate-fade-in-up"
-            style={{ background: 'var(--surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
+          <div className="rounded-[2px] p-6 w-full max-w-xs animate-fade-in-up"
+            style={{ background: 'var(--surface)', border: '1px solid var(--text-primary)' }}
             onClick={e => e.stopPropagation()}>
             <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Clear all history?</p>
             <p className="text-xs mb-5" style={{ color: 'var(--text-muted)' }}>This can't be undone.</p>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setShowClearConfirm(false)}
-                className="px-4 py-2 rounded-lg text-xs font-semibold"
-                style={{ background: 'var(--surface-muted)', color: 'var(--text-secondary)' }}>Cancel</button>
+                className="px-4 py-2 rounded-[2px] text-xs font-medium uppercase tracking-[0.06em]"
+                style={{ background: 'transparent', border: '1px solid var(--border-medium)', color: 'var(--text-secondary)' }}>Cancel</button>
               <button onClick={() => { setHistory([]); safeRemoveItem(CACHE_CONFIG.HISTORY_KEY); setShowClearConfirm(false); }}
-                className="px-4 py-2 rounded-lg text-xs font-semibold"
+                className="px-4 py-2 rounded-[2px] text-xs font-medium uppercase tracking-[0.06em]"
                 style={{ background: 'var(--red)', color: '#fff' }}>Clear</button>
             </div>
           </div>
