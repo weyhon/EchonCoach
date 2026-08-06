@@ -196,3 +196,58 @@ describe('fixCommonPhoneticErrors — preserves flap-T and silent-e fixes', () =
     expect(out).not.toMatch(/[,，、]/);
   });
 });
+
+// ── fixCommonPhoneticErrors: deterministic American-English corrections ──
+// Raw outputs below were observed live from Gemini for
+// "What are your plans for the afternoon?" (2026-07-15 investigation)
+
+describe('fixCommonPhoneticErrors — the → /ði/ before vowel sounds', () => {
+  it('fixes ðə before a linked vowel block', () => {
+    expect(fixCommonPhoneticErrors('for the afternoon', 'fər ðə.æftərˈnun'))
+      .toBe('fər ði.æftərˈnun');
+  });
+
+  it('fixes ðə before a stressed vowel block', () => {
+    expect(fixCommonPhoneticErrors('the evening', 'ðə ˈivnɪŋ'))
+      .toBe('ði ˈivnɪŋ');
+  });
+
+  it('keeps ðə before consonant sounds', () => {
+    expect(fixCommonPhoneticErrors('the driver', 'ðə ˈdraɪvər'))
+      .toBe('ðə ˈdraɪvər');
+  });
+});
+
+describe('fixCommonPhoneticErrors — one primary stress per block', () => {
+  it('collapses double primary stress, keeping the last (afternoon pattern)', () => {
+    expect(fixCommonPhoneticErrors('the afternoon', 'ðə.ˈæftərˈnun'))
+      .toBe('ði.æftərˈnun');
+  });
+
+  it('leaves single-stress blocks untouched', () => {
+    expect(fixCommonPhoneticErrors('tap your phone', 'ˈtæp jər ˈfoʊn'))
+      .toBe('ˈtæp jər ˈfoʊn');
+  });
+});
+
+describe('fixCommonPhoneticErrors — flap-T corrections', () => {
+  it('restores t after obstruents where flap is impossible (afternoon)', () => {
+    expect(fixCommonPhoneticErrors('the afternoon', 'ðə.ˈæf.ɾər.nun'))
+      .toBe('ði.ˈæf.tər.nun');
+  });
+
+  it('enforces flap for intervocalic t before unstressed vowel (What are)', () => {
+    expect(fixCommonPhoneticErrors('What are your', 'ˈwʌ.tər jər'))
+      .toBe('ˈwʌ.ɾər jər');
+  });
+
+  it('does not flap t before a stressed syllable (hotel)', () => {
+    expect(fixCommonPhoneticErrors('hotel', 'hoʊˈtɛl'))
+      .toBe('hoʊˈtɛl');
+  });
+
+  it('keeps legitimate flap after r (party)', () => {
+    expect(fixCommonPhoneticErrors('party', 'ˈpɑrɾi'))
+      .toBe('ˈpɑrɾi');
+  });
+});

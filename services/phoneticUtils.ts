@@ -409,6 +409,37 @@ export function fixCommonPhoneticErrors(text: string, phonetic: string): string 
   // Step 4: Clean up excessive spaces
   fixed = fixed.replace(/\s+/g, ' ');
 
+  // ── Deterministic American-English corrections (LLM 输出不稳定，规则兜底) ──
+  const VOWELS = 'aeiouɑæɛɪʊʌɔəɜɝɚ';
+
+  // Step 4.5: One primary stress per word — a word never carries two ˈ.
+  // Prompt 禁用 ˌ 后，模型常把 ˌæftərˈnun 写成 ˈæftərˈnun。
+  // 仅当两个 ˈ 之间没有音节点/空格（必然同一个词）时折叠，保留后一个
+  // （afternoon/engineer/seventeen 类词的主重音在后）。
+  fixed = fixed.split(' ').map(seg => {
+    while (/ˈ([^.\sˈ]*)ˈ/.test(seg)) {
+      seg = seg.replace(/ˈ([^.\sˈ]*)ˈ/, '$1ˈ');
+    }
+    return seg;
+  }).join(' ');
+
+  // Step 4.6: Flap-T 只存在于元音之间 — 障碍音后的 ɾ 还原为 t
+  // （after → ˈæf.tər，绝不是 ˈæf.ɾər；r/n 后的合法弹舌如 party 不动）
+  fixed = fixed.replace(/([fkpsʃθbgvzʒ])(\.?)ɾ/g, '$1$2t');
+
+  // Step 4.7: 元音之间、后接非重读元音的 t 必须弹舌（What‿are → wʌ.ɾər）
+  // 后接重读音节（ˈ 开头，如 hotel hoʊˈtɛl）不弹舌，由正则排除
+  fixed = fixed.replace(
+    new RegExp(`([${VOWELS}]ː?)(\\.?)t(\\.?)(?=[${VOWELS}])`, 'g'),
+    '$1$2ɾ$3'
+  );
+
+  // Step 4.8: "the" 在元音前读 /ði/（the‿afternoon → ði.æftərˈnun）
+  fixed = fixed.replace(
+    new RegExp(`(^|[\\s.])ðə(?=[\\s.]ˈ?[${VOWELS}])`, 'g'),
+    '$1ði'
+  );
+
   // Step 5: Fix "this" missing /s/ sound
   fixed = fixed.replace(/ðɪ\s+æ/g, 'ðɪs‿æ'); // "this a..." → "ðɪs‿æ"
   fixed = fixed.replace(/ðɪ\s+ɑ/g, 'ðɪs‿ɑ'); // "this o..." → "ðɪs‿ɑ"

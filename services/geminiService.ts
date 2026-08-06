@@ -228,6 +228,12 @@ AMERICAN ENGLISH PRONUNCIATION (apply throughout fullLinkedPhonetic):
   and→ənd, of→əv, for→fər, can→kən, was→wəz. The IPA must match how the sentence is
   actually spoken, not dictionary citation forms.
 - Careful: main-verb "do"→du (NOT dʊ, NOT də). "too"/"two"→tu.
+- "the" before a VOWEL sound → /ði/ (the‿afternoon → ði.æftərˈnun, the‿end → ði.ˈɛnd);
+  before consonant sounds → /ðə/ (the driver → ðə ˈdraɪvər).
+- Flap-T ONLY between vowel sounds. NEVER flap after a consonant:
+  after→ˈæftər (NOT ˈæfɾər), sixty→ˈsɪksti (NOT ˈsɪksɾi).
+- ONE primary stress ˈ per word maximum. For words with secondary + primary stress,
+  mark ONLY the primary: afternoon → æftərˈnun (NOT ˈæftərˈnun), engineer → ɛndʒəˈnɪr.
 
 STRICT RULES:
 1. 'fullLinkedSentence': Mark ALL natural linking points with '‿' in American English.
