@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-08-06T13:34:55.434Z",
+  "api": "https://echon-coach.vercel.app",
+  "runs": 2,
+  "corpus": 55,
+  "evaluated": 109,
+  "network_failures": 1,
+  "pass": 102,
+  "fallback": 7,
+  "errors": 0,
+  "error_free_rate": "100.0%",
+  "target": "98%",
+  "verdict": "PASS",
+  "error_details": []
+}

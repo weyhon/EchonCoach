@@ -1,0 +1,78 @@
+{
+  "description": "IPA eval corpus — 50 sentences stressing known Gemini failure modes",
+  "groups": {
+    "the_before_vowel": [
+      "What are your plans for the afternoon?",
+      "Let's meet at the end of the street.",
+      "She opened the umbrella in the elevator.",
+      "The answer is at the end of the article.",
+      "I left the office before the interview."
+    ],
+    "all_chains": [
+      "Perhaps I'll join you all after my training.",
+      "Thank you all again for coming.",
+      "We all agreed on the plan.",
+      "Is that all of it?",
+      "They all arrived early."
+    ],
+    "flap_t": [
+      "What a beautiful little city.",
+      "I need a bottle of water.",
+      "She's getting better at it.",
+      "Put it on the table.",
+      "My daughter wrote a letter to her auntie.",
+      "It's due to a lot of pressure.",
+      "The meeting starts at eight thirty."
+    ],
+    "double_stress_words": [
+      "The engineer works every afternoon.",
+      "She turned seventeen this afternoon.",
+      "The Japanese engineer arrived this afternoon.",
+      "I have a meeting in the afternoon.",
+      "The volunteers understood the situation."
+    ],
+    "weak_forms": [
+      "What do you want to do today?",
+      "Can you give me a hand?",
+      "I was going to call you.",
+      "We should have told them earlier.",
+      "There are a couple of options for us."
+    ],
+    "questions": [
+      "Are you coming to the party tonight?",
+      "Do you like it here?",
+      "Where are you going after work?",
+      "How is it going?",
+      "Would you mind opening the window?"
+    ],
+    "linking_heavy": [
+      "Pick it up and put it away.",
+      "Check it out when you get a chance.",
+      "Tell us about your first impression.",
+      "Turn it off before you leave.",
+      "Hold on a second."
+    ],
+    "long_sentences": [
+      "If you finish your homework early, we can watch a movie together tonight.",
+      "The restaurant on the corner serves the best noodles in the entire neighborhood.",
+      "I wanted to ask whether you could help me move some furniture this weekend.",
+      "Even though it was raining, we decided to walk along the river after dinner.",
+      "She told me that the train would arrive at about eleven in the morning."
+    ],
+    "general": [
+      "Just tap your phone or pay the driver in cash.",
+      "It's due to personnel issues this time.",
+      "I love you.",
+      "That sounds like a great idea.",
+      "Let me know when you're ready.",
+      "He works at a hotel downtown.",
+      "The sixty students attended the lecture.",
+      "My attitude improved a lot.",
+      "We visited a supermarket and a bakery.",
+      "This is exactly what I expected.",
+      "Sure, that sounds fun.",
+      "I think I'll make grilled chicken tonight.",
+      "No problem, I'll watch them."
+    ]
+  }
+}
