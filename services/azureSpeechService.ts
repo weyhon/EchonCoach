@@ -12,6 +12,9 @@
 import { AnalysisResult, WordAnalysis, PhonemeDetail } from '../types';
 import { convertToWav } from './audioUtils';
 
+// Azure 打分通常 1-2s；20s 之后判定为挂起，交给 Gemini 兜底
+const AZURE_TIMEOUT_MS = 20_000;
+
 // ── Config ──────────────────────────────────────────────────────────
 
 const AZURE_REGION = import.meta.env.VITE_AZURE_SPEECH_REGION || 'eastasia';
@@ -134,11 +137,28 @@ export async function azurePronunciationScore(
   // 4. Call Azure Speech API
   const apiUrl = `https://${region}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1?language=en-US&format=detailed`;
 
-  const res = await fetch(apiUrl, {
-    method: 'POST',
-    headers,
-    body: wavBlob,
-  });
+  // 超时保护：Azure 区域端点静默挂起时，fetch 永不 settle，
+  // App.tsx 的 Gemini 兜底就永远等不到 error —— 用户卡在"Analyzing…"转圈。
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), AZURE_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: wavBlob,
+      signal: controller.signal,
+    });
+  } catch (e: any) {
+    if (e?.name === 'AbortError') {
+      const err: any = new Error(`Azure Speech timed out after ${AZURE_TIMEOUT_MS / 1000}s`);
+      err.code = 'REQUEST_TIMEOUT';
+      throw err;
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '');

@@ -112,6 +112,9 @@ const App: React.FC = () => {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mediaSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const enrichAbortRef = useRef<AbortController | null>(null);
+  // Synchronous mutexes — React state lags a click, these do not.
+  const startingRecordingRef = useRef(false); // blocks a 2nd MediaRecorder
+  const analyzingRef = useRef(false);         // blocks duplicate TTS/linking fetches
 
   // Cleanup audio resources when stream/blob changes
   useEffect(() => {
@@ -288,6 +291,20 @@ const App: React.FC = () => {
 
   const playAndAnalyze = async (textToSpeak: string) => {
     if (!textToSpeak.trim()) return;
+    // The button re-enables before these fetches settle (appState goes to
+    // SHOWING_RESULT immediately), so without a synchronous mutex every extra
+    // click fires another TTS + linking pair — 3 clicks measured as 6 requests,
+    // enough to trip Gemini's 10/min TTS quota.
+    if (analyzingRef.current) return;
+    analyzingRef.current = true;
+    try {
+      await runPlayAndAnalyze(textToSpeak);
+    } finally {
+      analyzingRef.current = false;
+    }
+  };
+
+  const runPlayAndAnalyze = async (textToSpeak: string) => {
 
     // Check reference cache first (linking/phonetics analysis).
     // Skip stale cache entries with empty IPA — they came from incomplete prior runs.
@@ -461,6 +478,12 @@ const App: React.FC = () => {
   };
 
   const startRecording = async () => {
+    // A double-click (or key-repeat on R) lands a 2nd call before getUserMedia
+    // resolves. Two MediaRecorders would then share mediaRecorderRef/
+    // audioChunksRef: recorder #1's onstop clears recorder #2's silence timer
+    // and hides the Stop button, leaving the mic live with no way to stop it.
+    if (startingRecordingRef.current || mediaRecorderRef.current?.state === 'recording') return;
+    startingRecordingRef.current = true;
     try {
       // Cancel any pending Gemini enrichment from a previous recording
       enrichAbortRef.current?.abort();
@@ -619,6 +642,8 @@ const App: React.FC = () => {
       }
       showError("Microphone access denied. Please check your browser permissions.");
       setAppState(AppState.IDLE);
+    } finally {
+      startingRecordingRef.current = false;
     }
   };
 
@@ -938,9 +963,13 @@ const App: React.FC = () => {
           style={{ background: 'transparent', borderLeft: '1px solid var(--text-primary)' }}>
           <HistoryList
             history={history}
-            onQuickAnalyze={(t) => { setText(t); playAndAnalyze(t); }}
-            onQuickRecord={(t) => { setText(t); startRecording(); }}
+            // Switching sentences mid-recording orphans the live MediaRecorder:
+            // the Stop button disappears while it keeps recording, then its
+            // onstop overwrites whatever the user moved on to. Stop first.
+            onQuickAnalyze={(t) => { if (appState === AppState.RECORDING) return; setText(t); playAndAnalyze(t); }}
+            onQuickRecord={(t) => { if (appState === AppState.RECORDING) return; setText(t); startRecording(); }}
             onSelect={async (t) => {
+              if (appState === AppState.RECORDING) return;
               setText(t);
               const item = history.find(h => h.text.trim().toLowerCase() === t.trim().toLowerCase());
               if (item?.result) {

@@ -209,7 +209,15 @@ export const analyzePronunciation = async (
   });
   const text = response.text || "{}";
   console.log(`[perf] analyzePronunciation: ${((performance.now() - t0) / 1000).toFixed(1)}s (direct, slim=${slim})`);
-  return JSON.parse(text.replace(/```json|```/g, '').trim());
+  try {
+    return JSON.parse(text.replace(/```json|```/g, '').trim());
+  } catch {
+    // 长句的逐音素打分可能超出模型输出预算导致 JSON 截断 —— 不能让
+    // 原始 SyntaxError 直达用户（"Unexpected end of JSON input"）
+    const err: any = new Error('评分结果解析失败，请重试');
+    err.code = 'PARSE_ERROR';
+    throw err;
+  }
 };
 
 // ── Linking / Prosody Analysis ──────────────────────────────────────
