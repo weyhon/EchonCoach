@@ -1,14 +1,16 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { guard, tooLong } from './_guard';
 import { GoogleGenAI, Modality } from '@google/genai';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (guard(req, res, { maxBodyBytes: 8_000 })) return;
 
   try {
     const { text, slow, voiceName, tutor } = req.body;
     if (!text) return res.status(400).json({ error: 'Missing text' });
+    if (tooLong(text, 2_000)) return res.status(400).json({ error: 'text too long' });
 
     const prompt = tutor
       ? `Pronounce clearly in standard American English with natural flap-T (e.g., "water" sounds like "wader", "due to" sounds like "due-duh"): "${text}"`
