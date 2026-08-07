@@ -7,6 +7,7 @@ import { playBase64Audio, speakWithWebSpeech, cleanupAudioResources } from './se
 import { azurePronunciationScore, isAzureSpeechAvailable } from './services/azureSpeechService';
 import { shouldLink } from './services/linkingUtils';
 import { generateIntonationMap } from './services/intonationUtils';
+import { containsNonEnglishScript } from './services/scriptUtils';
 import { IPALegend } from './components/IPALegend';
 import { AnalysisResult, AppState, HistoryItem } from './types';
 import { CACHE_CONFIG, UI_CONFIG, SILENCE_DETECTION } from './config/constants';
@@ -41,6 +42,7 @@ const DEMO_RESULT: AnalysisResult = {
 const App: React.FC = () => {
   const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === 'results';
   const [text, setText] = useState<string>('How is it going?');
+  const hasNonEnglish = containsNonEnglishScript(text);
   const [appState, setAppState] = useState<AppState>(isDemo ? AppState.SHOWING_RESULT : AppState.IDLE);
   const [result, setResult] = useState<AnalysisResult | null>(isDemo ? DEMO_RESULT : null);
   const [activeAudioSource, setActiveAudioSource] = useState<string | null>(null);
@@ -854,8 +856,21 @@ const App: React.FC = () => {
                 </div>
               </div>
 
+              {/* Non-English notice — the coach only scores English, and the
+                  guide would otherwise print the source characters as IPA */}
+              {hasNonEnglish && (
+                <div className="mt-4 flex items-center gap-2" role="status" style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                  <span className="font-mono" style={{ fontSize: 10, fontWeight: 600, color: 'var(--rose)', letterSpacing: '0.16em' }}>
+                    ENGLISH ONLY
+                  </span>
+                  <span style={{ fontFamily: "'Fraunces', Georgia, serif", fontStyle: 'italic', fontSize: 13, color: 'var(--text-muted)' }}>
+                    此处只练英语发音，请输入英文句子。
+                  </span>
+                </div>
+              )}
+
               {/* Idle hint — a quiet footnote between hairline rules */}
-              {appState === AppState.IDLE && !result && (
+              {appState === AppState.IDLE && !result && !hasNonEnglish && (
                 <div className="mt-6 flex items-center gap-3" aria-hidden="true">
                   <div className="h-px flex-1" style={{ background: 'var(--border)' }} />
                   <span className="font-mono" style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-placeholder)', letterSpacing: '0.18em' }}>
