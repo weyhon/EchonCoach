@@ -822,7 +822,7 @@ const App: React.FC = () => {
                       className="px-2 py-1.5 text-xs transition-all"
                       style={ttsSpeed === key
                         ? { background: 'transparent', color: 'var(--text-primary)', fontWeight: 600, borderBottom: '2px solid var(--rose)', borderRadius: 0 }
-                        : { color: 'var(--text-placeholder)', background: 'transparent', fontWeight: 400, borderBottom: '2px solid transparent', borderRadius: 0 }}>
+                        : { color: 'var(--text-muted)', background: 'transparent', fontWeight: 400, borderBottom: '2px solid transparent', borderRadius: 0 }}>
                       {label}
                     </button>
                   ))}
