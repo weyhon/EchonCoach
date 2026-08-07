@@ -39,11 +39,16 @@ it; wired into `npm run check`, and verified to fail when the extension is remov
 - Rapid clicks across 4 different words: exactly one popover, race guard holds
 - Unmount during a pending word lookup: no crash, no orphaned popover
 
+## Also fixed (2026-08-07, same session)
+
+| Severity | Finding | Fix |
+|----------|---------|-----|
+| Minor | Non-English input rendered the source characters where the IPA belongs (`/'今天天气真好…/`), reading as a transcription rather than a failure | `services/scriptUtils.ts` detects non-Latin scripts; a quiet ENGLISH ONLY note replaces the idle hint. Verified live on production. |
+
 ## Open, not fixed
 
 | Severity | Finding | Why deferred |
 |----------|---------|--------------|
-| Minor | Non-English input (e.g. Chinese) renders the source characters as IPA rather than saying the app is English-only | Cosmetic; no crash. Needs a product decision on the right message |
 | Minor | `proxyPost` decides "don't retry 4xx" by regex-matching digits in the error message instead of the status code it already has; a 400 whose body has no digits gets retried twice (~3s dead time) | Real but low impact |
 | Minor | Two "play my recording" controls can both create blob URLs on near-simultaneous clicks, leaking the first | Requires clicking two controls within one render |
 | Minor | Per-IP rate limit is per serverless instance, so it throttles a naive script rather than a determined one | Documented in `api/_guard.ts`; a real limit needs Vercel WAF or Upstash |
