@@ -685,7 +685,7 @@ const App: React.FC = () => {
       <div className="flex pt-[52px]">
         {/* Main Content Area */}
         <div className="flex-1 px-6 lg:px-8 relative">
-          <main className="max-w-[660px] mx-auto space-y-5 pt-7 pb-16">
+          <main className={`max-w-[660px] mx-auto space-y-5 pt-7 pb-16${appState === AppState.IDLE && !result ? ' lg:min-h-[calc(100svh-140px)] lg:flex lg:flex-col lg:justify-center lg:pb-[9vh]' : ''}`}>
             {/* Input Section — open page, no card */}
             <div className="pt-3">
               {/* Label */}
@@ -708,11 +708,11 @@ const App: React.FC = () => {
                   }
                 }}
                 placeholder="Type or paste a sentence to practice..."
-                className="w-full resize-none outline-none input-focus"
+                className="w-full resize-none outline-none input-focus practice-input"
                 style={{
-                  minHeight: 72, padding: '12px 0 16px',
+                  padding: '12px 0 16px',
                   background: 'transparent', borderRadius: 0,
-                  fontFamily: "'Fraunces', Georgia, serif", fontSize: 25, fontWeight: 400, color: 'var(--text-primary)',
+                  fontFamily: "'Fraunces', Georgia, serif", fontWeight: 400, color: 'var(--text-primary)',
                   lineHeight: 1.35, letterSpacing: '-0.01em',
                 }}
                 disabled={appState !== AppState.IDLE && appState !== AppState.SHOWING_RESULT}

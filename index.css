@@ -243,3 +243,15 @@ a[class*="rounded"]:hover {
 .word-popover-pulse {
   animation: wordPopoverPulse 1.2s ease-in-out infinite;
 }
+
+/* ── Practice input — the page's protagonist; larger on desktop (PC-first) ── */
+.practice-input {
+  font-size: 25px;
+  min-height: 72px;
+}
+@media (min-width: 1024px) {
+  .practice-input {
+    font-size: 32px;
+    min-height: 96px;
+  }
+}
