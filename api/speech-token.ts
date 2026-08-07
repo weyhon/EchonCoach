@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { guard } from './_guard';
+import { guard } from './_guard.js';
 
 /**
  * Azure Speech token proxy — exchanges the server-side API key for a

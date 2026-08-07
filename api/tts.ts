@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { guard, tooLong } from './_guard';
+import { guard, tooLong } from './_guard.js';
 import { GoogleGenAI, Modality } from '@google/genai';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });

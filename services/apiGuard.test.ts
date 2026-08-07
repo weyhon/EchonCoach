@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { guard, tooLong } from './_guard';
+import { guard, tooLong } from '../api/_guard';
 
 const HOST = 'echon-coach.vercel.app';
 
