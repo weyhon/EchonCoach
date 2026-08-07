@@ -302,8 +302,9 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
           </div>
           <div style={{ borderTop: '1px solid var(--border)' }}>
             {[...result.wordBreakdown].sort((a, b) => {
-              const order = { incorrect: 0, needs_improvement: 1, correct: 2 };
-              return (order[a.status] ?? 1) - (order[b.status] ?? 1);
+              const sa = a.wordScore ?? (a.status === 'correct' ? 95 : a.status === 'needs_improvement' ? 56 : 20);
+              const sb = b.wordScore ?? (b.status === 'correct' ? 95 : b.status === 'needs_improvement' ? 56 : 20);
+              return sa - sb;
             }).map((wa, i) => {
               const wScore = wa.wordScore ?? (wa.status === 'correct' ? 95 : wa.status === 'needs_improvement' ? 56 : 20);
               return (
