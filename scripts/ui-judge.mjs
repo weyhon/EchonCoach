@@ -74,16 +74,6 @@ async function judgeWithGemini(screenshotBase64, designRules) {
 ## Design Rules
 ${designRules}
 
-## Pixel Elements — What to Look For
-This app uses a "Cozy Retro-Modern" design with pixel art accents. Look for these specific pixel elements:
-- Pixel badges: small rectangular labels with monospace text (e.g., "LVL 1", "S", "A", "B" grade badges) using bold colors
-- Pixel progress bar: thin horizontal bars resembling game HP bars with stepped/blocky fills
-- Pixel strip: rows of tiny colored squares as decorative accents
-- Pixel loading: stepped animations, blinking dots, or grid patterns
-- Monospace hint text: small uppercase text like "PRESS PLAY TO START" or "ANALYZING"
-- These elements are SMALL (≤10% of screen area) — they are "seasoning, not the main dish"
-Score pixel 15-20 if these small pixel accents are present and tasteful. Score 0 ONLY if NO pixel elements exist at all.
-
 ## Instructions
 1. Analyze the screenshot carefully
 2. Score each of the 5 dimensions (0-20 each)
@@ -96,7 +86,7 @@ Score pixel 15-20 if these small pixel accents are present and tasteful. Score 0
   "typography": { "score": <0-20>, "issues": ["..."] },
   "depth": { "score": <0-20>, "issues": ["..."] },
   "interaction": { "score": <0-20>, "issues": ["..."] },
-  "pixel": { "score": <0-20>, "issues": ["..."] },
+  "restraint": { "score": <0-20>, "issues": ["..."] },
   "total": <0-100>,
   "grade": "<S/A/B/C/D>",
   "top_suggestion": "<most impactful single improvement>"
@@ -118,11 +108,14 @@ IMPORTANT: Return ONLY valid JSON. No markdown fences, no explanation text.`;
     }],
     generationConfig: {
       temperature: 0.1, // Low temp for consistent scoring
-      maxOutputTokens: 1024,
+      maxOutputTokens: 4096,
+      responseMimeType: 'application/json',
+      // 2.5 系列是思考型模型，思考也占输出配额 — 打分不需要思考预算
+      thinkingConfig: { thinkingBudget: 0 },
     },
   };
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
 
   const response = await fetch(url, {
     method: 'POST',
@@ -223,7 +216,7 @@ function median(arr) {
 
 function medianJudge(results) {
   // Take median of each dimension and total
-  const dims = ['color', 'typography', 'depth', 'interaction', 'pixel'];
+  const dims = ['color', 'typography', 'depth', 'interaction', 'restraint'];
   const merged = {};
   for (const d of dims) {
     const scores = results.map(r => r[d]?.score ?? 0);
@@ -258,7 +251,7 @@ async function main() {
 
   // Show individual run scores
   allResults.forEach((r, i) => {
-    console.log(`  Run ${i + 1}: C=${r.color?.score} T=${r.typography?.score} D=${r.depth?.score} I=${r.interaction?.score} P=${r.pixel?.score} → ${r.total}`);
+    console.log(`  Run ${i + 1}: C=${r.color?.score} T=${r.typography?.score} D=${r.depth?.score} I=${r.interaction?.score} R=${r.restraint?.score} → ${r.total}`);
   });
 
   // Median
@@ -289,7 +282,7 @@ async function main() {
   console.log(`  Typography:  ${judgeResult.typography?.score}/20`);
   console.log(`  Depth:       ${judgeResult.depth?.score}/20`);
   console.log(`  Interaction: ${judgeResult.interaction?.score}/20`);
-  console.log(`  Pixel:       ${judgeResult.pixel?.score}/20`);
+  console.log(`  Restraint:   ${judgeResult.restraint?.score}/20`);
   console.log('──────────────────');
   console.log(`  Design:      ${combined.design_score}/100`);
   console.log(`  Lighthouse:  ${combined.lighthouse_a11y}/100`);
