@@ -1,5 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { guard, tooLong } from './_guard';
 import { GoogleGenAI } from '@google/genai';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
@@ -14,13 +13,11 @@ Example: word "going" in "How is it going?" → {"ipa":"/ˈgoʊɪŋ/","meaning":
 Return ONLY valid JSON with exactly these 2 fields. No markdown, no explanation.`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (guard(req, res, { maxBodyBytes: 8_000 })) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
     const { word, sentence } = req.body;
     if (!word || !sentence) return res.status(400).json({ error: 'Missing word or sentence' });
-    if (tooLong(word, 80)) return res.status(400).json({ error: 'word too long' });
-    if (tooLong(sentence, 2_000)) return res.status(400).json({ error: 'sentence too long' });
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
