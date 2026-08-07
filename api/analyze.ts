@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { guard, tooLong } from './_guard';
 import { GoogleGenAI } from '@google/genai';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
@@ -63,11 +64,12 @@ const PRONUNCIATION_FULL_INSTRUCTION = `${PRONUNCIATION_SCORING_INSTRUCTION.repl
 const ANALYSIS_MODEL = 'gemini-3-flash-preview';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (guard(req, res, { maxBodyBytes: 12_000_000 })) return;
 
   try {
     const { referenceText, audioBase64, slim } = req.body;
     if (!referenceText || !audioBase64) return res.status(400).json({ error: 'Missing referenceText or audioBase64' });
+    if (tooLong(referenceText, 2_000)) return res.status(400).json({ error: 'referenceText too long' });
 
     const instruction = slim ? PRONUNCIATION_SCORING_INSTRUCTION : PRONUNCIATION_FULL_INSTRUCTION;
     const response = await ai.models.generateContent({
