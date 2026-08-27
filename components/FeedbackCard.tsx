@@ -155,36 +155,34 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
           showPitchCurve
         />
 
-        {/* Chinese translation — hidden by default, tap to reveal */}
+        {/* Chinese translation — still collapsed by default, so the learner
+            reads the English before reaching for the answer. The toggle now
+            borrows the A/B Reference button's vocabulary (rose hairline when
+            idle, filled when active): as muted grey 11px text it was the
+            quietest thing on the page and went unfound. */}
         {result.translation && (
           <div className="flex flex-col items-center mt-3">
-            {showTranslation ? (
-              <>
-                <div
-                  className="px-4 py-1.5 text-center animate-fade-in"
-                  style={{ color: 'var(--text-secondary)', fontSize: 15, lineHeight: 1.5, maxWidth: '90%' }}
-                >
-                  {result.translation}
-                </div>
-                <button
-                  onClick={() => setShowTranslation(false)}
-                  aria-expanded={true}
-                  className="mt-1.5 text-[11px] font-semibold uppercase tracking-wider transition-colors hover-rose"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  Hide Chinese ▴
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => setShowTranslation(true)}
-                aria-expanded={false}
-                className="text-[11px] font-semibold uppercase tracking-wider transition-colors hover-rose"
-                style={{ color: 'var(--text-muted)' }}
+            {showTranslation && (
+              <div
+                className="px-4 py-1.5 text-center animate-fade-in"
+                style={{ color: 'var(--text-secondary)', fontSize: 15, lineHeight: 1.5, maxWidth: '90%' }}
               >
-                Show Chinese ▾
-              </button>
+                {result.translation}
+              </div>
             )}
+            <button
+              onClick={() => setShowTranslation(v => !v)}
+              aria-expanded={showTranslation}
+              title="Show the Chinese meaning"
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-[2px] text-[11px] font-medium uppercase tracking-[0.06em] transition-all active:scale-95${showTranslation ? ' mt-1.5' : ''}`}
+              style={{
+                border: '1px solid var(--rose)',
+                color: showTranslation ? '#fff' : 'var(--rose)',
+                background: showTranslation ? 'var(--rose)' : 'transparent',
+              }}
+            >
+              {showTranslation ? 'Hide Chinese ▴' : 'Show Chinese ▾'}
+            </button>
           </div>
         )}
 
