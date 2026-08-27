@@ -13,6 +13,7 @@ import { AnalysisResult, AppState, HistoryItem } from './types';
 import { CACHE_CONFIG, UI_CONFIG, SILENCE_DETECTION } from './config/constants';
 import { safeGetJSON, safeSetJSON, safeRemoveItem } from './services/storageUtils';
 import { lruGet, lruSet } from './utils/lru';
+import { withTranslationFrom } from './utils/mergeResult';
 
 // LRU-style cache: evict oldest entries when over limit to prevent unbounded memory growth
 const MAX_TTS_CACHE = 20;  // ~20 * 50KB = ~1MB max
@@ -314,7 +315,9 @@ const App: React.FC = () => {
     if (cachedRef && cachedRef.fullLinkedPhonetic) {
       // If user has a recording result, merge linking data with it
       const cachedRecording = lruGet(recordingCache, textToSpeak);
-      setResult(cachedRecording || cachedRef);
+      // Recording results predate/lack a translation — carry the reference's
+      // across so replaying a practised sentence keeps "Show Chinese".
+      setResult(cachedRecording ? withTranslationFrom(cachedRecording, cachedRef) : cachedRef);
       setAppState(AppState.SHOWING_RESULT);
       await handlePlayTTS(textToSpeak, false);
       return;
@@ -612,15 +615,31 @@ const App: React.FC = () => {
             res.intonationMap = cached.intonationMap;
           }
 
+          // A scored recording never carries a translation — the scoring prompt
+          // does not ask for one. The merges above backfill it only when the
+          // analysis returned NO linking data of its own, so on the common path
+          // (analysis returns its own fullLinkedSentence) the translation was
+          // silently dropped and "Show Chinese" disappeared after recording.
+          // Backfill it on its own terms, independent of the linking gate.
+          res = withTranslationFrom(res, lruGet(referenceCache, text));
+
           setResult(res);
           setAppState(AppState.SHOWING_RESULT);
           lruSet(recordingCache, text, res, MAX_RESULT_CACHE);
           saveToHistory(text, res);
 
-          // If no linking data yet, fetch in background
-          if (!res.fullLinkedSentence) {
+          // Still missing linking data or a translation? Fetch in the background
+          // and fill ONLY the gaps — a blanket spread would overwrite the
+          // analysis's own linking data with the generic pass.
+          if (!res.fullLinkedSentence || !res.translation) {
             getLinkingAnalysisForText(text).then(linking => {
-              const enriched = { ...res, ...linking };
+              const enriched: AnalysisResult = {
+                ...res,
+                fullLinkedSentence: res.fullLinkedSentence || linking.fullLinkedSentence,
+                fullLinkedPhonetic: res.fullLinkedPhonetic || linking.fullLinkedPhonetic,
+                intonationMap: res.intonationMap || linking.intonationMap,
+                translation: res.translation || linking.translation,
+              };
               setResult(enriched);
               lruSet(recordingCache, text, enriched, MAX_RESULT_CACHE);
             }).catch(() => {});
