@@ -53,6 +53,20 @@ a[class*="rounded"]:hover {
   box-shadow: none;
 }
 
+/* ── Disclosure control (Show/Hide Chinese) — a secondary action, so
+   design-rules.md:81 says transparent mono text, not a box. Findability
+   comes from the accent colour; the hairline only answers on hover, so it
+   never competes with the boxed audio actions below it. ── */
+
+.disclosure {
+  border-bottom: 1px solid transparent;
+  transition: color 200ms ease-out, border-color 200ms ease-out;
+}
+.disclosure:hover,
+.disclosure:focus-visible {
+  border-bottom-color: currentColor;
+}
+
 /* ── Mini equalizer — three ink bars breathing while audio plays ── */
 
 .eq-mini {

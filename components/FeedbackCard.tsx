@@ -174,11 +174,13 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
               onClick={() => setShowTranslation(v => !v)}
               aria-expanded={showTranslation}
               title="Show the Chinese meaning"
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-[2px] text-[11px] font-medium uppercase tracking-[0.06em] transition-all active:scale-95${showTranslation ? ' mt-1.5' : ''}`}
+              className={`disclosure px-1 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] active:scale-95${showTranslation ? ' mt-1' : ''}`}
               style={{
-                border: '1px solid var(--rose)',
-                color: showTranslation ? '#fff' : 'var(--rose)',
-                background: showTranslation ? 'var(--rose)' : 'transparent',
+                background: 'transparent',
+                border: 'none',
+                // Rose while it still has something to offer; once the meaning
+                // is on screen the control has done its job and recedes.
+                color: showTranslation ? 'var(--text-muted)' : 'var(--rose)',
               }}
             >
               {showTranslation ? 'Hide Chinese ▴' : 'Show Chinese ▾'}
