@@ -28,27 +28,26 @@ a[class*="rounded"]:hover {
   transition: all 200ms ease-out;
 }
 
-/* ── Letterpress primary button — an ink printing plate sits under
-   the button; hover lifts it off the plate, pressing stamps it down ── */
+/* ── Pressed Stamp primary button — the action is inked INTO the page.
+   Weight comes from the ink hairline, not from floating: the old
+   letterpress plate broke two house rules at once (design-rules.md:73-75
+   "阴影基本禁用 / ❌ 明显投影", and the no-lift rule below), and it read
+   as a game button on an otherwise restrained printed page.
+   Now the press pushes inward, and the row-wide scale(0.98) above
+   carries the compression — same press every other button has. ── */
 
 .btn-press {
   border: 1px solid var(--text-primary);
-  box-shadow:
-    3px 3px 0 0 var(--text-primary),
-    inset 0 0 0 1px rgba(252, 252, 250, 0.28);
-  transition: transform 150ms ease-out, box-shadow 150ms ease-out;
+  transition: box-shadow 120ms ease-out, filter 120ms ease-out;
 }
+/* Deeper than the global brightness(0.96) — a primary action should
+   answer more clearly than a text button, without moving. */
 .btn-press:not(:disabled):hover {
-  transform: translate(-1px, -1px);
-  box-shadow:
-    4px 4px 0 0 var(--text-primary),
-    inset 0 0 0 1px rgba(252, 252, 250, 0.28);
+  filter: brightness(0.93);
 }
 .btn-press:not(:disabled):active {
-  transform: translate(3px, 3px);
-  box-shadow:
-    0 0 0 0 var(--text-primary),
-    inset 0 0 0 1px rgba(252, 252, 250, 0.28);
+  box-shadow: inset 0 2px 5px rgba(17, 17, 16, 0.42);
+  transition: box-shadow 0ms, transform 100ms ease-out;
 }
 .btn-press:disabled {
   box-shadow: none;

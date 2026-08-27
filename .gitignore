@@ -36,3 +36,7 @@ skills-lock.json
 .gstack/
 screenshots/
 results.tsv
+
+# Design canvas: ignore only the seeded output (~2 MiB, regenerable);
+# the .dc.html source artboards are the working files and stay tracked.
+design-play-button/play-reference-button.html
