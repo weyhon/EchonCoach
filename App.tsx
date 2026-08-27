@@ -317,8 +317,27 @@ const App: React.FC = () => {
       const cachedRecording = lruGet(recordingCache, textToSpeak);
       // Recording results predate/lack a translation — carry the reference's
       // across so replaying a practised sentence keeps "Show Chinese".
-      setResult(cachedRecording ? withTranslationFrom(cachedRecording, cachedRef) : cachedRef);
+      const shown = cachedRecording ? withTranslationFrom(cachedRecording, cachedRef) : cachedRef;
+      setResult(shown);
       setAppState(AppState.SHOWING_RESULT);
+
+      // An entry cached before translations existed has IPA but no
+      // translation, and this early return would never call the linking API
+      // again — so "Show Chinese" stayed hidden for that sentence forever.
+      // Show the cached result instantly (that is the point of the cache),
+      // then quietly backfill the missing translation and heal the caches.
+      if (!shown.translation) {
+        getLinkingAnalysisForText(textToSpeak).then(linking => {
+          if (!linking?.translation) return;
+          const healedRef = withTranslationFrom(cachedRef, linking);
+          lruSet(referenceCache, textToSpeak, healedRef, MAX_RESULT_CACHE);
+          const healedShown = withTranslationFrom(shown, linking);
+          if (cachedRecording) lruSet(recordingCache, textToSpeak, healedShown, MAX_RESULT_CACHE);
+          setResult(healedShown);
+          saveToHistory(textToSpeak, healedShown);
+        }).catch(() => {});
+      }
+
       await handlePlayTTS(textToSpeak, false);
       return;
     }
