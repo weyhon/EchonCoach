@@ -117,7 +117,16 @@ const App: React.FC = () => {
   const enrichAbortRef = useRef<AbortController | null>(null);
   // Synchronous mutexes — React state lags a click, these do not.
   const startingRecordingRef = useRef(false); // blocks a 2nd MediaRecorder
-  const analyzingRef = useRef(false);         // blocks duplicate TTS/linking fetches
+  // Sentences whose TTS/linking fetch is in flight. Keyed by sentence, not a
+  // single boolean: a global lock silently swallowed Play for a NEW sentence
+  // while the previous one was still loading.
+  const inFlightRef = useRef<Set<string>>(new Set());
+  // The sentence currently in the textarea. Async results check it before
+  // painting — a slow response for an old sentence must never land on top of
+  // the one the user has since switched to.
+  const currentTextRef = useRef(text);
+  currentTextRef.current = text;
+  const isCurrent = (t: string) => t.trim() === currentTextRef.current.trim();
 
   // Cleanup audio resources when stream/blob changes
   useEffect(() => {
@@ -298,12 +307,12 @@ const App: React.FC = () => {
     // SHOWING_RESULT immediately), so without a synchronous mutex every extra
     // click fires another TTS + linking pair — 3 clicks measured as 6 requests,
     // enough to trip Gemini's 10/min TTS quota.
-    if (analyzingRef.current) return;
-    analyzingRef.current = true;
+    if (inFlightRef.current.has(textToSpeak)) return;
+    inFlightRef.current.add(textToSpeak);
     try {
       await runPlayAndAnalyze(textToSpeak);
     } finally {
-      analyzingRef.current = false;
+      inFlightRef.current.delete(textToSpeak);
     }
   };
 
@@ -333,7 +342,7 @@ const App: React.FC = () => {
           lruSet(referenceCache, textToSpeak, healedRef, MAX_RESULT_CACHE);
           const healedShown = withTranslationFrom(shown, linking);
           if (cachedRecording) lruSet(recordingCache, textToSpeak, healedShown, MAX_RESULT_CACHE);
-          setResult(healedShown);
+          if (isCurrent(textToSpeak)) setResult(healedShown);
           saveToHistory(textToSpeak, healedShown);
         }).catch(() => {});
       }
@@ -384,7 +393,9 @@ const App: React.FC = () => {
           intonationMap: linking.intonationMap,
           translation: linking.translation
         };
-        setResult(enrichedRes);
+        // Cache and history are keyed by sentence, so they are always safe;
+        // only the screen must belong to the sentence the user is on now.
+        if (isCurrent(textToSpeak)) setResult(enrichedRes);
         lruSet(referenceCache, textToSpeak, enrichedRes, MAX_RESULT_CACHE);
         saveToHistory(textToSpeak, enrichedRes);
       } else {
@@ -397,7 +408,7 @@ const App: React.FC = () => {
         const base64 = ttsResult.value;
         lruSet(ttsCache, `${textToSpeak}_normal`, base64, MAX_TTS_CACHE);
         setIsAudioLoading(false);
-        await playAudio(base64, 'input_normal');
+        if (isCurrent(textToSpeak)) await playAudio(base64, 'input_normal');
       } else {
         throw ttsResult.reason;
       }
@@ -597,7 +608,7 @@ const App: React.FC = () => {
                       match.suggestion = gw.suggestion;
                     }
                   });
-                  setResult(enriched);
+                  if (isCurrent(capturedText)) setResult(enriched);
                   lruSet(recordingCache, capturedText, enriched, MAX_RESULT_CACHE);
                 }
               } catch { /* Gemini enrichment is optional */ }
@@ -659,7 +670,7 @@ const App: React.FC = () => {
                 intonationMap: res.intonationMap || linking.intonationMap,
                 translation: res.translation || linking.translation,
               };
-              setResult(enriched);
+              if (isCurrent(text)) setResult(enriched);
               lruSet(recordingCache, text, enriched, MAX_RESULT_CACHE);
             }).catch(() => {});
           }
