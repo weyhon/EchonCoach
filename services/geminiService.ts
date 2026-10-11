@@ -390,7 +390,7 @@ export const getLinkingAnalysisForText = async (text: string): Promise<any> => {
     let parsed: any;
 
     if (USE_PROXY) {
-      parsed = await proxyPost('linking', { text });
+      parsed = await proxyPost('linking', { text }, 45000);
     } else {
       const response = await ai!.models.generateContent({
         model: "gemini-2.5-flash",

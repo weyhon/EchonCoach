@@ -111,6 +111,7 @@ const App: React.FC = () => {
   const audioChunksRef = useRef<Blob[]>([]);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const isPlayingRef = useRef(false); // Synchronous mutex - prevents race condition from React state lag
+  const playTokenRef = useRef(0);    // which playback currently owns isPlayingRef
   const silenceTimerRef = useRef<number | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mediaSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -375,17 +376,51 @@ const App: React.FC = () => {
     // Note: don't cache or save-to-history yet — wait for linking to enrich the result,
     // otherwise an incomplete (empty IPA) entry poisons the cache.
 
-    // 2) Fire TTS + remote linking in parallel (audio plays when ready)
+    // 2) Fire TTS and linking in parallel — and play the audio the moment it
+    //    arrives. Audio used to wait for BOTH (Promise.allSettled), so on
+    //    production the button sat idle-looking for 20–45s while linking
+    //    (slow, sometimes timed out and retried) finished. A second click in
+    //    that window started its own playback, then the first one played
+    //    too — the user heard the sentence twice, a few seconds apart.
+    //    While the audio loads we hold the shared playback lock and show
+    //    "Loading..." on a disabled button, so nothing can start a second copy.
+    const playToken = ++playTokenRef.current;
+    isPlayingRef.current = true;
     setIsAudioLoading(true);
-    try {
-      const [ttsResult, linkingResult] = await Promise.allSettled([
-        generateSpeech(textToSpeak, false, selectedVoice),
-        getLinkingAnalysisForText(textToSpeak)
-      ]);
+    setActiveAudioSource('input_loading');
+    const releasePlayback = () => {
+      if (playTokenRef.current !== playToken) return; // a newer play owns the lock
+      isPlayingRef.current = false;
+      setIsAudioLoading(false);
+      setActiveAudioSource(prev => (prev === 'input_loading' ? null : prev));
+    };
 
-      // Update result with richer remote linking data if available
-      if (linkingResult.status === 'fulfilled') {
-        const linking = linkingResult.value;
+    const audioDone = generateSpeech(textToSpeak, false, selectedVoice)
+      .then(async base64 => {
+        lruSet(ttsCache, `${textToSpeak}_normal`, base64, MAX_TTS_CACHE);
+        setIsAudioLoading(false);
+        if (isCurrent(textToSpeak)) await playAudio(base64, 'input_normal');
+      })
+      .catch(async (e: any) => {
+        console.error("PlayAndAnalyze TTS failure", e);
+        if (e?.code === 'REQUEST_TIMEOUT') {
+          showError("Request timed out. Check your connection and try again.");
+        } else if (e?.code === 'RATE_LIMIT') {
+          showError("API rate limit reached. Please try again later.");
+        } else if (e?.code === 'INSUFFICIENT_BALANCE') {
+          try { await speakWithWebSpeech(textToSpeak, 1); } catch (_) {}
+        } else if (e?.code === 'NO_AUDIO') {
+          showError("No audio returned from API. Please try again.");
+        } else if (typeof e?.message === 'string') {
+          showError(e.message);
+        } else {
+          showError("Speech generation failed. Check your connection.");
+        }
+      })
+      .finally(releasePlayback);
+
+    const linkingDone = getLinkingAnalysisForText(textToSpeak)
+      .then(linking => {
         const enrichedRes: AnalysisResult = {
           ...localRes,
           fullLinkedSentence: linking.fullLinkedSentence,
@@ -398,37 +433,14 @@ const App: React.FC = () => {
         if (isCurrent(textToSpeak)) setResult(enrichedRes);
         lruSet(referenceCache, textToSpeak, enrichedRes, MAX_RESULT_CACHE);
         saveToHistory(textToSpeak, enrichedRes);
-      } else {
-        // Linking failed — still save the local result so the entry shows in history,
-        // but it won't be cached (so next attempt will retry the API).
+      })
+      .catch(() => {
+        // Linking failed — still save the local result so the entry shows in
+        // history, but don't cache it (the next attempt retries the API).
         saveToHistory(textToSpeak, localRes);
-      }
+      });
 
-      if (ttsResult.status === 'fulfilled') {
-        const base64 = ttsResult.value;
-        lruSet(ttsCache, `${textToSpeak}_normal`, base64, MAX_TTS_CACHE);
-        setIsAudioLoading(false);
-        if (isCurrent(textToSpeak)) await playAudio(base64, 'input_normal');
-      } else {
-        throw ttsResult.reason;
-      }
-    } catch (e: any) {
-      console.error("PlayAndAnalyze TTS failure", e);
-      if (e?.code === 'REQUEST_TIMEOUT') {
-        showError("Request timed out. Check your connection and try again.");
-      } else if (e?.code === 'RATE_LIMIT') {
-        showError("API rate limit reached. Please try again later.");
-      } else if (e?.code === 'INSUFFICIENT_BALANCE') {
-        try { await speakWithWebSpeech(textToSpeak, 1); } catch (_) {}
-      } else if (e?.code === 'NO_AUDIO') {
-        showError("No audio returned from API. Please try again.");
-      } else if (typeof e?.message === 'string') {
-        showError(e.message);
-      } else {
-        showError("Speech generation failed. Check your connection.");
-      }
-      setIsAudioLoading(false);
-    }
+    await Promise.allSettled([audioDone, linkingDone]);
   };
 
   const stopSilenceDetection = () => {
@@ -804,20 +816,20 @@ const App: React.FC = () => {
                     <button
                       onClick={() => { result ? handlePlayTTS(text, ttsSpeed === 'slow') : playAndAnalyze(text); }}
                       disabled={!text.trim() || isBusy || appState === AppState.RECORDING || appState === AppState.ANALYZING}
-                      aria-label={appState === AppState.GENERATING_TTS ? 'Loading audio' : 'Play reference pronunciation'}
+                      aria-label={appState === AppState.GENERATING_TTS || activeAudioSource === 'input_loading' ? 'Loading audio' : 'Play reference pronunciation'}
                       title="Play reference (Space)"
                       className={`flex items-center gap-2 px-5 py-2.5 rounded-[2px] text-[11px] font-semibold uppercase tracking-[0.1em] disabled:opacity-60 min-h-[44px] ${isBusy ? '' : 'btn-press'}`}
                       style={isBusy
                         ? { background: 'transparent', color: 'var(--rose)', border: '1px solid var(--rose)' }
                         : { background: 'var(--rose)', color: '#fff' }}>
                       {isBusy ? (
-                        appState === AppState.GENERATING_TTS
+                        appState === AppState.GENERATING_TTS || activeAudioSource === 'input_loading'
                           ? <span className="pixel-spinner-sm"><span className="dot" /><span className="dot" /><span className="dot" /></span>
                           : <span className="eq-mini" aria-hidden="true"><span /><span /><span /></span>
                       ) : (
                         <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                       )}
-                      {appState === AppState.GENERATING_TTS ? 'Loading...' : activeAudioSource?.startsWith('input_') ? 'Playing...' : 'Play Reference'}
+                      {appState === AppState.GENERATING_TTS || activeAudioSource === 'input_loading' ? 'Loading...' : activeAudioSource?.startsWith('input_') ? 'Playing...' : 'Play Reference'}
                     </button>
                   );
                 })()}
