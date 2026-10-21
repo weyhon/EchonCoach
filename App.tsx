@@ -2,7 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FeedbackCard } from './components/FeedbackCard';
 import { HistoryList } from './components/HistoryList';
-import { generateSpeech, analyzePronunciation, getLinkingAnalysisForText, generateTutorAudio } from './services/geminiService';
+import { generateSpeech, analyzePronunciation, getLinkingAnalysisForText, generateTutorAudio, getPhraseBreaks } from './services/geminiService';
+import { withPauses } from './utils/phrasing';
 import { playBase64Audio, speakWithWebSpeech, cleanupAudioResources } from './services/audioUtils';
 import { azurePronunciationScore, isAzureSpeechAvailable } from './services/azureSpeechService';
 import { shouldLink } from './services/linkingUtils';
@@ -273,7 +274,10 @@ const App: React.FC = () => {
       setAppState(AppState.GENERATING_TTS);
       setActiveAudioSource(sourceKey);
       try {
-        const base64 = await generateSpeech(textToSpeak, isSlow, selectedVoice);
+        // Thought-group breaks become "..." so the reference audio breathes
+        // where the annotation draws "/". Cached after the first call.
+        const breaks = await getPhraseBreaks(textToSpeak);
+        const base64 = await generateSpeech(withPauses(textToSpeak, breaks), isSlow, selectedVoice);
         lruSet(ttsCache, cacheKey, base64, MAX_TTS_CACHE);
         await playAudio(base64, sourceKey);
       } catch (e: any) {
@@ -395,7 +399,10 @@ const App: React.FC = () => {
       setActiveAudioSource(prev => (prev === 'input_loading' ? null : prev));
     };
 
-    const audioDone = generateSpeech(textToSpeak, false, selectedVoice)
+    // Phrasing (~1s) runs first so the audio can pause at thought groups;
+    // linking (~18s) runs in parallel and never delays the audio.
+    const audioDone = getPhraseBreaks(textToSpeak)
+      .then(breaks => generateSpeech(withPauses(textToSpeak, breaks), false, selectedVoice))
       .then(async base64 => {
         lruSet(ttsCache, `${textToSpeak}_normal`, base64, MAX_TTS_CACHE);
         setIsAudioLoading(false);

@@ -4,7 +4,8 @@ import { shouldLink, isFunctionWord } from '../services/linkingUtils';
 import { generateIntonationTokens as getTokens } from '../services/intonationUtils';
 import { isYesNoQuestion, isWhQuestion } from '../services/linkingUtils';
 import { WordPopover } from './WordPopover';
-import { getWordDefinition } from '../services/geminiService';
+import { getWordDefinition, getPhraseBreaks, getCachedPhraseBreaks } from '../services/geminiService';
+import { punctuationBreaks } from '../utils/phrasing';
 
 export interface AnnotationWord {
   word: string;
@@ -127,6 +128,19 @@ export const SentenceAnnotation: React.FC<Props> = ({
   showPitchCurve = false,
 }) => {
   const words = buildAnnotationWords(text, wordBreakdown);
+  // Thought-group breaks (意群): the same breaks the reference audio pauses
+  // at. Punctuation breaks show immediately; the model's phrasing replaces
+  // them when it arrives (cached, so usually instant).
+  const [breaks, setBreaks] = useState<number[]>(
+    () => getCachedPhraseBreaks(text) ?? punctuationBreaks(text)
+  );
+  useEffect(() => {
+    let alive = true;
+    setBreaks(getCachedPhraseBreaks(text) ?? punctuationBreaks(text));
+    getPhraseBreaks(text).then(b => { if (alive) setBreaks(b); });
+    return () => { alive = false; };
+  }, [text]);
+  const breakSet = useMemo(() => new Set(breaks), [breaks]);
   // Memoized so updateCurve's deps stay stable — otherwise: infinite render loop.
   const pitchValues = useMemo(
     () => (showPitchCurve ? getPitchValues(text) : []),
@@ -251,7 +265,7 @@ export const SentenceAnnotation: React.FC<Props> = ({
     updateCurve();
     window.addEventListener('resize', updateCurve);
     return () => window.removeEventListener('resize', updateCurve);
-  }, [updateCurve, text, wordBreakdown]);
+  }, [updateCurve, text, wordBreakdown, breaks]);
 
   useEffect(() => {
     if (showPitchCurve) {
@@ -398,8 +412,9 @@ export const SentenceAnnotation: React.FC<Props> = ({
                 </span>
               </div>
 
-              {/* Linking arc */}
-              {w.linksToNext && (
+              {/* Linking arc — never across a thought-group break: you
+                  breathe there, so the sounds do not run together */}
+              {w.linksToNext && !breakSet.has(i) && (
                 <div className="flex flex-col items-center self-end shrink-0" style={{
                   width: 14, marginBottom: 2,
                   transform: showPitchCurve ? `translateY(${yOffset}px)` : undefined,
@@ -409,8 +424,23 @@ export const SentenceAnnotation: React.FC<Props> = ({
                 </div>
               )}
 
+              {/* Thought-group break: breathe here */}
+              {breakSet.has(i) && i < words.length - 1 && (
+                <div
+                  className="flex flex-col items-center self-end shrink-0"
+                  aria-hidden="true"
+                  title="Pause here"
+                  style={{
+                    width: 24, marginBottom: 3,
+                    transform: showPitchCurve ? `translateY(${yOffset}px)` : undefined,
+                  }}
+                >
+                  <span className="font-mono leading-none" style={{ fontSize: 20, color: 'var(--rose)', opacity: 0.6, lineHeight: 1 }}>/</span>
+                </div>
+              )}
+
               {/* Spacing */}
-              {!w.linksToNext && i < words.length - 1 && (
+              {!w.linksToNext && !breakSet.has(i) && i < words.length - 1 && (
                 <div className="shrink-0" style={{ width: 7 }} />
               )}
             </React.Fragment>

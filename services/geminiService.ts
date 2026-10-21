@@ -10,6 +10,7 @@ import {
   validateLinkedPhonetic
 } from "./phoneticUtils";
 import { generateIntonationMap } from "./intonationUtils";
+import { punctuationBreaks, breaksFromPhrasing } from "../utils/phrasing";
 
 // ── API mode: proxy (production) vs direct (local dev) ──────────────
 // In production (Vercel), calls go through /api/* serverless functions
@@ -76,8 +77,8 @@ export const generateSpeech = async (text: string, slow: boolean = false, voiceN
 
   try {
     const prompt = slow
-      ? `Speak slowly and clearly in standard American English, with deliberate pauses at commas and periods so each clause is easy to follow: ${text}`
-      : `Read in natural standard American English with: proper flap-T (water→wader, better→bedder, "due to"→"due-duh"), rhotic r, natural word linking, AND conversational prosody — brief breath pause at commas, longer pause at periods, NOT a flat monotone: ${text}`;
+      ? `Speak slowly and clearly in standard American English, with deliberate pauses at commas, periods and each "..." (each "..." marks the end of a thought group — pause there, do not trail off), so each chunk is easy to follow: ${text}`
+      : `Read in natural standard American English with: proper flap-T (water→wader, better→bedder, "due to"→"due-duh"), rhotic r, natural word linking within each phrase, AND conversational prosody — brief breath pause at commas, longer pause at periods, NOT a flat monotone. Each "..." marks the end of a thought group: take a short, relaxed breath pause there (about a quarter of a second) — a phrasing pause, NOT a hesitation, and do not let the intonation trail off: ${text}`;
     const response = await ai!.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: prompt }] }],
@@ -532,4 +533,83 @@ export const getWordDefinition = async (
   }
   definitionCache.set(cacheKey, parsed);
   return parsed;
+};
+
+// ── Thought groups (断句) ──────────────────────────────────────────
+// One source of truth for where to breathe: the annotation draws "/" at these
+// breaks and the reference audio pauses at them. Same dual mode as the rest:
+// production → /api/phrase, local dev with VITE_API_KEY → Gemini directly.
+
+// Keep in sync with api/phrase.ts.
+const PHRASE_SYSTEM_INSTRUCTION = `You mark thought groups for an English pronunciation learner.
+Insert " / " where a native American speaker takes a short breath when reading the sentence aloud.
+Rules:
+- Copy EVERY word exactly as given, in the same order, with the same punctuation. Only add slashes.
+- Break at commas and other punctuation inside the sentence.
+- Without punctuation, break before a relative clause (who / which / that), before a long prepositional phrase, or after a long subject.
+- Thought groups are usually 3–7 words. Do not split a sentence of 6 words or fewer unless it has punctuation.
+Example: "Do you recommend it for someone who keeps a skeptical attitude toward medical aesthetics?"
+→ {"phrasing":"Do you recommend it for someone / who keeps a skeptical attitude / toward medical aesthetics?"}
+Return ONLY valid JSON: {"phrasing": "..."}`;
+
+const phraseCache = new Map<string, number[]>();
+const phraseInFlight = new Map<string, Promise<number[]>>();
+// The audio waits on this call, so never let it hold playback hostage.
+const PHRASE_TIMEOUT_MS = 6000;
+
+const fetchPhrasing = async (text: string): Promise<string> => {
+  if (USE_PROXY) {
+    const data = await proxyPost('phrase', { text }, PHRASE_TIMEOUT_MS);
+    return typeof data?.phrasing === 'string' ? data.phrasing : '';
+  }
+  const response = await ai!.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: text,
+    config: {
+      systemInstruction: PHRASE_SYSTEM_INSTRUCTION,
+      responseMimeType: 'application/json',
+      thinkingConfig: { thinkingBudget: 0 },
+    },
+  });
+  const parsed = JSON.parse((response.text || '{}').replace(/```json|```/g, '').trim());
+  return typeof parsed?.phrasing === 'string' ? parsed.phrasing : '';
+};
+
+/** Synchronous peek — breaks already known for this sentence, or null. */
+export const getCachedPhraseBreaks = (text: string): number[] | null =>
+  phraseCache.get(text.trim()) ?? null;
+
+/**
+ * Where to pause in this sentence, as "after word i" indices. Never rejects:
+ * any failure, timeout or model output that rewrites the sentence falls back
+ * to punctuation-only breaks. Concurrent calls for one sentence share a fetch.
+ */
+export const getPhraseBreaks = (text: string): Promise<number[]> => {
+  const key = text.trim();
+  if (!key) return Promise.resolve([]);
+  const cached = phraseCache.get(key);
+  if (cached) return Promise.resolve(cached);
+  const pending = phraseInFlight.get(key);
+  if (pending) return pending;
+
+  const job = (async () => {
+    let breaks = punctuationBreaks(key);
+    let trusted = false;
+    try {
+      const phrasing = await Promise.race([
+        fetchPhrasing(key),
+        new Promise<string>((_, rej) => setTimeout(() => rej(new Error('phrase timeout')), PHRASE_TIMEOUT_MS)),
+      ]);
+      const parsed = breaksFromPhrasing(key, phrasing);
+      if (parsed) { breaks = parsed; trusted = true; }
+    } catch (e) {
+      console.warn('Phrasing unavailable, using punctuation breaks:', e);
+    }
+    // Only cache a real answer, so a transient failure retries next time.
+    if (trusted) phraseCache.set(key, breaks);
+    return breaks;
+  })().finally(() => phraseInFlight.delete(key));
+
+  phraseInFlight.set(key, job);
+  return job;
 };

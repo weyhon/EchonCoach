@@ -15,8 +15,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const prompt = tutor
       ? `Pronounce clearly in standard American English with natural flap-T (e.g., "water" sounds like "wader", "due to" sounds like "due-duh"): "${text}"`
       : slow
-        ? `Speak slowly and clearly in standard American English, with deliberate pauses at commas and periods so each clause is easy to follow: ${text}`
-        : `Read in natural standard American English with: proper flap-T (water→wader, better→bedder, "due to"→"due-duh"), rhotic r, natural word linking, AND conversational prosody — brief breath pause at commas, longer pause at periods, NOT a flat monotone: ${text}`;
+        ? `Speak slowly and clearly in standard American English, with deliberate pauses at commas, periods and each "..." (each "..." marks the end of a thought group — pause there, do not trail off), so each chunk is easy to follow: ${text}`
+        : `Read in natural standard American English with: proper flap-T (water→wader, better→bedder, "due to"→"due-duh"), rhotic r, natural word linking within each phrase, AND conversational prosody — brief breath pause at commas, longer pause at periods, NOT a flat monotone. Each "..." marks the end of a thought group: take a short, relaxed breath pause there (about a quarter of a second) — a phrasing pause, NOT a hesitation, and do not let the intonation trail off: ${text}`;
 
     const callTTS = () => {
       const timeout = new Promise<never>((_, reject) =>
