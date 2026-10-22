@@ -1,9 +1,10 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AnalysisResult, WordAnalysis } from '../types';
 import { IPALegend } from './IPALegend';
 import { WordDetailModal } from './WordDetailModal';
 import { SentenceAnnotation } from './SentenceAnnotation';
+import { wordToPhoneticBlock, blockRangeForWords } from '../utils/ipaAlign';
 
 interface FeedbackCardProps {
   result: AnalysisResult;
@@ -28,6 +29,10 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
   const [karaokeIndex, setKaraokeIndex] = useState<number>(-1);
   const [detailWord, setDetailWord] = useState<WordAnalysis | null>(null);
   const [showTranslation, setShowTranslation] = useState<boolean>(false);
+  // Words the learner just tapped or selected — the matching IPA block above
+  // lights up so they can read the sound of exactly what they picked.
+  const [highlight, setHighlight] = useState<[number, number] | null>(null);
+  const guideRef = useRef<HTMLDivElement>(null);
   const karaokeTimerRef = useRef<number | null>(null);
   const isPlayingNormal = activeAudioSource === 'input_normal';
   const isPlayingSlow = activeAudioSource === 'input_slow';
@@ -37,19 +42,30 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
 
   // Collapse the translation whenever the sentence changes, so each new
   // sentence starts hidden (learners try to understand before revealing).
-  useEffect(() => { setShowTranslation(false); }, [result.speechScript]);
+  useEffect(() => { setShowTranslation(false); setHighlight(null); }, [result.speechScript]);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: React.MouseEvent) => {
+    // A tap on a word sets its own highlight in onWordClick, which runs after
+    // this mouseup — don't let the empty selection below clear it.
+    const onWord = !!(e.target as HTMLElement).closest?.('[data-word-index]');
     setTimeout(() => {
       const sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0) return;
-      const rawText = sel.toString().trim();
+      if (!sel) return;
+      // No range at all and a collapsed one both mean "nothing selected".
+      const rawText = sel.rangeCount ? sel.toString().trim() : '';
       const cleanedText = rawText.replace(/[‿●·↗↘/]/g, '').replace(/\s+/g, ' ').trim();
       if (cleanedText && cleanedText.length > 0) {
         setSelectedText(cleanedText);
+        // Which words does the selection touch? Ask the DOM rather than
+        // re-matching text — a drag that starts mid-word still counts.
+        const hit = Array.from(guideRef.current?.querySelectorAll<HTMLElement>('[data-word-index]') ?? [])
+          .filter(el => sel.containsNode(el, true))
+          .map(el => Number(el.dataset.wordIndex));
+        setHighlight(hit.length ? [Math.min(...hit), Math.max(...hit)] : null);
       } else {
         if (document.activeElement?.tagName !== 'BUTTON') {
            setSelectedText(null);
+           if (!onWord) setHighlight(null);
         }
       }
     }, 50);
@@ -57,6 +73,18 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
 
   // Karaoke highlight effect — advance word index during TTS playback
   const words = (result.fullLinkedSentence || result.speechScript || "").trim().split(/\s+/);
+
+  // IPA is grouped by linked chunk; map each sentence word to its chunk.
+  // null when the sentence and IPA don't reconcile → nothing is highlighted.
+  const phoneticBlocks = useMemo(
+    () => (result.fullLinkedPhonetic || '').trim().split(/\s+/).filter(Boolean),
+    [result.fullLinkedPhonetic],
+  );
+  const wordToBlock = useMemo(
+    () => wordToPhoneticBlock(result.speechScript || '', result.fullLinkedSentence, result.fullLinkedPhonetic),
+    [result.speechScript, result.fullLinkedSentence, result.fullLinkedPhonetic],
+  );
+  const ipaRange = highlight ? blockRangeForWords(wordToBlock, highlight[0], highlight[1]) : null;
   useEffect(() => {
     if (!isKaraokePlaying) {
       setKaraokeIndex(-1);
@@ -111,7 +139,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
       style={{ background: 'transparent', borderTop: '1px solid var(--text-primary)' }}>
 
       {/* === Unified Pronunciation Guide === */}
-      <div className="px-1 pt-5 pb-4 border-b animate-section stagger-1 relative" style={{ borderColor: 'var(--border)' }} onMouseUp={handleMouseUp}>
+      <div ref={guideRef} className="px-1 pt-5 pb-4 border-b animate-section stagger-1 relative" style={{ borderColor: 'var(--border)' }} onMouseUp={handleMouseUp}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="label-micro" style={{ color: 'var(--text-muted)', margin: 0 }}>
             PRONUNCIATION GUIDE
@@ -135,11 +163,26 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
           <div className="flex justify-center mb-3">
             <div className="px-4 py-1">
               <p className="text-[12px] md:text-[13px] font-medium tracking-[0.08em] font-mono select-none pointer-events-none text-center leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                /{result.fullLinkedPhonetic.split('ˈ').map((part, i) =>
-                  i === 0
-                    ? <React.Fragment key={i}>{part}</React.Fragment>
-                    : <React.Fragment key={i}><span className="font-bold" style={{ color: 'var(--pink)' }}>ˈ</span>{part}</React.Fragment>
-                )}/
+                /{phoneticBlocks.map((block, b) => {
+                  const on = !!ipaRange && b >= ipaRange[0] && b <= ipaRange[1];
+                  return (
+                    <React.Fragment key={b}>
+                      {b > 0 && ' '}
+                      <span
+                        className="transition-colors duration-200"
+                        style={on
+                          ? { color: 'var(--rose)', background: 'var(--rose-50)', boxShadow: '0 0 0 3px var(--rose-50)', borderRadius: 2 }
+                          : undefined}
+                      >
+                        {block.split('ˈ').map((part, i) =>
+                          i === 0
+                            ? <React.Fragment key={i}>{part}</React.Fragment>
+                            : <React.Fragment key={i}><span className="font-bold" style={{ color: 'var(--pink)' }}>ˈ</span>{part}</React.Fragment>
+                        )}
+                      </span>
+                    </React.Fragment>
+                  );
+                })}/
               </p>
             </div>
           </div>
@@ -149,7 +192,11 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
         <SentenceAnnotation
           text={result.speechScript || ''}
           wordBreakdown={result.wordBreakdown}
-          onWordClick={(word) => onPlayTutor(word)}
+          onWordClick={(word, index) => {
+            if (index !== undefined) setHighlight([index, index]);
+            onPlayTutor(word);
+          }}
+          highlightRange={highlight}
           karaokeIndex={karaokeIndex}
           isKaraokePlaying={isKaraokePlaying}
           showPitchCurve

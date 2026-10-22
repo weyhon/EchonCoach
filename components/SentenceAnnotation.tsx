@@ -46,7 +46,10 @@ const wordColor = (status?: WordAnalysis['status']): string => {
 interface Props {
   text: string;
   wordBreakdown?: WordAnalysis[];
-  onWordClick?: (word: string) => void;
+  /** index = position in the sentence's whitespace-split words (absent on popover replay) */
+  onWordClick?: (word: string, index?: number) => void;
+  /** Inclusive word range to mark as matching the highlighted IPA above. */
+  highlightRange?: [number, number] | null;
   karaokeIndex?: number;
   isKaraokePlaying?: boolean;
   showPitchCurve?: boolean;
@@ -124,7 +127,7 @@ const WORD_PITCH_RANGE = 12;
 const CURVE_EXTRA = 14;
 
 export const SentenceAnnotation: React.FC<Props> = ({
-  text, wordBreakdown, onWordClick, karaokeIndex = -1, isKaraokePlaying = false,
+  text, wordBreakdown, onWordClick, karaokeIndex = -1, isKaraokePlaying = false, highlightRange = null,
   showPitchCurve = false,
 }) => {
   const words = buildAnnotationWords(text, wordBreakdown);
@@ -277,7 +280,7 @@ export const SentenceAnnotation: React.FC<Props> = ({
   return (
     <div
       ref={containerRef}
-      className="select-none relative"
+      className="relative"
       style={{
         lineHeight: 1,
         paddingTop: showPitchCurve ? 30 : 0,
@@ -359,7 +362,7 @@ export const SentenceAnnotation: React.FC<Props> = ({
               >
                 {/* IPA + stress + intonation — hidden when pitch curve is active (curve replaces them visually) */}
                 {!showPitchCurve && (
-                  <div className="flex items-center justify-center gap-0.5 h-5">
+                  <div className="flex items-center justify-center gap-0.5 h-5 select-none">
                     {w.isStressed && !isKaraokePlaying && (
                       <span className="font-bold leading-none" style={{ fontSize: 9, color: 'var(--rose)' }}>●</span>
                     )}
@@ -381,6 +384,7 @@ export const SentenceAnnotation: React.FC<Props> = ({
                 )}
                 {/* Word */}
                 <span
+                  data-word-index={i}
                   role={onWordClick ? 'button' : undefined}
                   tabIndex={onWordClick ? 0 : undefined}
                   aria-label={onWordClick ? `Hear and define "${w.word.replace(/[?.!,;:'"()[\]{}]/g, '')}"` : undefined}
@@ -392,17 +396,21 @@ export const SentenceAnnotation: React.FC<Props> = ({
                     borderBottom: w.isStressed && !isKaraokePlaying && !showPitchCurve ? '2px solid var(--rose)' : undefined,
                     paddingBottom: w.isStressed && !isKaraokePlaying && !showPitchCurve ? 2 : 0,
                     letterSpacing: '-0.01em',
+                    // Same mark as the IPA block above, so the pair reads as one.
+                    ...(highlightRange && i >= highlightRange[0] && i <= highlightRange[1]
+                      ? { background: 'var(--rose-50)', boxShadow: '0 0 0 3px var(--rose-50)', borderRadius: 2 }
+                      : null),
                   }}
                   onClick={onWordClick ? (e) => {
                     const clean = w.word.replace(/[?.!,;:'"()[\]{}]/g, '');
-                    onWordClick(clean);                                   // 现有行为：播放发音
+                    onWordClick(clean, i);                                // 现有行为：播放发音
                     openPopover(clean, e.currentTarget as HTMLElement);   // 新增：弹出释义卡片
                   } : undefined}
                   onKeyDown={onWordClick ? (e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
                       const clean = w.word.replace(/[?.!,;:'"()[\]{}]/g, '');
-                      onWordClick(clean);
+                      onWordClick(clean, i);
                       openPopover(clean, e.currentTarget as HTMLElement);
                     }
                   } : undefined}
@@ -415,7 +423,7 @@ export const SentenceAnnotation: React.FC<Props> = ({
               {/* Linking arc — never across a thought-group break: you
                   breathe there, so the sounds do not run together */}
               {w.linksToNext && !breakSet.has(i) && (
-                <div className="flex flex-col items-center self-end shrink-0" style={{
+                <div className="flex flex-col items-center self-end shrink-0 select-none" style={{
                   width: 14, marginBottom: 2,
                   transform: showPitchCurve ? `translateY(${yOffset}px)` : undefined,
                 }}>
@@ -427,7 +435,7 @@ export const SentenceAnnotation: React.FC<Props> = ({
               {/* Thought-group break: breathe here */}
               {breakSet.has(i) && i < words.length - 1 && (
                 <div
-                  className="flex flex-col items-center self-end shrink-0"
+                  className="flex flex-col items-center self-end shrink-0 select-none"
                   aria-hidden="true"
                   title="Pause here"
                   style={{
